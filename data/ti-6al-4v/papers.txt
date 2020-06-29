@@ -1,0 +1,294 @@
+Babu and Lindgren 2013 performed QS compression with chemistry listed
+20C through 900C at 100C increments at rates of 0.001/s, 0.01/s, 1/s
++ 50C increments above 900C at rates 0.001/s, 0.01/s, 0.1/s, 1/s
+
+
+Ti64 Taylor cylinder McDonald, Gray, SCCM, 2007
+https://aip.scitation.org/doi/pdf/10.1063/1.2833190?class=pdf
+quotes Razorenov about oxygen affecting HEL
+cites Rosenberg, Z, J. Phys D: Appl. Phys. 14, 261-266 1981
+https://iopscience.iop.org/article/10.1088/0022-3727/14/2/018/pdf
+
+Ti64 Zerilli Armstrong 1996
+https://aip.scitation.org/doi/pdf/10.1063/1.50713?class=pdf
+QS and SHPB?
+specifies adiabatic heating important for rates greater than 100/s
+DJW - Was able to get referenced Follansbee and Gray 1989 data referenced in this paper,
+Ogawa Nojima 1988 data is pretty difficult to pull from this paper and the referenced paper
+is in Japanese and of poor copy quality making it difficult to extract data.
+
+Ti64 SHPB Seo et al 2005
+no explicit wt% assay given?  It specifies alloy Ti-6Al-4V, AMS 4928N HEAT 579L
+
+AMS 4928N Standard is:
+Element, min, max
+Al, 5.50, 6.75
+V, 3.50, 4.50
+Fe, -, 0.30
+O, -, 0.20
+C, -, 0.10
+N, -, 0.05
+H, -, 0.0125
+Y, -, 0.005
+Resid each, -, 0.10
+Resid total, -, 0.40
+Ti, Bal.
+
+Cannot find specifications associated with heat treatment HEAT 579L
+
+Fig 15
+1400/s, 293K, 473K, 673K, 873K, 1073K, 1273K
+
+Fig 17
+293K, 700/s
+293K, 1400/s
+
+Chen et al 2015 lots of data
+https://www.sciencedirect.com/science/article/pii/S0264127515003986
+Figures have 293K, 373K, 573K, 773K, 973K, 1173K
+Each temp has 0.0001/s, 0.01/s, 2500/s, 4000/s, 7500/s, 10,000/s
+
+Tabei et al 2017 lots of data!
+** DJW Already extracted data from other references, NO NEW DATA
+fig 5
+from khan et al 2007
+a, all 0.0001/s
+233K, 296K, 422K, 588K
+b, all 298K
+0.0001/s, 0.001/s, 1/s, 2926/s
+
+Fig 4
+strain, MPa
+0  , 0    at 140, 624
+0.3, 1800 at 851, 105
+data set is 2000/s at 298K
+ 141  308
+ 142  294
+ 149  280
+ 161  265
+ 198  247
+ 238  234
+ 319  220
+ 411  206
+ 513  194
+ 616  184
+ 719  176
+ 751  175
+
+Fig 5
+strain, MPa
+0   , 0    at  108, 556
+0.25, 1600 at  805, 82
+T=298K, 2926/s
+ 126  154
+ 154  152
+ 200  146
+ 241  143
+ 292  138
+ 330  136
+ 370  136
+ 406  134
+ 454  132
+ 493  132
+ 528  131
+ 574  132
+ 619  131
+ 656  130
+ 694  130
+ 723  132
+ 744  133
+
+fig 7
+from lee and lin 1998
+all 2000/s
+298K, 973K, 1073K, 1173K, 1273K, 1373K
+
+
+Nemat-Nasser LOTS OF DATA!
+have wt% of Al, V, Fe, O, C, N, H, Y
+
+fig 1
+a - commercial
+77K, 1900/s
+296K, 1900/s
+598K, 2700/s
+798K, 3100/s
+998K, 3700/s
+b - commercial
+296K, 6000/s
+296K, 2000/s
+296K, 0.001/s
+598K, 0.001/s
+c - RS-HIP
+all 0.01/s
+296K, 500K, 600K, 700K, 800K, 1000K
+d - RS-MIL-HIP
+296K, 2000/s
+296K, 0.01/s
+600K, 0.01/s
+800K, 0.01/s
+296K, 2000/s
+296K, 5100/s
+
+fig 6
+a - commercial? - 598K, 2000/s; 660K, 2000/s
+d - commercial  - 296K, 2000/s; 598K, 2000/s
+
+fig 7
+all commercial?
+a
+598K, 2000/s
+598K, 0.001/s
+d
+77K, 1900/s
+296K, 1900/s
+598K, 2700/s
+798K, 3100/s
+998K, 3700/s
+
+fig 8
+a
+commercial 0.001/s, 2000/s
+b
+commercial 2000/s
+c
+RS-HIP     0.01/s, 2400/s
+d
+RS-MIL-HIP 0.01/s, 2000/s
+
+fig 9 RT
+commercial 6000/s
+RS-HIP     6700/s
+RS-ML-HIP  5100/s
+
+Nemat-Nasser Fig 1 data
+a-Ti64
+0  ,    0 MPa at 192, 1264
+0.7, 2400 MPa    712,  924
+296K, 1900/s curve follows
+ 194 1241
+ 196 1146
+ 199 1092
+ 200 1076
+ 202 1074
+ 206 1077
+ 211 1072
+ 217 1072
+ 219 1071
+ 224 1072
+ 230 1070
+ 236 1074
+ 244 1070
+ 249 1070
+ 255 1068
+ 262 1069
+ 267 1068
+ 270 1066
+ 276 1066
+ 283 1064
+ 290 1062
+ 300 1060
+ 308 1059
+ 314 1058
+ 322 1056
+ 328 1055
+ 336 1054
+ 344 1053
+ 354 1052
+ 364 1051
+ 374 1050
+ 382 1050
+ 392 1050
+ 400 1050
+
+d-RS-MIL-HIP
+0  ,    0 MPa is 833,1705
+0.4, 2400 MPa is 1355,1362
+296K, 2000/s curve follows,
+cut at strain 0.2:
+ 834 1694
+ 839 1682
+ 840 1670
+ 842 1659
+ 843 1648
+ 844 1636
+ 844 1625
+ 845 1614
+ 845 1602
+ 846 1590
+ 847 1579
+ 848 1568
+ 849 1556
+ 851 1544
+ 852 1533
+ 854 1522
+ 856 1510
+ 858 1499
+ 862 1489
+ 872 1484
+ 881 1482
+ 890 1480
+ 901 1478
+ 912 1476
+ 921 1476
+ 932 1475
+ 947 1474
+ 958 1473
+ 967 1473
+ 982 1474
+ 996 1473
+1009 1472
+1020 1472
+1030 1471
+1042 1471
+1054 1470
+1062 1470
+1071 1470
+1079 1470
+1091 1470
+1110 1469
+
+Fig 8c data for 2400/s on Ti64-HIP
+0,0 is at 196, 1704
+0.4, 2000 MPa is at 722, 1357
+T=296K, 2400/s
+ 198 1694
+ 200 1684
+ 203 1660
+ 209 1608
+ 210 1584
+ 214 1547
+ 216 1518
+ 218 1498
+ 222 1476
+ 226 1470
+ 233 1472
+ 238 1472
+ 242 1468
+ 248 1468
+ 254 1466
+ 265 1464
+ 272 1462
+ 279 1461
+ 286 1460
+ 290 1459
+ 301 1459
+ 306 1458
+ 313 1456
+ 324 1454
+ 334 1452
+ 342 1452
+ 351 1453
+ 358 1453
+ 368 1452
+ 384 1452
+ 398 1450
+ 406 1450
+ 416 1450
+ 429 1448
+ 440 1450
+ 445 1451
+ 452 1448
+ 459 1449
+ 468 1450
+ 480 1450

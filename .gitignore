@@ -1,0 +1,13 @@
+/code/*.txt
+*.pyc
+.Rproj.user
+*.DS_Store
+*.Rhistory
+*.rda
+/DJWLocal
+*~$*
+/calibration/**/*.o
+/calibration/**/*.so
+/calibration/**/__pycache__/*
+/calibration/**/build/*
+/calibration/**/*.html

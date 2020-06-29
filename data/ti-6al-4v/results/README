@@ -1,0 +1,17 @@
+Explanation of Bayesian model calibration results for PTW using various ti-6al-4v data
+
+
+Different datasets are used for calibration.  The possible datasets are given in datasets.csv. 
+Posterior samples are given in posterior_samples.csv
+
+## datasets.csv ##
+label - numeric label for dataset (used in posterior_samples.csv)
+paper - paper where data came from
+temp, strainRate, chem_*,... - details of the experiment and chemical composition of the material
+
+## posterior_samples.csv ##
+columns 1:10 - PTW parameters
+columns 11+ - binary for whether dataset was used in the calibration.  
+    For instance, if useData_12 is 1, the dataset with label 12 from datasets.csv was used for this calibration.
+rows - posterior samples (columns 11+ determine 
+    the data used for the calibration, and there are many samples taken from the posterior for each calibration)

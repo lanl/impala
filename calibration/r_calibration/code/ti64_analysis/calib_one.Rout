@@ -1,0 +1,1998 @@
+
+R version 3.6.1 (2019-07-05) -- "Action of the Toes"
+Copyright (C) 2019 The R Foundation for Statistical Computing
+Platform: x86_64-apple-darwin15.6.0 (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> emax   = 0.65
+> Nhist  = 100
+> source('~/git/immpala/code/strength_setup_ptw.R')
+> 
+> calib<-function(experiment,nchains=1,nmcmc=3000,nburn=2000){
++   
++   ###################################
++   ## get data
++   
++   dat.header<-list() # header data
++   dat.chem<-list() # chemistry data
++   dat.ss<-list() # stress strain data
++   
++   dirs<-list.dirs('~/git/immpala/ti-6al-4v/Data/',recursive = F)
++   for(i in 1:length(dirs)){
++     dat.ss[[i]]<-dat.header[[i]]<-dat.chem[[i]]<-list()
++     ff<-list.files(dirs[i])
++     csv.files<-which(substr(ff,nchar(ff)-3,nchar(ff))=='.csv')
++     for(j in 1:length(csv.files)){
++       dat.ss[[i]][[j]]<-read.csv(paste0(dirs[i],'/',ff[csv.files[j]]),skip=17,colClasses=rep("numeric",2))
++       dat.chem[[i]][[j]]<-read.csv(paste0(dirs[i],'/',ff[csv.files[j]]),head=F,skip=5,nrows=11,colClasses=rep("character",2))
++       dat.header[[i]][[j]]<-read.csv(paste0(dirs[i],'/',ff[csv.files[j]]),head=F,nrows=3,colClasses="character")
++     }
++   }
++   
++   dat<-list()
++   for(i in 1:length(dat.ss)){
++     dat[[i]]<-list()
++     for(j in 1:length(dat.ss[[i]])){
++       dat[[i]][[j]]<-list()
++       dat[[i]][[j]]$strainType<-substr(names(dat.ss[[i]][[j]])[1],1,1) # true or plastic
++       dat[[i]][[j]]$paper<-strsplit(dat.header[[i]][[j]][1,],' ')[[1]][2]
++       dat[[i]][[j]]$temp<-as.numeric(strsplit(dat.header[[i]][[j]][2,],' ')[[1]][3])
++       dat[[i]][[j]]$strainRate<-as.numeric(strsplit(dat.header[[i]][[j]][3,],' ')[[1]][4])
++       dat[[i]][[j]]$ss<-dat.ss[[i]][[j]]
++       dat[[i]][[j]]$chem<-dat.chem[[i]][[j]]
++       suppressWarnings(class(dat[[i]][[j]]$chem[,2])<-'numeric')
++     }
++   }
++   
++   
++   dat.info.true<-dat.info.plastic<-data.frame(paper=character(),temp=numeric(),strainRate=numeric(),chem_Y=numeric(),chem_N=numeric(),chem_C=numeric(),chem_H=numeric(),chem_Fe=numeric(),chem_0=numeric(),chem_Al=numeric(),chem_V=numeric(),chem_Mn=numeric(),chem_Si=numeric(),stringsAsFactors=F)
++   dat.true<-dat.plastic<-list()
++   k<-h<-0
++   for(i in 1:length(dat)){
++     for(j in 1:length(dat[[i]])){
++       if(dat[[i]][[j]]$strainType=='T'){
++         k<-k+1
++         dat.true[[k]]<-dat[[i]][[j]]$ss
++         dat.info.true[k,]<-c(dat[[i]][[j]]$paper,dat[[i]][[j]]$temp,dat[[i]][[j]]$strainRate,dat[[i]][[j]]$chem[-1,2])
++       } else{
++         h<-h+1
++         dat.plastic[[h]]<-dat[[i]][[j]]$ss
++         dat.info.plastic[h,]<-c(dat[[i]][[j]]$paper,dat[[i]][[j]]$temp,dat[[i]][[j]]$strainRate,dat[[i]][[j]]$chem[-1,2])
++       }
++     }
++   }
++   
++ 
++   
++   
++   
++   
++   model='PTW'
++   x.rr<-matrix(c(.001,.1,
++                  0,10,
++                  .001,.05,
++                  .001,.05,
++                  0,.05,
++                  0,.05, 
++                  0,.1, 
++                  0,1,
++                  .01,1,
++                  10^-6,10^-1,
++                  0,1 # test
++   ),ncol=2,byrow=T)
++   p=nrow(x.rr)
++   
++ 
++   
++   unstandardize<-function(u){
++     u*(x.rr[,2]-x.rr[,1])+x.rr[,1]
++   }
++   
++   dat.calib<-dat.plastic[[experiment]]
++   dat.calib[,2]<-dat.calib[,2]*1e-5
++   temp.calib<-as.numeric(dat.info.plastic$temp[experiment])
++   strainRate.calib<-as.numeric(dat.info.plastic$strainRate[experiment])
++   
++   
++   ###################################
++   ## functions
++   
++   astep.mat<-function(sz.mat,ct.mat){
++     for(s in 1:ncol(sz.mat)){
++       sz.mat[,s]<-astep(sz.mat[,s],ct.mat[,s])
++     }
++     sz.mat
++   }
++   
++   astep<-function(sz,ct){
++     for(s in 1:length(sz)){
++       if(ct[s]<20)
++         sz[s]<-sz[s]*.5
++       if(ct[s]>30)
++         sz[s]<-sz[s]*1.1
++     }
++     return(sz)
++   }
++   
++   
++   
++   get.se<-function(uu){
++     #se<-NA
++     #  unlist(mclapply(1:length(dat.plastic),function(i){
++     #for(i in 1:length(dat.plastic)){
++     mm<-f(unstandardize(uu),temp.calib,strainRate.calib)
++     mm.dat<-approx(mm[,1],mm[,2],xout=dat.calib[,1],rule=c(2,2))$y
++     sum((mm.dat-dat.calib[,2])^2)
++     # },mc.cores=4))
++   }
++   
++   # R<-exp(-as.matrix(dist(dat.calib[,1]))^2/.01^2)+diag(length(dat.calib[,1]))*1e-10
++   # R[1:10,1:10]
++   # Rinv<-solve(R)
++   # get.se<-function(uu){
++   #   #se<-NA
++   #   #  unlist(mclapply(1:length(dat.plastic),function(i){
++   #   #for(i in 1:length(dat.plastic)){
++   #   mm<-f(unstandardize(uu),temp.calib,strainRate.calib)
++   #   mm.dat<-approx(mm[,1],mm[,2],xout=dat.calib[,1],rule=c(2,2))$y
++   #   c(t(mm.dat-dat.calib[,2])%*%Rinv%*%(mm.dat-dat.calib[,2]))
++   #   # },mc.cores=4))
++   # }
++   
++   system.time(aa<-get.se(rep(.5,11)))
++   
++   get.alpha<-function(uu,s2.hop,se.hop.curr,itemp){
++     se.hop.cand<-get.se(uu)
++     alpha<- -.5*(sum(se.hop.cand/s2.hop) - sum(se.hop.curr/s2.hop) )*itemp
++     return(list(alpha=alpha,se.hop=se.hop.cand))
++   }
++   
++   
++   constraints<-function(model,uu){
++     if(any(uu<0 | uu>1))
++       return(T)
++     
++     uu<-unstandardize(uu)
++     if(model=='PTW'){
++       if(uu[4]>uu[3] | uu[5]>uu[3] | uu[5]<max(uu[6],0) | uu[6]>min(uu[4],uu[5]) | uu[7]<uu[3])#if(uu[4]>uu[3] | uu[7]<uu[8] | uu[7]>uu[3] | uu[8]>min(uu[7],uu[4]) )#| uu[9]<uu[3] | uu[10]<uu[11])
++         return(T)
++     }
++     return(F)
++   }
++   
++   ###################################
++   ## MCMC
++   
++   mcmc<-function(){
++     require(BASS)
++     require(mnormt)
++     
++     itemp.ladder<-1/(1.5^(0:8))#c(1,.8,.6,.4,.2,.1,.05,1/20)
++     start.temper=100
++     
++     ntemp<-ntemps<-length(itemp.ladder)
++     
++     u<-array(dim=c(nmcmc,p,ntemp))
++     
++     for(tt in 1:ntemps){
++       start.u<-runif(p)
++       cont<-constraints(model,start.u)
++       while(cont){
++         start.u<-runif(p)
++         cont<-constraints(model,start.u)
++       }
++       u[1,,tt]<-start.u
++     }
++     
++     n<-length(dat.plastic[[experiment]][,1])
++     n.hop=1
++     s2.hop<-matrix(nrow=nmcmc,ncol=tt)
++     se.hop<-matrix(nrow=nmcmc,ncol=tt)
++     
++     a.hop<-rep(0,n.hop)
++     b.hop<-rep(0,n.hop)
++     
++     # # hop variance: mean: .0003, sd=.0003 a<-100, b<-1e-5
++     # hist(sqrt(1/rgamma(100000,8,1e-7)))
++     a.hop<-rep(8,n.hop)
++     b.hop<-rep(1e-7,n.hop)
++     
++     for(tt in 1:ntemp){
++       cand<-get.alpha(t(u[1,,tt]),rep(1,n.hop),rep(1,n.hop),itemp.ladder[tt])
++       se.hop[1,tt]<-cand$se.hop
++     }
++     
++     
++     stepsize<-matrix(.5,nrow=p,ncol=ntemps)
++     
++     count<-count100<-matrix(0,nrow=p,ncol=ntemps)
++     count.swap<-0
++     swap.vals<-matrix(nrow=nmcmc,ncol=2)
++     
++     lpost<-function(s2.hop,se.hop){
++       (-n/2-a.hop-1)*log(s2.hop) +
++         -1/s2.hop*(se.hop/2 + b.hop)
++     }
++     
++     for(i in 2:nmcmc){
++       
++       for(tt in 1:ntemps)
++         s2.hop[i,tt]<-BASS:::rigammaTemper(1,n/2+a.hop,b.hop+.5*sum(se.hop[i-1,tt]),itemper = itemp.ladder[tt])
++       
++       u[i,,]<-u[i-1,,]
++       se.hop[i,]<-se.hop[i-1,]
++       
++       
++       for(tt in 1:ntemps){
++         
++         for(jj in 1:p){
++           u.cand<-u[i,,tt]
++           u.cand[jj]<-runif(1,max(u.cand[jj]-stepsize[jj,tt],0),min(u.cand[jj]+stepsize[jj,tt],1))
++           
++           if(constraints("PTW",u.cand))
++             alpha<- -9999
++           else{
++             cand<-get.alpha(t(u.cand),s2.hop[i,tt],se.hop[i-1,tt],itemp.ladder[tt])
++             alpha<-cand$alpha
++             if(is.na(alpha))
++               alpha<- -9999
++           }
++           
++           if(log(runif(1)) < alpha){
++             u[i,,tt]<-u.cand
++             se.hop[i,tt]<-cand$se.hop
++             count[jj,tt]<-count[jj,tt]+1
++             count100[jj,tt]<-count100[jj,tt]+1
++           }
++         }
++         
++       }
++       
++       if(i>start.temper & ntemp>1){
++         #browser()
++         swap<-sample(1:ntemp,size=2) # candidate swap
++         alpha<-(itemp.ladder[swap[2]]-itemp.ladder[swap[1]])*(lpost(s2.hop[i,swap[1]],se.hop[i,swap[1]])-lpost(s2.hop[i,swap[2]],se.hop[i,swap[2]]))
++         if(log(runif(1))<alpha){ # swap states
++           temp<-u[i,,swap[1]]
++           u[i,,swap[1]]<-u[i,,swap[2]]
++           u[i,,swap[2]]<-temp
++           
++           temp<-se.hop[i,swap[1]]
++           se.hop[i,swap[1]]<-se.hop[i,swap[2]]
++           se.hop[i,swap[2]]<-temp
++           
++           temp<-s2.hop[i,swap[1]]
++           s2.hop[i,swap[1]]<-s2.hop[i,swap[2]]
++           s2.hop[i,swap[2]]<-temp
++           
++           
++           count.swap<-count.swap+1
++           swap.vals[i,]<-sort(swap)
++         }
++       }
++       
++       
++       
++       if(i%%100==0){
++         if(i<nburn & i>100)
++           stepsize<-astep(stepsize,count100)
++         cat('it:',i,'acc:',count.swap,timestamp(quiet=T),'\n')
++         count100<-matrix(0,nrow=p,ncol=ntemps)
++       }
++       
++       
++     }
++     
++     return(list(u=u,count=count,s2.hop=s2.hop,se.hop=se.hop,count=count,count.swap=count.swap,swap.vals=swap.vals))
++   }
++   
++ 
++   
++   library(parallel)
++   ps<-mclapply(1:nchains,function(x) mcmc(),mc.cores = 1)
++   
++   save(ps,experiment,file = paste0('ps_',experiment,'.rda'))
++   
++   #return(list(ps=ps,experiment=experiment))
++   return(NULL)
++   
++ }
+> 
+> #aa=calib(1,nchains=2)
+> #aa<-mclapply(1:nexp,function(i) calib(i,nchains=2),mc.cores = 2,mc.preschedule = F)
+> 
+> library(parallel)
+> 
+> nexp<-174
+> aa<-mclapply(1:nexp,function(i) calib(i,nchains=1),mc.cores = 20,mc.preschedule = F)
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: BASS
+Loading required package: BASS
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: mnormt
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: BASS
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: mnormt
+Loading required package: mnormt
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: mnormt
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:43:18 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:43:20 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:43:20 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:43:21 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:43:21 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:43:21 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:43:21 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:43:21 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:43:21 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:43:21 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:43:21 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:43:22 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:43:22 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:43:22 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:43:23 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:43:23 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:43:23 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:43:24 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:43:24 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:43:25 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 200 acc: 9 ##------ Wed Mar 25 16:45:52 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:45:55 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:45:58 2020 ------## 
+it: 200 acc: 9 ##------ Wed Mar 25 16:45:58 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:45:58 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:46:00 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:46:01 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:46:01 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:46:01 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:46:05 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:46:05 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:46:07 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:46:10 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:46:11 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:46:11 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:46:12 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:46:16 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:46:20 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:46:30 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 100 acc: 0 ##------ Wed Mar 25 16:46:33 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 300 acc: 15 ##------ Wed Mar 25 16:48:29 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:48:33 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:48:36 2020 ------## 
+it: 300 acc: 20 ##------ Wed Mar 25 16:48:37 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:48:42 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:48:44 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:48:45 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:48:45 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:48:47 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:48:47 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:48:48 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:48:49 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:48:50 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:48:50 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:48:51 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 100 acc: 0 ##------ Wed Mar 25 16:48:53 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 100 acc: 0 ##------ Wed Mar 25 16:49:04 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:49:04 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 100 acc: 0 ##------ Wed Mar 25 16:49:12 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 100 acc: 0 ##------ Wed Mar 25 16:49:28 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 100 acc: 0 ##------ Wed Mar 25 16:51:10 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:51:14 2020 ------## 
+it: 400 acc: 23 ##------ Wed Mar 25 16:51:15 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:51:23 2020 ------## 
+it: 400 acc: 35 ##------ Wed Mar 25 16:51:23 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:51:23 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:51:25 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:51:26 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:51:29 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:51:30 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:51:30 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:51:31 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:51:33 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:51:35 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:51:36 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:51:37 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:51:44 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:51:48 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:51:49 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 100 acc: 0 ##------ Wed Mar 25 16:51:58 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 100 acc: 0 ##------ Wed Mar 25 16:53:52 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:53:56 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 500 acc: 29 ##------ Wed Mar 25 16:54:05 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:54:05 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:54:05 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:54:06 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:54:08 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:54:10 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:54:10 2020 ------## 
+it: 500 acc: 48 ##------ Wed Mar 25 16:54:11 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:54:12 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:54:13 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:54:14 2020 ------## 
+Loading required package: BASS
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:54:16 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:54:18 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:54:31 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:54:34 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:54:34 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:54:37 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:54:53 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 100 acc: 0 ##------ Wed Mar 25 16:56:41 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:56:43 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:56:43 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:56:44 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:56:45 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:56:49 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:56:53 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:56:54 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:56:54 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:56:55 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:56:55 2020 ------## 
+it: 600 acc: 42 ##------ Wed Mar 25 16:56:55 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 600 acc: 58 ##------ Wed Mar 25 16:56:56 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:57:00 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:57:00 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 200 acc: 10 ##------ Wed Mar 25 16:57:15 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:57:18 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+it: 100 acc: 0 ##------ Wed Mar 25 16:57:24 2020 ------## 
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:57:31 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:57:40 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 100 acc: 0 ##------ Wed Mar 25 16:59:21 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:59:25 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:59:25 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:59:28 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:59:30 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:59:31 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 16:59:35 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 100 acc: 0 ##------ Wed Mar 25 16:59:40 2020 ------## 
+it: 700 acc: 73 ##------ Wed Mar 25 16:59:42 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 700 acc: 59 ##------ Wed Mar 25 16:59:44 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:59:45 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 100 acc: 0 ##------ Wed Mar 25 16:59:47 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:59:48 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:59:50 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 100 acc: 0 ##------ Wed Mar 25 16:59:54 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 16:59:59 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 300 acc: 30 ##------ Wed Mar 25 16:59:59 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 17:00:05 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 17:00:15 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 17:00:15 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 100 acc: 0 ##------ Wed Mar 25 17:02:06 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 17:02:06 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 17:02:11 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 17:02:13 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 17:02:19 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 17:02:21 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 100 acc: 0 ##------ Wed Mar 25 17:02:22 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 100 acc: 0 ##------ Wed Mar 25 17:02:24 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+it: 800 acc: 88 ##------ Wed Mar 25 17:02:27 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 17:02:29 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 17:02:29 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 17:02:32 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 800 acc: 70 ##------ Wed Mar 25 17:02:32 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 17:02:34 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 17:02:41 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 100 acc: 0 ##------ Wed Mar 25 17:02:44 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 400 acc: 44 ##------ Wed Mar 25 17:02:48 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 17:02:50 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 17:02:51 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 17:03:06 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 100 acc: 0 ##------ Wed Mar 25 17:04:45 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 17:04:48 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 17:04:57 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 17:05:01 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 17:05:02 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 17:05:02 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 17:05:03 2020 ------## 
+it: 200 acc: 14 ##------ Wed Mar 25 17:05:05 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 17:05:05 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 17:05:06 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 17:05:13 2020 ------## 
+it: 900 acc: 103 ##------ Wed Mar 25 17:05:17 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 17:05:18 2020 ------## 
+it: 900 acc: 80 ##------ Wed Mar 25 17:05:19 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 17:05:19 2020 ------## 
+it: 200 acc: 17 ##------ Wed Mar 25 17:05:23 2020 ------## 
+it: 200 acc: 16 ##------ Wed Mar 25 17:05:26 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 17:05:29 2020 ------## 
+it: 500 acc: 62 ##------ Wed Mar 25 17:05:33 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 17:05:43 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 200 acc: 20 ##------ Wed Mar 25 17:07:17 2020 ------## 
+it: 200 acc: 18 ##------ Wed Mar 25 17:07:19 2020 ------## 
+it: 200 acc: 18 ##------ Wed Mar 25 17:07:36 2020 ------## 
+it: 200 acc: 15 ##------ Wed Mar 25 17:07:37 2020 ------## 
+it: 200 acc: 9 ##------ Wed Mar 25 17:07:38 2020 ------## 
+it: 200 acc: 13 ##------ Wed Mar 25 17:07:39 2020 ------## 
+it: 200 acc: 18 ##------ Wed Mar 25 17:07:39 2020 ------## 
+it: 200 acc: 23 ##------ Wed Mar 25 17:07:42 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 300 acc: 27 ##------ Wed Mar 25 17:07:45 2020 ------## 
+it: 200 acc: 13 ##------ Wed Mar 25 17:07:48 2020 ------## 
+it: 200 acc: 9 ##------ Wed Mar 25 17:07:49 2020 ------## 
+it: 200 acc: 17 ##------ Wed Mar 25 17:07:50 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 17:07:51 2020 ------## 
+it: 200 acc: 11 ##------ Wed Mar 25 17:07:57 2020 ------## 
+it: 1000 acc: 93 ##------ Wed Mar 25 17:08:05 2020 ------## 
+it: 1000 acc: 119 ##------ Wed Mar 25 17:08:06 2020 ------## 
+it: 300 acc: 36 ##------ Wed Mar 25 17:08:07 2020 ------## 
+it: 300 acc: 28 ##------ Wed Mar 25 17:08:12 2020 ------## 
+it: 600 acc: 81 ##------ Wed Mar 25 17:08:21 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 100 acc: 0 ##------ Wed Mar 25 17:08:42 2020 ------## 
+it: 300 acc: 28 ##------ Wed Mar 25 17:09:50 2020 ------## 
+it: 300 acc: 32 ##------ Wed Mar 25 17:09:58 2020 ------## 
+it: 300 acc: 30 ##------ Wed Mar 25 17:10:15 2020 ------## 
+it: 300 acc: 26 ##------ Wed Mar 25 17:10:17 2020 ------## 
+it: 300 acc: 13 ##------ Wed Mar 25 17:10:19 2020 ------## 
+it: 400 acc: 35 ##------ Wed Mar 25 17:10:20 2020 ------## 
+it: 300 acc: 26 ##------ Wed Mar 25 17:10:20 2020 ------## 
+it: 300 acc: 15 ##------ Wed Mar 25 17:10:23 2020 ------## 
+it: 300 acc: 30 ##------ Wed Mar 25 17:10:23 2020 ------## 
+it: 300 acc: 26 ##------ Wed Mar 25 17:10:24 2020 ------## 
+it: 300 acc: 21 ##------ Wed Mar 25 17:10:24 2020 ------## 
+it: 200 acc: 23 ##------ Wed Mar 25 17:10:25 2020 ------## 
+it: 300 acc: 38 ##------ Wed Mar 25 17:10:28 2020 ------## 
+it: 300 acc: 23 ##------ Wed Mar 25 17:10:35 2020 ------## 
+it: 400 acc: 47 ##------ Wed Mar 25 17:10:51 2020 ------## 
+it: 1100 acc: 106 ##------ Wed Mar 25 17:10:56 2020 ------## 
+it: 400 acc: 40 ##------ Wed Mar 25 17:10:56 2020 ------## 
+it: 1100 acc: 133 ##------ Wed Mar 25 17:10:58 2020 ------## 
+it: 700 acc: 98 ##------ Wed Mar 25 17:11:08 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 200 acc: 21 ##------ Wed Mar 25 17:11:21 2020 ------## 
+it: 400 acc: 38 ##------ Wed Mar 25 17:12:33 2020 ------## 
+it: 400 acc: 47 ##------ Wed Mar 25 17:12:42 2020 ------## 
+it: 400 acc: 45 ##------ Wed Mar 25 17:12:56 2020 ------## 
+it: 400 acc: 38 ##------ Wed Mar 25 17:13:00 2020 ------## 
+it: 400 acc: 37 ##------ Wed Mar 25 17:13:01 2020 ------## 
+it: 300 acc: 37 ##------ Wed Mar 25 17:13:02 2020 ------## 
+it: 500 acc: 47 ##------ Wed Mar 25 17:13:03 2020 ------## 
+it: 400 acc: 23 ##------ Wed Mar 25 17:13:03 2020 ------## 
+it: 400 acc: 42 ##------ Wed Mar 25 17:13:06 2020 ------## 
+it: 400 acc: 38 ##------ Wed Mar 25 17:13:07 2020 ------## 
+it: 400 acc: 20 ##------ Wed Mar 25 17:13:08 2020 ------## 
+it: 400 acc: 33 ##------ Wed Mar 25 17:13:09 2020 ------## 
+it: 400 acc: 49 ##------ Wed Mar 25 17:13:17 2020 ------## 
+it: 400 acc: 32 ##------ Wed Mar 25 17:13:17 2020 ------## 
+it: 500 acc: 53 ##------ Wed Mar 25 17:13:33 2020 ------## 
+it: 500 acc: 53 ##------ Wed Mar 25 17:13:43 2020 ------## 
+it: 1200 acc: 115 ##------ Wed Mar 25 17:13:44 2020 ------## 
+it: 1200 acc: 149 ##------ Wed Mar 25 17:13:49 2020 ------## 
+it: 800 acc: 111 ##------ Wed Mar 25 17:13:54 2020 ------## 
+it: 300 acc: 36 ##------ Wed Mar 25 17:14:04 2020 ------## 
+it: 500 acc: 56 ##------ Wed Mar 25 17:15:23 2020 ------## 
+it: 500 acc: 60 ##------ Wed Mar 25 17:15:32 2020 ------## 
+it: 500 acc: 54 ##------ Wed Mar 25 17:15:39 2020 ------## 
+it: 600 acc: 55 ##------ Wed Mar 25 17:15:43 2020 ------## 
+it: 400 acc: 57 ##------ Wed Mar 25 17:15:44 2020 ------## 
+it: 500 acc: 48 ##------ Wed Mar 25 17:15:46 2020 ------## 
+it: 500 acc: 32 ##------ Wed Mar 25 17:15:46 2020 ------## 
+it: 500 acc: 56 ##------ Wed Mar 25 17:15:50 2020 ------## 
+it: 500 acc: 52 ##------ Wed Mar 25 17:15:51 2020 ------## 
+it: 500 acc: 41 ##------ Wed Mar 25 17:15:56 2020 ------## 
+it: 500 acc: 50 ##------ Wed Mar 25 17:15:57 2020 ------## 
+it: 500 acc: 30 ##------ Wed Mar 25 17:15:58 2020 ------## 
+it: 500 acc: 59 ##------ Wed Mar 25 17:16:05 2020 ------## 
+it: 500 acc: 46 ##------ Wed Mar 25 17:16:06 2020 ------## 
+it: 600 acc: 66 ##------ Wed Mar 25 17:16:18 2020 ------## 
+it: 600 acc: 70 ##------ Wed Mar 25 17:16:30 2020 ------## 
+it: 1300 acc: 128 ##------ Wed Mar 25 17:16:34 2020 ------## 
+it: 900 acc: 125 ##------ Wed Mar 25 17:16:38 2020 ------## 
+it: 400 acc: 51 ##------ Wed Mar 25 17:16:40 2020 ------## 
+it: 1300 acc: 167 ##------ Wed Mar 25 17:16:41 2020 ------## 
+it: 600 acc: 75 ##------ Wed Mar 25 17:18:07 2020 ------## 
+it: 600 acc: 70 ##------ Wed Mar 25 17:18:19 2020 ------## 
+it: 600 acc: 66 ##------ Wed Mar 25 17:18:20 2020 ------## 
+it: 500 acc: 78 ##------ Wed Mar 25 17:18:25 2020 ------## 
+it: 700 acc: 71 ##------ Wed Mar 25 17:18:28 2020 ------## 
+it: 600 acc: 59 ##------ Wed Mar 25 17:18:32 2020 ------## 
+it: 600 acc: 50 ##------ Wed Mar 25 17:18:32 2020 ------## 
+it: 600 acc: 64 ##------ Wed Mar 25 17:18:36 2020 ------## 
+it: 600 acc: 71 ##------ Wed Mar 25 17:18:40 2020 ------## 
+it: 600 acc: 64 ##------ Wed Mar 25 17:18:45 2020 ------## 
+it: 600 acc: 49 ##------ Wed Mar 25 17:18:46 2020 ------## 
+it: 600 acc: 36 ##------ Wed Mar 25 17:18:49 2020 ------## 
+it: 600 acc: 71 ##------ Wed Mar 25 17:18:57 2020 ------## 
+it: 600 acc: 61 ##------ Wed Mar 25 17:18:58 2020 ------## 
+it: 700 acc: 79 ##------ Wed Mar 25 17:19:03 2020 ------## 
+it: 700 acc: 82 ##------ Wed Mar 25 17:19:14 2020 ------## 
+it: 500 acc: 64 ##------ Wed Mar 25 17:19:17 2020 ------## 
+it: 1000 acc: 141 ##------ Wed Mar 25 17:19:20 2020 ------## 
+it: 1400 acc: 141 ##------ Wed Mar 25 17:19:25 2020 ------## 
+it: 1400 acc: 186 ##------ Wed Mar 25 17:19:29 2020 ------## 
+it: 700 acc: 89 ##------ Wed Mar 25 17:20:52 2020 ------## 
+it: 700 acc: 84 ##------ Wed Mar 25 17:21:01 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 600 acc: 97 ##------ Wed Mar 25 17:21:04 2020 ------## 
+it: 700 acc: 88 ##------ Wed Mar 25 17:21:11 2020 ------## 
+it: 800 acc: 85 ##------ Wed Mar 25 17:21:15 2020 ------## 
+it: 700 acc: 65 ##------ Wed Mar 25 17:21:20 2020 ------## 
+it: 700 acc: 80 ##------ Wed Mar 25 17:21:20 2020 ------## 
+it: 700 acc: 66 ##------ Wed Mar 25 17:21:22 2020 ------## 
+it: 700 acc: 83 ##------ Wed Mar 25 17:21:29 2020 ------## 
+it: 700 acc: 86 ##------ Wed Mar 25 17:21:34 2020 ------## 
+it: 700 acc: 47 ##------ Wed Mar 25 17:21:35 2020 ------## 
+it: 700 acc: 54 ##------ Wed Mar 25 17:21:41 2020 ------## 
+it: 700 acc: 86 ##------ Wed Mar 25 17:21:50 2020 ------## 
+it: 700 acc: 90 ##------ Wed Mar 25 17:21:53 2020 ------## 
+it: 800 acc: 91 ##------ Wed Mar 25 17:21:54 2020 ------## 
+it: 600 acc: 83 ##------ Wed Mar 25 17:21:54 2020 ------## 
+it: 800 acc: 102 ##------ Wed Mar 25 17:22:00 2020 ------## 
+it: 1100 acc: 155 ##------ Wed Mar 25 17:22:04 2020 ------## 
+it: 1500 acc: 147 ##------ Wed Mar 25 17:22:12 2020 ------## 
+it: 1500 acc: 205 ##------ Wed Mar 25 17:22:18 2020 ------## 
+it: 800 acc: 103 ##------ Wed Mar 25 17:23:39 2020 ------## 
+it: 800 acc: 95 ##------ Wed Mar 25 17:23:43 2020 ------## 
+it: 700 acc: 114 ##------ Wed Mar 25 17:23:46 2020 ------## 
+it: 900 acc: 96 ##------ Wed Mar 25 17:24:01 2020 ------## 
+it: 800 acc: 99 ##------ Wed Mar 25 17:24:03 2020 ------## 
+it: 800 acc: 95 ##------ Wed Mar 25 17:24:04 2020 ------## 
+it: 800 acc: 74 ##------ Wed Mar 25 17:24:11 2020 ------## 
+it: 800 acc: 76 ##------ Wed Mar 25 17:24:11 2020 ------## 
+it: 800 acc: 55 ##------ Wed Mar 25 17:24:25 2020 ------## 
+it: 800 acc: 91 ##------ Wed Mar 25 17:24:25 2020 ------## 
+it: 800 acc: 100 ##------ Wed Mar 25 17:24:27 2020 ------## 
+it: 700 acc: 97 ##------ Wed Mar 25 17:24:37 2020 ------## 
+it: 800 acc: 62 ##------ Wed Mar 25 17:24:38 2020 ------## 
+it: 900 acc: 103 ##------ Wed Mar 25 17:24:45 2020 ------## 
+it: 800 acc: 99 ##------ Wed Mar 25 17:24:45 2020 ------## 
+it: 900 acc: 113 ##------ Wed Mar 25 17:24:46 2020 ------## 
+it: 800 acc: 106 ##------ Wed Mar 25 17:24:47 2020 ------## 
+it: 1200 acc: 176 ##------ Wed Mar 25 17:24:52 2020 ------## 
+it: 1600 acc: 163 ##------ Wed Mar 25 17:25:07 2020 ------## 
+it: 1600 acc: 219 ##------ Wed Mar 25 17:25:12 2020 ------## 
+it: 900 acc: 112 ##------ Wed Mar 25 17:26:30 2020 ------## 
+it: 900 acc: 111 ##------ Wed Mar 25 17:26:33 2020 ------## 
+it: 800 acc: 132 ##------ Wed Mar 25 17:26:33 2020 ------## 
+it: 1000 acc: 103 ##------ Wed Mar 25 17:26:52 2020 ------## 
+it: 900 acc: 110 ##------ Wed Mar 25 17:26:56 2020 ------## 
+it: 900 acc: 103 ##------ Wed Mar 25 17:26:59 2020 ------## 
+it: 900 acc: 85 ##------ Wed Mar 25 17:27:04 2020 ------## 
+it: 900 acc: 84 ##------ Wed Mar 25 17:27:07 2020 ------## 
+it: 900 acc: 62 ##------ Wed Mar 25 17:27:17 2020 ------## 
+it: 900 acc: 124 ##------ Wed Mar 25 17:27:18 2020 ------## 
+it: 800 acc: 104 ##------ Wed Mar 25 17:27:19 2020 ------## 
+it: 900 acc: 106 ##------ Wed Mar 25 17:27:22 2020 ------## 
+it: 1000 acc: 116 ##------ Wed Mar 25 17:27:33 2020 ------## 
+it: 900 acc: 73 ##------ Wed Mar 25 17:27:34 2020 ------## 
+it: 1000 acc: 128 ##------ Wed Mar 25 17:27:34 2020 ------## 
+it: 900 acc: 124 ##------ Wed Mar 25 17:27:37 2020 ------## 
+it: 1300 acc: 193 ##------ Wed Mar 25 17:27:37 2020 ------## 
+it: 900 acc: 119 ##------ Wed Mar 25 17:27:38 2020 ------## 
+it: 1700 acc: 176 ##------ Wed Mar 25 17:27:55 2020 ------## 
+it: 1700 acc: 241 ##------ Wed Mar 25 17:28:03 2020 ------## 
+it: 900 acc: 145 ##------ Wed Mar 25 17:29:10 2020 ------## 
+it: 1000 acc: 120 ##------ Wed Mar 25 17:29:13 2020 ------## 
+it: 1000 acc: 127 ##------ Wed Mar 25 17:29:17 2020 ------## 
+it: 1100 acc: 116 ##------ Wed Mar 25 17:29:42 2020 ------## 
+it: 1000 acc: 123 ##------ Wed Mar 25 17:29:43 2020 ------## 
+it: 1000 acc: 127 ##------ Wed Mar 25 17:29:46 2020 ------## 
+it: 900 acc: 123 ##------ Wed Mar 25 17:29:56 2020 ------## 
+it: 1000 acc: 94 ##------ Wed Mar 25 17:30:00 2020 ------## 
+it: 1000 acc: 95 ##------ Wed Mar 25 17:30:01 2020 ------## 
+it: 1000 acc: 142 ##------ Wed Mar 25 17:30:09 2020 ------## 
+it: 1000 acc: 119 ##------ Wed Mar 25 17:30:12 2020 ------## 
+it: 1000 acc: 72 ##------ Wed Mar 25 17:30:13 2020 ------## 
+it: 1100 acc: 147 ##------ Wed Mar 25 17:30:19 2020 ------## 
+it: 1100 acc: 134 ##------ Wed Mar 25 17:30:22 2020 ------## 
+it: 1400 acc: 207 ##------ Wed Mar 25 17:30:23 2020 ------## 
+it: 1000 acc: 139 ##------ Wed Mar 25 17:30:25 2020 ------## 
+it: 1000 acc: 84 ##------ Wed Mar 25 17:30:28 2020 ------## 
+it: 1000 acc: 135 ##------ Wed Mar 25 17:30:30 2020 ------## 
+it: 1800 acc: 189 ##------ Wed Mar 25 17:30:44 2020 ------## 
+it: 1800 acc: 255 ##------ Wed Mar 25 17:30:53 2020 ------## 
+it: 1000 acc: 156 ##------ Wed Mar 25 17:31:48 2020 ------## 
+it: 1100 acc: 141 ##------ Wed Mar 25 17:31:57 2020 ------## 
+it: 1100 acc: 129 ##------ Wed Mar 25 17:31:57 2020 ------## 
+it: 1200 acc: 128 ##------ Wed Mar 25 17:32:27 2020 ------## 
+it: 1000 acc: 145 ##------ Wed Mar 25 17:32:31 2020 ------## 
+it: 1100 acc: 142 ##------ Wed Mar 25 17:32:33 2020 ------## 
+it: 1100 acc: 141 ##------ Wed Mar 25 17:32:33 2020 ------## 
+it: 1100 acc: 108 ##------ Wed Mar 25 17:32:52 2020 ------## 
+it: 1100 acc: 110 ##------ Wed Mar 25 17:32:53 2020 ------## 
+it: 1100 acc: 156 ##------ Wed Mar 25 17:32:57 2020 ------## 
+it: 1200 acc: 161 ##------ Wed Mar 25 17:33:02 2020 ------## 
+it: 1100 acc: 86 ##------ Wed Mar 25 17:33:04 2020 ------## 
+it: 1500 acc: 221 ##------ Wed Mar 25 17:33:06 2020 ------## 
+it: 1100 acc: 133 ##------ Wed Mar 25 17:33:06 2020 ------## 
+it: 1200 acc: 144 ##------ Wed Mar 25 17:33:12 2020 ------## 
+it: 1100 acc: 154 ##------ Wed Mar 25 17:33:14 2020 ------## 
+it: 1100 acc: 100 ##------ Wed Mar 25 17:33:16 2020 ------## 
+it: 1100 acc: 150 ##------ Wed Mar 25 17:33:24 2020 ------## 
+it: 1900 acc: 200 ##------ Wed Mar 25 17:33:35 2020 ------## 
+it: 1900 acc: 272 ##------ Wed Mar 25 17:33:45 2020 ------## 
+it: 1100 acc: 174 ##------ Wed Mar 25 17:34:28 2020 ------## 
+it: 1200 acc: 142 ##------ Wed Mar 25 17:34:40 2020 ------## 
+it: 1200 acc: 155 ##------ Wed Mar 25 17:34:46 2020 ------## 
+it: 1100 acc: 163 ##------ Wed Mar 25 17:35:01 2020 ------## 
+it: 1200 acc: 154 ##------ Wed Mar 25 17:35:17 2020 ------## 
+it: 1300 acc: 137 ##------ Wed Mar 25 17:35:18 2020 ------## 
+it: 1200 acc: 152 ##------ Wed Mar 25 17:35:29 2020 ------## 
+it: 1200 acc: 125 ##------ Wed Mar 25 17:35:41 2020 ------## 
+it: 1300 acc: 172 ##------ Wed Mar 25 17:35:46 2020 ------## 
+it: 1200 acc: 121 ##------ Wed Mar 25 17:35:46 2020 ------## 
+it: 1200 acc: 172 ##------ Wed Mar 25 17:35:49 2020 ------## 
+it: 1600 acc: 238 ##------ Wed Mar 25 17:35:52 2020 ------## 
+it: 1200 acc: 94 ##------ Wed Mar 25 17:35:52 2020 ------## 
+it: 1200 acc: 155 ##------ Wed Mar 25 17:35:56 2020 ------## 
+it: 1300 acc: 153 ##------ Wed Mar 25 17:36:04 2020 ------## 
+it: 1200 acc: 161 ##------ Wed Mar 25 17:36:10 2020 ------## 
+it: 1200 acc: 169 ##------ Wed Mar 25 17:36:11 2020 ------## 
+it: 1200 acc: 114 ##------ Wed Mar 25 17:36:12 2020 ------## 
+it: 2000 acc: 214 ##------ Wed Mar 25 17:36:26 2020 ------## 
+it: 2000 acc: 285 ##------ Wed Mar 25 17:36:34 2020 ------## 
+it: 1200 acc: 189 ##------ Wed Mar 25 17:37:09 2020 ------## 
+it: 1300 acc: 156 ##------ Wed Mar 25 17:37:22 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 1300 acc: 170 ##------ Wed Mar 25 17:37:33 2020 ------## 
+it: 1200 acc: 175 ##------ Wed Mar 25 17:37:40 2020 ------## 
+it: 1300 acc: 168 ##------ Wed Mar 25 17:38:03 2020 ------## 
+it: 1400 acc: 142 ##------ Wed Mar 25 17:38:04 2020 ------## 
+it: 1300 acc: 160 ##------ Wed Mar 25 17:38:18 2020 ------## 
+it: 1400 acc: 189 ##------ Wed Mar 25 17:38:28 2020 ------## 
+it: 1300 acc: 137 ##------ Wed Mar 25 17:38:33 2020 ------## 
+it: 1300 acc: 194 ##------ Wed Mar 25 17:38:37 2020 ------## 
+it: 1700 acc: 247 ##------ Wed Mar 25 17:38:39 2020 ------## 
+it: 1300 acc: 107 ##------ Wed Mar 25 17:38:40 2020 ------## 
+it: 1300 acc: 130 ##------ Wed Mar 25 17:38:42 2020 ------## 
+it: 1300 acc: 170 ##------ Wed Mar 25 17:38:49 2020 ------## 
+it: 1400 acc: 164 ##------ Wed Mar 25 17:38:55 2020 ------## 
+it: 1300 acc: 175 ##------ Wed Mar 25 17:38:59 2020 ------## 
+it: 1300 acc: 191 ##------ Wed Mar 25 17:39:03 2020 ------## 
+it: 1300 acc: 134 ##------ Wed Mar 25 17:39:09 2020 ------## 
+it: 2100 acc: 229 ##------ Wed Mar 25 17:39:14 2020 ------## 
+it: 2100 acc: 304 ##------ Wed Mar 25 17:39:26 2020 ------## 
+it: 1300 acc: 204 ##------ Wed Mar 25 17:39:45 2020 ------## 
+it: 1400 acc: 171 ##------ Wed Mar 25 17:40:02 2020 ------## 
+it: 1300 acc: 188 ##------ Wed Mar 25 17:40:13 2020 ------## 
+it: 1400 acc: 182 ##------ Wed Mar 25 17:40:23 2020 ------## 
+it: 1400 acc: 188 ##------ Wed Mar 25 17:40:48 2020 ------## 
+it: 1500 acc: 154 ##------ Wed Mar 25 17:40:55 2020 ------## 
+it: 1400 acc: 167 ##------ Wed Mar 25 17:41:11 2020 ------## 
+it: 1500 acc: 205 ##------ Wed Mar 25 17:41:18 2020 ------## 
+it: 1400 acc: 148 ##------ Wed Mar 25 17:41:21 2020 ------## 
+it: 1400 acc: 218 ##------ Wed Mar 25 17:41:22 2020 ------## 
+it: 1800 acc: 265 ##------ Wed Mar 25 17:41:24 2020 ------## 
+it: 1400 acc: 122 ##------ Wed Mar 25 17:41:29 2020 ------## 
+it: 1400 acc: 143 ##------ Wed Mar 25 17:41:32 2020 ------## 
+it: 1400 acc: 185 ##------ Wed Mar 25 17:41:41 2020 ------## 
+it: 1500 acc: 176 ##------ Wed Mar 25 17:41:47 2020 ------## 
+it: 1400 acc: 195 ##------ Wed Mar 25 17:41:52 2020 ------## 
+it: 1400 acc: 210 ##------ Wed Mar 25 17:41:55 2020 ------## 
+it: 1400 acc: 153 ##------ Wed Mar 25 17:42:00 2020 ------## 
+it: 2200 acc: 240 ##------ Wed Mar 25 17:42:05 2020 ------## 
+it: 2200 acc: 323 ##------ Wed Mar 25 17:42:18 2020 ------## 
+it: 1400 acc: 225 ##------ Wed Mar 25 17:42:24 2020 ------## 
+it: 1500 acc: 177 ##------ Wed Mar 25 17:42:45 2020 ------## 
+it: 1400 acc: 209 ##------ Wed Mar 25 17:42:46 2020 ------## 
+it: 1500 acc: 191 ##------ Wed Mar 25 17:43:08 2020 ------## 
+it: 1500 acc: 209 ##------ Wed Mar 25 17:43:32 2020 ------## 
+it: 1600 acc: 167 ##------ Wed Mar 25 17:43:42 2020 ------## 
+it: 1500 acc: 188 ##------ Wed Mar 25 17:44:03 2020 ------## 
+it: 1600 acc: 229 ##------ Wed Mar 25 17:44:05 2020 ------## 
+it: 1900 acc: 285 ##------ Wed Mar 25 17:44:06 2020 ------## 
+it: 1500 acc: 244 ##------ Wed Mar 25 17:44:09 2020 ------## 
+it: 1500 acc: 162 ##------ Wed Mar 25 17:44:12 2020 ------## 
+it: 1500 acc: 146 ##------ Wed Mar 25 17:44:21 2020 ------## 
+it: 1500 acc: 158 ##------ Wed Mar 25 17:44:26 2020 ------## 
+it: 1600 acc: 189 ##------ Wed Mar 25 17:44:36 2020 ------## 
+it: 1500 acc: 197 ##------ Wed Mar 25 17:44:37 2020 ------## 
+it: 1500 acc: 214 ##------ Wed Mar 25 17:44:43 2020 ------## 
+it: 1500 acc: 226 ##------ Wed Mar 25 17:44:45 2020 ------## 
+it: 1500 acc: 174 ##------ Wed Mar 25 17:44:53 2020 ------## 
+it: 2300 acc: 248 ##------ Wed Mar 25 17:44:54 2020 ------## 
+it: 1500 acc: 242 ##------ Wed Mar 25 17:45:03 2020 ------## 
+it: 2300 acc: 339 ##------ Wed Mar 25 17:45:11 2020 ------## 
+it: 1500 acc: 229 ##------ Wed Mar 25 17:45:17 2020 ------## 
+it: 1600 acc: 189 ##------ Wed Mar 25 17:45:30 2020 ------## 
+it: 1600 acc: 205 ##------ Wed Mar 25 17:45:57 2020 ------## 
+it: 1600 acc: 231 ##------ Wed Mar 25 17:46:22 2020 ------## 
+it: 1700 acc: 185 ##------ Wed Mar 25 17:46:30 2020 ------## 
+it: 2000 acc: 303 ##------ Wed Mar 25 17:46:46 2020 ------## 
+it: 1700 acc: 242 ##------ Wed Mar 25 17:46:48 2020 ------## 
+it: 1600 acc: 256 ##------ Wed Mar 25 17:46:53 2020 ------## 
+it: 1600 acc: 209 ##------ Wed Mar 25 17:46:54 2020 ------## 
+it: 1600 acc: 178 ##------ Wed Mar 25 17:47:03 2020 ------## 
+it: 1600 acc: 163 ##------ Wed Mar 25 17:47:13 2020 ------## 
+it: 1600 acc: 176 ##------ Wed Mar 25 17:47:20 2020 ------## 
+it: 1700 acc: 207 ##------ Wed Mar 25 17:47:26 2020 ------## 
+it: 1600 acc: 211 ##------ Wed Mar 25 17:47:28 2020 ------## 
+it: 1600 acc: 230 ##------ Wed Mar 25 17:47:33 2020 ------## 
+it: 1600 acc: 247 ##------ Wed Mar 25 17:47:38 2020 ------## 
+it: 1600 acc: 254 ##------ Wed Mar 25 17:47:38 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 2400 acc: 256 ##------ Wed Mar 25 17:47:47 2020 ------## 
+it: 1600 acc: 194 ##------ Wed Mar 25 17:47:48 2020 ------## 
+it: 1600 acc: 254 ##------ Wed Mar 25 17:47:53 2020 ------## 
+it: 2400 acc: 361 ##------ Wed Mar 25 17:48:01 2020 ------## 
+it: 1700 acc: 204 ##------ Wed Mar 25 17:48:10 2020 ------## 
+it: 1700 acc: 218 ##------ Wed Mar 25 17:48:46 2020 ------## 
+it: 1700 acc: 245 ##------ Wed Mar 25 17:49:07 2020 ------## 
+it: 1800 acc: 193 ##------ Wed Mar 25 17:49:15 2020 ------## 
+it: 2100 acc: 315 ##------ Wed Mar 25 17:49:32 2020 ------## 
+it: 1800 acc: 257 ##------ Wed Mar 25 17:49:35 2020 ------## 
+it: 1700 acc: 270 ##------ Wed Mar 25 17:49:37 2020 ------## 
+it: 1700 acc: 221 ##------ Wed Mar 25 17:49:48 2020 ------## 
+it: 1700 acc: 199 ##------ Wed Mar 25 17:49:53 2020 ------## 
+it: 1700 acc: 177 ##------ Wed Mar 25 17:50:02 2020 ------## 
+it: 1700 acc: 185 ##------ Wed Mar 25 17:50:12 2020 ------## 
+it: 1800 acc: 218 ##------ Wed Mar 25 17:50:12 2020 ------## 
+it: 1700 acc: 274 ##------ Wed Mar 25 17:50:20 2020 ------## 
+it: 1700 acc: 226 ##------ Wed Mar 25 17:50:21 2020 ------## 
+it: 1700 acc: 246 ##------ Wed Mar 25 17:50:26 2020 ------## 
+it: 1700 acc: 266 ##------ Wed Mar 25 17:50:29 2020 ------## 
+it: 1700 acc: 273 ##------ Wed Mar 25 17:50:29 2020 ------## 
+it: 1700 acc: 215 ##------ Wed Mar 25 17:50:38 2020 ------## 
+it: 2500 acc: 263 ##------ Wed Mar 25 17:50:40 2020 ------## 
+it: 2500 acc: 375 ##------ Wed Mar 25 17:50:54 2020 ------## 
+it: 1800 acc: 216 ##------ Wed Mar 25 17:50:59 2020 ------## 
+it: 1800 acc: 230 ##------ Wed Mar 25 17:51:36 2020 ------## 
+it: 1800 acc: 264 ##------ Wed Mar 25 17:51:53 2020 ------## 
+it: 1900 acc: 204 ##------ Wed Mar 25 17:52:04 2020 ------## 
+it: 2200 acc: 325 ##------ Wed Mar 25 17:52:18 2020 ------## 
+it: 1900 acc: 281 ##------ Wed Mar 25 17:52:22 2020 ------## 
+it: 1800 acc: 287 ##------ Wed Mar 25 17:52:24 2020 ------## 
+it: 1800 acc: 217 ##------ Wed Mar 25 17:52:42 2020 ------## 
+it: 1800 acc: 240 ##------ Wed Mar 25 17:52:45 2020 ------## 
+it: 1800 acc: 295 ##------ Wed Mar 25 17:52:55 2020 ------## 
+it: 1900 acc: 229 ##------ Wed Mar 25 17:52:58 2020 ------## 
+it: 1800 acc: 190 ##------ Wed Mar 25 17:52:58 2020 ------## 
+it: 1800 acc: 206 ##------ Wed Mar 25 17:53:02 2020 ------## 
+it: 1800 acc: 299 ##------ Wed Mar 25 17:53:06 2020 ------## 
+it: 1800 acc: 236 ##------ Wed Mar 25 17:53:15 2020 ------## 
+it: 1800 acc: 290 ##------ Wed Mar 25 17:53:16 2020 ------## 
+it: 1800 acc: 263 ##------ Wed Mar 25 17:53:20 2020 ------## 
+it: 1800 acc: 229 ##------ Wed Mar 25 17:53:29 2020 ------## 
+it: 2600 acc: 272 ##------ Wed Mar 25 17:53:33 2020 ------## 
+it: 2600 acc: 383 ##------ Wed Mar 25 17:53:41 2020 ------## 
+it: 1900 acc: 227 ##------ Wed Mar 25 17:53:43 2020 ------## 
+it: 1900 acc: 247 ##------ Wed Mar 25 17:54:30 2020 ------## 
+it: 1900 acc: 284 ##------ Wed Mar 25 17:54:42 2020 ------## 
+it: 2000 acc: 211 ##------ Wed Mar 25 17:54:54 2020 ------## 
+it: 2300 acc: 344 ##------ Wed Mar 25 17:55:00 2020 ------## 
+it: 2000 acc: 292 ##------ Wed Mar 25 17:55:06 2020 ------## 
+it: 1900 acc: 306 ##------ Wed Mar 25 17:55:11 2020 ------## 
+it: 1900 acc: 230 ##------ Wed Mar 25 17:55:29 2020 ------## 
+it: 1900 acc: 314 ##------ Wed Mar 25 17:55:34 2020 ------## 
+it: 1900 acc: 249 ##------ Wed Mar 25 17:55:40 2020 ------## 
+it: 1900 acc: 317 ##------ Wed Mar 25 17:55:41 2020 ------## 
+it: 1900 acc: 209 ##------ Wed Mar 25 17:55:46 2020 ------## 
+it: 1900 acc: 225 ##------ Wed Mar 25 17:55:53 2020 ------## 
+it: 2000 acc: 239 ##------ Wed Mar 25 17:55:53 2020 ------## 
+it: 1900 acc: 307 ##------ Wed Mar 25 17:56:04 2020 ------## 
+it: 1900 acc: 272 ##------ Wed Mar 25 17:56:10 2020 ------## 
+it: 1900 acc: 256 ##------ Wed Mar 25 17:56:11 2020 ------## 
+it: 1900 acc: 245 ##------ Wed Mar 25 17:56:14 2020 ------## 
+it: 2700 acc: 281 ##------ Wed Mar 25 17:56:21 2020 ------## 
+it: 2000 acc: 240 ##------ Wed Mar 25 17:56:29 2020 ------## 
+it: 2700 acc: 391 ##------ Wed Mar 25 17:56:31 2020 ------## 
+it: 2000 acc: 254 ##------ Wed Mar 25 17:57:22 2020 ------## 
+it: 2000 acc: 300 ##------ Wed Mar 25 17:57:29 2020 ------## 
+it: 2100 acc: 218 ##------ Wed Mar 25 17:57:42 2020 ------## 
+it: 2400 acc: 362 ##------ Wed Mar 25 17:57:47 2020 ------## 
+it: 2100 acc: 306 ##------ Wed Mar 25 17:57:53 2020 ------## 
+it: 2000 acc: 320 ##------ Wed Mar 25 17:58:04 2020 ------## 
+it: 2000 acc: 340 ##------ Wed Mar 25 17:58:09 2020 ------## 
+it: 2000 acc: 332 ##------ Wed Mar 25 17:58:14 2020 ------## 
+it: 2000 acc: 247 ##------ Wed Mar 25 17:58:18 2020 ------## 
+it: 2000 acc: 264 ##------ Wed Mar 25 17:58:33 2020 ------## 
+it: 2000 acc: 222 ##------ Wed Mar 25 17:58:36 2020 ------## 
+it: 2100 acc: 253 ##------ Wed Mar 25 17:58:43 2020 ------## 
+it: 2000 acc: 244 ##------ Wed Mar 25 17:58:44 2020 ------## 
+it: 2000 acc: 323 ##------ Wed Mar 25 17:58:58 2020 ------## 
+it: 2000 acc: 288 ##------ Wed Mar 25 17:59:00 2020 ------## 
+it: 2000 acc: 268 ##------ Wed Mar 25 17:59:04 2020 ------## 
+it: 2000 acc: 276 ##------ Wed Mar 25 17:59:06 2020 ------## 
+it: 2800 acc: 293 ##------ Wed Mar 25 17:59:08 2020 ------## 
+it: 2100 acc: 251 ##------ Wed Mar 25 17:59:18 2020 ------## 
+it: 2800 acc: 408 ##------ Wed Mar 25 17:59:24 2020 ------## 
+it: 2100 acc: 260 ##------ Wed Mar 25 18:00:11 2020 ------## 
+it: 2100 acc: 314 ##------ Wed Mar 25 18:00:12 2020 ------## 
+it: 2200 acc: 221 ##------ Wed Mar 25 18:00:33 2020 ------## 
+it: 2500 acc: 375 ##------ Wed Mar 25 18:00:35 2020 ------## 
+it: 2200 acc: 321 ##------ Wed Mar 25 18:00:42 2020 ------## 
+it: 2100 acc: 356 ##------ Wed Mar 25 18:00:45 2020 ------## 
+it: 2100 acc: 345 ##------ Wed Mar 25 18:00:49 2020 ------## 
+it: 2100 acc: 343 ##------ Wed Mar 25 18:00:52 2020 ------## 
+it: 2100 acc: 257 ##------ Wed Mar 25 18:01:10 2020 ------## 
+it: 2100 acc: 276 ##------ Wed Mar 25 18:01:21 2020 ------## 
+it: 2100 acc: 242 ##------ Wed Mar 25 18:01:28 2020 ------## 
+it: 2100 acc: 257 ##------ Wed Mar 25 18:01:33 2020 ------## 
+it: 2200 acc: 262 ##------ Wed Mar 25 18:01:38 2020 ------## 
+it: 2100 acc: 337 ##------ Wed Mar 25 18:01:48 2020 ------## 
+it: 2100 acc: 306 ##------ Wed Mar 25 18:01:48 2020 ------## 
+it: 2100 acc: 286 ##------ Wed Mar 25 18:01:53 2020 ------## 
+it: 2900 acc: 307 ##------ Wed Mar 25 18:01:57 2020 ------## 
+it: 2100 acc: 296 ##------ Wed Mar 25 18:01:59 2020 ------## 
+it: 2200 acc: 258 ##------ Wed Mar 25 18:02:05 2020 ------## 
+it: 2900 acc: 415 ##------ Wed Mar 25 18:02:12 2020 ------## 
+it: 2200 acc: 327 ##------ Wed Mar 25 18:02:58 2020 ------## 
+it: 2200 acc: 271 ##------ Wed Mar 25 18:03:01 2020 ------## 
+it: 2300 acc: 230 ##------ Wed Mar 25 18:03:14 2020 ------## 
+it: 2600 acc: 394 ##------ Wed Mar 25 18:03:19 2020 ------## 
+it: 2200 acc: 361 ##------ Wed Mar 25 18:03:23 2020 ------## 
+it: 2200 acc: 370 ##------ Wed Mar 25 18:03:26 2020 ------## 
+it: 2300 acc: 335 ##------ Wed Mar 25 18:03:33 2020 ------## 
+it: 2200 acc: 356 ##------ Wed Mar 25 18:03:38 2020 ------## 
+it: 2200 acc: 276 ##------ Wed Mar 25 18:03:56 2020 ------## 
+it: 2200 acc: 290 ##------ Wed Mar 25 18:04:15 2020 ------## 
+it: 2200 acc: 263 ##------ Wed Mar 25 18:04:22 2020 ------## 
+it: 2200 acc: 274 ##------ Wed Mar 25 18:04:27 2020 ------## 
+it: 2300 acc: 277 ##------ Wed Mar 25 18:04:31 2020 ------## 
+it: 2200 acc: 314 ##------ Wed Mar 25 18:04:37 2020 ------## 
+it: 2200 acc: 356 ##------ Wed Mar 25 18:04:39 2020 ------## 
+it: 2200 acc: 299 ##------ Wed Mar 25 18:04:40 2020 ------## 
+it: 3000 acc: 316 ##------ Wed Mar 25 18:04:48 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 2300 acc: 274 ##------ Wed Mar 25 18:04:53 2020 ------## 
+it: 2200 acc: 311 ##------ Wed Mar 25 18:04:54 2020 ------## 
+it: 3000 acc: 424 ##------ Wed Mar 25 18:05:00 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 2300 acc: 342 ##------ Wed Mar 25 18:05:42 2020 ------## 
+it: 2300 acc: 280 ##------ Wed Mar 25 18:05:49 2020 ------## 
+it: 2300 acc: 378 ##------ Wed Mar 25 18:06:01 2020 ------## 
+it: 2300 acc: 382 ##------ Wed Mar 25 18:06:06 2020 ------## 
+it: 2400 acc: 234 ##------ Wed Mar 25 18:06:07 2020 ------## 
+it: 2700 acc: 409 ##------ Wed Mar 25 18:06:09 2020 ------## 
+it: 2400 acc: 343 ##------ Wed Mar 25 18:06:23 2020 ------## 
+it: 2300 acc: 369 ##------ Wed Mar 25 18:06:30 2020 ------## 
+it: 2300 acc: 292 ##------ Wed Mar 25 18:06:54 2020 ------## 
+it: 2300 acc: 295 ##------ Wed Mar 25 18:07:14 2020 ------## 
+it: 2300 acc: 279 ##------ Wed Mar 25 18:07:20 2020 ------## 
+it: 2300 acc: 288 ##------ Wed Mar 25 18:07:27 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 18:07:31 2020 ------## 
+it: 2400 acc: 282 ##------ Wed Mar 25 18:07:32 2020 ------## 
+it: 2300 acc: 379 ##------ Wed Mar 25 18:07:35 2020 ------## 
+it: 2300 acc: 326 ##------ Wed Mar 25 18:07:37 2020 ------## 
+it: 2300 acc: 320 ##------ Wed Mar 25 18:07:37 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 18:07:44 2020 ------## 
+it: 2400 acc: 285 ##------ Wed Mar 25 18:07:45 2020 ------## 
+it: 2300 acc: 321 ##------ Wed Mar 25 18:07:57 2020 ------## 
+it: 2400 acc: 353 ##------ Wed Mar 25 18:08:38 2020 ------## 
+it: 2400 acc: 400 ##------ Wed Mar 25 18:08:42 2020 ------## 
+it: 2400 acc: 301 ##------ Wed Mar 25 18:08:43 2020 ------## 
+it: 2400 acc: 400 ##------ Wed Mar 25 18:08:52 2020 ------## 
+it: 2800 acc: 428 ##------ Wed Mar 25 18:09:00 2020 ------## 
+it: 2500 acc: 242 ##------ Wed Mar 25 18:09:04 2020 ------## 
+it: 2500 acc: 356 ##------ Wed Mar 25 18:09:16 2020 ------## 
+it: 2400 acc: 383 ##------ Wed Mar 25 18:09:25 2020 ------## 
+it: 2400 acc: 304 ##------ Wed Mar 25 18:09:54 2020 ------## 
+it: 200 acc: 17 ##------ Wed Mar 25 18:10:09 2020 ------## 
+it: 2400 acc: 313 ##------ Wed Mar 25 18:10:14 2020 ------## 
+it: 2400 acc: 297 ##------ Wed Mar 25 18:10:19 2020 ------## 
+it: 200 acc: 14 ##------ Wed Mar 25 18:10:24 2020 ------## 
+it: 2400 acc: 310 ##------ Wed Mar 25 18:10:29 2020 ------## 
+it: 2400 acc: 392 ##------ Wed Mar 25 18:10:30 2020 ------## 
+it: 2400 acc: 337 ##------ Wed Mar 25 18:10:31 2020 ------## 
+it: 2500 acc: 291 ##------ Wed Mar 25 18:10:34 2020 ------## 
+it: 2400 acc: 336 ##------ Wed Mar 25 18:10:35 2020 ------## 
+it: 2500 acc: 297 ##------ Wed Mar 25 18:10:36 2020 ------## 
+it: 2400 acc: 331 ##------ Wed Mar 25 18:10:58 2020 ------## 
+it: 2500 acc: 415 ##------ Wed Mar 25 18:11:24 2020 ------## 
+it: 2500 acc: 375 ##------ Wed Mar 25 18:11:35 2020 ------## 
+it: 2500 acc: 416 ##------ Wed Mar 25 18:11:37 2020 ------## 
+it: 2500 acc: 312 ##------ Wed Mar 25 18:11:39 2020 ------## 
+it: 2900 acc: 439 ##------ Wed Mar 25 18:11:51 2020 ------## 
+it: 2600 acc: 254 ##------ Wed Mar 25 18:12:02 2020 ------## 
+it: 2600 acc: 370 ##------ Wed Mar 25 18:12:10 2020 ------## 
+it: 2500 acc: 401 ##------ Wed Mar 25 18:12:20 2020 ------## 
+it: 2500 acc: 316 ##------ Wed Mar 25 18:12:53 2020 ------## 
+it: 300 acc: 31 ##------ Wed Mar 25 18:12:55 2020 ------## 
+it: 300 acc: 26 ##------ Wed Mar 25 18:13:08 2020 ------## 
+it: 2500 acc: 327 ##------ Wed Mar 25 18:13:19 2020 ------## 
+it: 2500 acc: 312 ##------ Wed Mar 25 18:13:19 2020 ------## 
+it: 2500 acc: 420 ##------ Wed Mar 25 18:13:28 2020 ------## 
+it: 2600 acc: 308 ##------ Wed Mar 25 18:13:28 2020 ------## 
+it: 2500 acc: 334 ##------ Wed Mar 25 18:13:30 2020 ------## 
+it: 2500 acc: 355 ##------ Wed Mar 25 18:13:30 2020 ------## 
+it: 2500 acc: 346 ##------ Wed Mar 25 18:13:35 2020 ------## 
+it: 2600 acc: 301 ##------ Wed Mar 25 18:13:36 2020 ------## 
+it: 2500 acc: 345 ##------ Wed Mar 25 18:13:58 2020 ------## 
+it: 2600 acc: 431 ##------ Wed Mar 25 18:14:09 2020 ------## 
+it: 2600 acc: 439 ##------ Wed Mar 25 18:14:22 2020 ------## 
+it: 2600 acc: 395 ##------ Wed Mar 25 18:14:34 2020 ------## 
+it: 2600 acc: 323 ##------ Wed Mar 25 18:14:35 2020 ------## 
+it: 3000 acc: 453 ##------ Wed Mar 25 18:14:43 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 2700 acc: 268 ##------ Wed Mar 25 18:14:58 2020 ------## 
+it: 2700 acc: 379 ##------ Wed Mar 25 18:15:03 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 2600 acc: 425 ##------ Wed Mar 25 18:15:13 2020 ------## 
+it: 400 acc: 40 ##------ Wed Mar 25 18:15:45 2020 ------## 
+it: 2600 acc: 329 ##------ Wed Mar 25 18:15:50 2020 ------## 
+it: 400 acc: 41 ##------ Wed Mar 25 18:15:57 2020 ------## 
+it: 2700 acc: 316 ##------ Wed Mar 25 18:16:20 2020 ------## 
+it: 2600 acc: 327 ##------ Wed Mar 25 18:16:21 2020 ------## 
+it: 2600 acc: 342 ##------ Wed Mar 25 18:16:23 2020 ------## 
+it: 2600 acc: 444 ##------ Wed Mar 25 18:16:26 2020 ------## 
+it: 2600 acc: 371 ##------ Wed Mar 25 18:16:28 2020 ------## 
+it: 2600 acc: 352 ##------ Wed Mar 25 18:16:30 2020 ------## 
+it: 2600 acc: 356 ##------ Wed Mar 25 18:16:32 2020 ------## 
+it: 2700 acc: 311 ##------ Wed Mar 25 18:16:33 2020 ------## 
+it: 2700 acc: 443 ##------ Wed Mar 25 18:16:50 2020 ------## 
+it: 2600 acc: 362 ##------ Wed Mar 25 18:17:01 2020 ------## 
+it: 2700 acc: 454 ##------ Wed Mar 25 18:17:06 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 18:17:23 2020 ------## 
+it: 2700 acc: 412 ##------ Wed Mar 25 18:17:29 2020 ------## 
+it: 2700 acc: 331 ##------ Wed Mar 25 18:17:31 2020 ------## 
+it: 2800 acc: 279 ##------ Wed Mar 25 18:17:51 2020 ------## 
+it: 2800 acc: 388 ##------ Wed Mar 25 18:17:53 2020 ------## 
+it: 2700 acc: 444 ##------ Wed Mar 25 18:18:04 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 500 acc: 51 ##------ Wed Mar 25 18:18:42 2020 ------## 
+it: 500 acc: 49 ##------ Wed Mar 25 18:18:46 2020 ------## 
+it: 2700 acc: 343 ##------ Wed Mar 25 18:18:50 2020 ------## 
+it: 2800 acc: 328 ##------ Wed Mar 25 18:19:08 2020 ------## 
+it: 2700 acc: 339 ##------ Wed Mar 25 18:19:20 2020 ------## 
+it: 2700 acc: 352 ##------ Wed Mar 25 18:19:23 2020 ------## 
+it: 2700 acc: 391 ##------ Wed Mar 25 18:19:24 2020 ------## 
+it: 2700 acc: 464 ##------ Wed Mar 25 18:19:25 2020 ------## 
+it: 2700 acc: 370 ##------ Wed Mar 25 18:19:28 2020 ------## 
+it: 2700 acc: 368 ##------ Wed Mar 25 18:19:30 2020 ------## 
+it: 2800 acc: 461 ##------ Wed Mar 25 18:19:31 2020 ------## 
+it: 2800 acc: 317 ##------ Wed Mar 25 18:19:31 2020 ------## 
+it: 2800 acc: 474 ##------ Wed Mar 25 18:19:49 2020 ------## 
+it: 200 acc: 12 ##------ Wed Mar 25 18:19:58 2020 ------## 
+it: 2700 acc: 369 ##------ Wed Mar 25 18:20:01 2020 ------## 
+it: 2800 acc: 342 ##------ Wed Mar 25 18:20:21 2020 ------## 
+it: 2800 acc: 435 ##------ Wed Mar 25 18:20:23 2020 ------## 
+it: 2900 acc: 288 ##------ Wed Mar 25 18:20:45 2020 ------## 
+it: 2900 acc: 399 ##------ Wed Mar 25 18:20:46 2020 ------## 
+it: 2800 acc: 463 ##------ Wed Mar 25 18:21:01 2020 ------## 
+it: 600 acc: 66 ##------ Wed Mar 25 18:21:42 2020 ------## 
+it: 600 acc: 61 ##------ Wed Mar 25 18:21:42 2020 ------## 
+it: 2800 acc: 361 ##------ Wed Mar 25 18:21:48 2020 ------## 
+it: 2900 acc: 341 ##------ Wed Mar 25 18:22:02 2020 ------## 
+it: 2900 acc: 482 ##------ Wed Mar 25 18:22:13 2020 ------## 
+it: 2800 acc: 353 ##------ Wed Mar 25 18:22:16 2020 ------## 
+it: 2800 acc: 412 ##------ Wed Mar 25 18:22:20 2020 ------## 
+it: 2800 acc: 484 ##------ Wed Mar 25 18:22:21 2020 ------## 
+it: 2800 acc: 366 ##------ Wed Mar 25 18:22:23 2020 ------## 
+it: 2800 acc: 385 ##------ Wed Mar 25 18:22:25 2020 ------## 
+it: 2900 acc: 329 ##------ Wed Mar 25 18:22:28 2020 ------## 
+it: 2800 acc: 379 ##------ Wed Mar 25 18:22:29 2020 ------## 
+it: 2900 acc: 492 ##------ Wed Mar 25 18:22:32 2020 ------## 
+it: 300 acc: 29 ##------ Wed Mar 25 18:22:41 2020 ------## 
+it: 2800 acc: 391 ##------ Wed Mar 25 18:23:00 2020 ------## 
+it: 2900 acc: 363 ##------ Wed Mar 25 18:23:12 2020 ------## 
+it: 2900 acc: 448 ##------ Wed Mar 25 18:23:15 2020 ------## 
+it: 3000 acc: 422 ##------ Wed Mar 25 18:23:34 2020 ------## 
+it: 3000 acc: 295 ##------ Wed Mar 25 18:23:35 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 2900 acc: 478 ##------ Wed Mar 25 18:23:47 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 700 acc: 81 ##------ Wed Mar 25 18:24:31 2020 ------## 
+it: 700 acc: 75 ##------ Wed Mar 25 18:24:37 2020 ------## 
+it: 2900 acc: 380 ##------ Wed Mar 25 18:24:37 2020 ------## 
+it: 3000 acc: 500 ##------ Wed Mar 25 18:24:45 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 3000 acc: 349 ##------ Wed Mar 25 18:24:51 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 2900 acc: 367 ##------ Wed Mar 25 18:25:08 2020 ------## 
+it: 3000 acc: 505 ##------ Wed Mar 25 18:25:10 2020 ------## 
+it: 2900 acc: 424 ##------ Wed Mar 25 18:25:11 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 2900 acc: 499 ##------ Wed Mar 25 18:25:16 2020 ------## 
+it: 2900 acc: 398 ##------ Wed Mar 25 18:25:17 2020 ------## 
+it: 2900 acc: 392 ##------ Wed Mar 25 18:25:17 2020 ------## 
+it: 2900 acc: 379 ##------ Wed Mar 25 18:25:19 2020 ------## 
+it: 400 acc: 45 ##------ Wed Mar 25 18:25:19 2020 ------## 
+it: 3000 acc: 336 ##------ Wed Mar 25 18:25:24 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 2900 acc: 409 ##------ Wed Mar 25 18:25:56 2020 ------## 
+it: 3000 acc: 376 ##------ Wed Mar 25 18:26:04 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 18:26:04 2020 ------## 
+it: 3000 acc: 467 ##------ Wed Mar 25 18:26:05 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+it: 100 acc: 0 ##------ Wed Mar 25 18:26:17 2020 ------## 
+it: 3000 acc: 500 ##------ Wed Mar 25 18:26:35 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 100 acc: 0 ##------ Wed Mar 25 18:27:21 2020 ------## 
+it: 800 acc: 101 ##------ Wed Mar 25 18:27:26 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 18:27:27 2020 ------## 
+it: 3000 acc: 394 ##------ Wed Mar 25 18:27:31 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+it: 800 acc: 86 ##------ Wed Mar 25 18:27:35 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 100 acc: 0 ##------ Wed Mar 25 18:27:47 2020 ------## 
+it: 3000 acc: 388 ##------ Wed Mar 25 18:28:07 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 18:28:07 2020 ------## 
+it: 500 acc: 76 ##------ Wed Mar 25 18:28:08 2020 ------## 
+it: 3000 acc: 442 ##------ Wed Mar 25 18:28:08 2020 ------## 
+Loading required package: BASS
+Loading required package: mnormt
+Loading required package: BASS
+Loading required package: mnormt
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 3000 acc: 514 ##------ Wed Mar 25 18:28:11 2020 ------## 
+it: 3000 acc: 412 ##------ Wed Mar 25 18:28:13 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 3000 acc: 412 ##------ Wed Mar 25 18:28:16 2020 ------## 
+it: 3000 acc: 388 ##------ Wed Mar 25 18:28:17 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 200 acc: 17 ##------ Wed Mar 25 18:28:31 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 18:28:38 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 18:28:41 2020 ------## 
+it: 3000 acc: 425 ##------ Wed Mar 25 18:28:48 2020 ------## 
+it: 200 acc: 19 ##------ Wed Mar 25 18:28:53 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 18:29:08 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: divide by zero encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 200 acc: 25 ##------ Wed Mar 25 18:29:35 2020 ------## 
+it: 200 acc: 20 ##------ Wed Mar 25 18:29:36 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 18:29:46 2020 ------## 
+it: 200 acc: 14 ##------ Wed Mar 25 18:29:51 2020 ------## 
+it: 900 acc: 115 ##------ Wed Mar 25 18:29:53 2020 ------## 
+it: 900 acc: 98 ##------ Wed Mar 25 18:29:59 2020 ------## 
+it: 200 acc: 17 ##------ Wed Mar 25 18:30:09 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 18:30:10 2020 ------## 
+it: 100 acc: 0 ##------ Wed Mar 25 18:30:12 2020 ------## 
+it: 600 acc: 106 ##------ Wed Mar 25 18:30:17 2020 ------## 
+it: 300 acc: 38 ##------ Wed Mar 25 18:30:21 2020 ------## 
+it: 200 acc: 14 ##------ Wed Mar 25 18:30:33 2020 ------## 
+it: 200 acc: 26 ##------ Wed Mar 25 18:30:35 2020 ------## 
+it: 300 acc: 26 ##------ Wed Mar 25 18:30:52 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 300 acc: 42 ##------ Wed Mar 25 18:31:21 2020 ------## 
+it: 300 acc: 39 ##------ Wed Mar 25 18:31:23 2020 ------## 
+it: 300 acc: 31 ##------ Wed Mar 25 18:31:38 2020 ------## 
+it: 1000 acc: 127 ##------ Wed Mar 25 18:31:42 2020 ------## 
+it: 1000 acc: 103 ##------ Wed Mar 25 18:31:52 2020 ------## 
+it: 300 acc: 32 ##------ Wed Mar 25 18:31:56 2020 ------## 
+it: 400 acc: 64 ##------ Wed Mar 25 18:32:01 2020 ------## 
+it: 700 acc: 134 ##------ Wed Mar 25 18:32:05 2020 ------## 
+it: 300 acc: 26 ##------ Wed Mar 25 18:32:16 2020 ------## 
+it: 300 acc: 47 ##------ Wed Mar 25 18:32:20 2020 ------## 
+it: 400 acc: 40 ##------ Wed Mar 25 18:32:39 2020 ------## 
+it: 400 acc: 58 ##------ Wed Mar 25 18:33:09 2020 ------## 
+it: 400 acc: 53 ##------ Wed Mar 25 18:33:10 2020 ------## 
+it: 400 acc: 44 ##------ Wed Mar 25 18:33:22 2020 ------## 
+it: 1100 acc: 142 ##------ Wed Mar 25 18:33:29 2020 ------## 
+it: 500 acc: 102 ##------ Wed Mar 25 18:33:42 2020 ------## 
+it: 1100 acc: 108 ##------ Wed Mar 25 18:33:44 2020 ------## 
+it: 400 acc: 45 ##------ Wed Mar 25 18:33:46 2020 ------## 
+it: 800 acc: 154 ##------ Wed Mar 25 18:33:51 2020 ------## 
+it: 400 acc: 49 ##------ Wed Mar 25 18:33:58 2020 ------## 
+it: 400 acc: 73 ##------ Wed Mar 25 18:34:08 2020 ------## 
+it: 500 acc: 58 ##------ Wed Mar 25 18:34:28 2020 ------## 
+it: 500 acc: 94 ##------ Wed Mar 25 18:34:59 2020 ------## 
+it: 500 acc: 73 ##------ Wed Mar 25 18:34:59 2020 ------## 
+it: 500 acc: 70 ##------ Wed Mar 25 18:35:10 2020 ------## 
+it: 1200 acc: 155 ##------ Wed Mar 25 18:35:17 2020 ------## 
+it: 600 acc: 142 ##------ Wed Mar 25 18:35:25 2020 ------## 
+it: 1200 acc: 122 ##------ Wed Mar 25 18:35:35 2020 ------## 
+it: 900 acc: 179 ##------ Wed Mar 25 18:35:37 2020 ------## 
+it: 500 acc: 58 ##------ Wed Mar 25 18:35:39 2020 ------## 
+it: 500 acc: 65 ##------ Wed Mar 25 18:35:44 2020 ------## 
+it: 500 acc: 98 ##------ Wed Mar 25 18:35:57 2020 ------## 
+strength_models_add_ptw.py:251: RuntimeWarning: invalid value encountered in double_scalars
+  eArg2 = eps * mp.p * mp.theta / ( mp.s0 - tau_y ) / ( exp(eArg1) - 1.0 )
+it: 600 acc: 71 ##------ Wed Mar 25 18:36:20 2020 ------## 
+it: 600 acc: 87 ##------ Wed Mar 25 18:36:48 2020 ------## 
+it: 600 acc: 120 ##------ Wed Mar 25 18:36:49 2020 ------## 
+it: 600 acc: 98 ##------ Wed Mar 25 18:37:00 2020 ------## 
+it: 1300 acc: 163 ##------ Wed Mar 25 18:37:05 2020 ------## 
+it: 700 acc: 179 ##------ Wed Mar 25 18:37:08 2020 ------## 
+it: 1000 acc: 212 ##------ Wed Mar 25 18:37:25 2020 ------## 
+it: 1300 acc: 138 ##------ Wed Mar 25 18:37:28 2020 ------## 
+it: 600 acc: 76 ##------ Wed Mar 25 18:37:30 2020 ------## 
+it: 600 acc: 75 ##------ Wed Mar 25 18:37:31 2020 ------## 
+it: 600 acc: 124 ##------ Wed Mar 25 18:37:44 2020 ------## 
+it: 700 acc: 82 ##------ Wed Mar 25 18:38:11 2020 ------## 
+it: 700 acc: 101 ##------ Wed Mar 25 18:38:38 2020 ------## 
+it: 700 acc: 151 ##------ Wed Mar 25 18:38:40 2020 ------## 
+it: 700 acc: 121 ##------ Wed Mar 25 18:38:50 2020 ------## 
+it: 800 acc: 212 ##------ Wed Mar 25 18:38:52 2020 ------## 
+it: 1400 acc: 184 ##------ Wed Mar 25 18:38:54 2020 ------## 
+it: 700 acc: 83 ##------ Wed Mar 25 18:39:14 2020 ------## 
+it: 1100 acc: 237 ##------ Wed Mar 25 18:39:14 2020 ------## 
+it: 1400 acc: 150 ##------ Wed Mar 25 18:39:20 2020 ------## 
+it: 700 acc: 89 ##------ Wed Mar 25 18:39:23 2020 ------## 
+it: 700 acc: 153 ##------ Wed Mar 25 18:39:33 2020 ------## 
+it: 800 acc: 93 ##------ Wed Mar 25 18:40:03 2020 ------## 
+it: 800 acc: 124 ##------ Wed Mar 25 18:40:30 2020 ------## 
+it: 800 acc: 187 ##------ Wed Mar 25 18:40:30 2020 ------## 
+it: 900 acc: 258 ##------ Wed Mar 25 18:40:36 2020 ------## 
+it: 800 acc: 147 ##------ Wed Mar 25 18:40:40 2020 ------## 
+it: 1500 acc: 201 ##------ Wed Mar 25 18:40:41 2020 ------## 
+it: 800 acc: 99 ##------ Wed Mar 25 18:40:58 2020 ------## 
+it: 1200 acc: 272 ##------ Wed Mar 25 18:41:02 2020 ------## 
+it: 1500 acc: 158 ##------ Wed Mar 25 18:41:14 2020 ------## 
+it: 800 acc: 108 ##------ Wed Mar 25 18:41:16 2020 ------## 
+it: 800 acc: 180 ##------ Wed Mar 25 18:41:20 2020 ------## 
+it: 900 acc: 109 ##------ Wed Mar 25 18:41:54 2020 ------## 
+it: 900 acc: 227 ##------ Wed Mar 25 18:42:19 2020 ------## 
+it: 1000 acc: 291 ##------ Wed Mar 25 18:42:19 2020 ------## 
+it: 900 acc: 145 ##------ Wed Mar 25 18:42:20 2020 ------## 
+it: 1600 acc: 216 ##------ Wed Mar 25 18:42:29 2020 ------## 
+it: 900 acc: 171 ##------ Wed Mar 25 18:42:30 2020 ------## 
+it: 900 acc: 108 ##------ Wed Mar 25 18:42:44 2020 ------## 
+it: 1300 acc: 308 ##------ Wed Mar 25 18:42:50 2020 ------## 
+it: 900 acc: 119 ##------ Wed Mar 25 18:43:07 2020 ------## 
+it: 1600 acc: 177 ##------ Wed Mar 25 18:43:07 2020 ------## 
+it: 900 acc: 205 ##------ Wed Mar 25 18:43:09 2020 ------## 
+it: 1000 acc: 124 ##------ Wed Mar 25 18:43:47 2020 ------## 
+it: 1100 acc: 331 ##------ Wed Mar 25 18:44:03 2020 ------## 
+it: 1000 acc: 256 ##------ Wed Mar 25 18:44:09 2020 ------## 
+it: 1000 acc: 163 ##------ Wed Mar 25 18:44:11 2020 ------## 
+it: 1700 acc: 224 ##------ Wed Mar 25 18:44:17 2020 ------## 
+it: 1000 acc: 197 ##------ Wed Mar 25 18:44:19 2020 ------## 
+it: 1000 acc: 123 ##------ Wed Mar 25 18:44:30 2020 ------## 
+it: 1400 acc: 337 ##------ Wed Mar 25 18:44:37 2020 ------## 
+it: 1000 acc: 230 ##------ Wed Mar 25 18:44:57 2020 ------## 
+it: 1700 acc: 203 ##------ Wed Mar 25 18:45:00 2020 ------## 
+it: 1000 acc: 132 ##------ Wed Mar 25 18:45:00 2020 ------## 
+it: 1100 acc: 139 ##------ Wed Mar 25 18:45:39 2020 ------## 
+it: 1200 acc: 368 ##------ Wed Mar 25 18:45:46 2020 ------## 
+it: 1100 acc: 282 ##------ Wed Mar 25 18:45:57 2020 ------## 
+it: 1100 acc: 179 ##------ Wed Mar 25 18:46:00 2020 ------## 
+it: 1800 acc: 234 ##------ Wed Mar 25 18:46:06 2020 ------## 
+it: 1100 acc: 229 ##------ Wed Mar 25 18:46:09 2020 ------## 
+it: 1100 acc: 130 ##------ Wed Mar 25 18:46:15 2020 ------## 
+it: 1500 acc: 378 ##------ Wed Mar 25 18:46:24 2020 ------## 
+it: 1100 acc: 256 ##------ Wed Mar 25 18:46:45 2020 ------## 
+it: 1800 acc: 231 ##------ Wed Mar 25 18:46:52 2020 ------## 
+it: 1100 acc: 140 ##------ Wed Mar 25 18:46:53 2020 ------## 
+it: 1300 acc: 402 ##------ Wed Mar 25 18:47:28 2020 ------## 
+it: 1200 acc: 158 ##------ Wed Mar 25 18:47:31 2020 ------## 
+it: 1200 acc: 312 ##------ Wed Mar 25 18:47:46 2020 ------## 
+it: 1200 acc: 203 ##------ Wed Mar 25 18:47:51 2020 ------## 
+it: 1900 acc: 247 ##------ Wed Mar 25 18:47:54 2020 ------## 
+it: 1200 acc: 257 ##------ Wed Mar 25 18:47:58 2020 ------## 
+it: 1200 acc: 140 ##------ Wed Mar 25 18:48:01 2020 ------## 
+it: 1600 acc: 406 ##------ Wed Mar 25 18:48:11 2020 ------## 
+it: 1200 acc: 285 ##------ Wed Mar 25 18:48:33 2020 ------## 
+it: 1900 acc: 247 ##------ Wed Mar 25 18:48:44 2020 ------## 
+it: 1200 acc: 151 ##------ Wed Mar 25 18:48:45 2020 ------## 
+it: 1400 acc: 454 ##------ Wed Mar 25 18:49:12 2020 ------## 
+it: 1300 acc: 175 ##------ Wed Mar 25 18:49:23 2020 ------## 
+it: 1300 acc: 328 ##------ Wed Mar 25 18:49:35 2020 ------## 
+it: 1300 acc: 231 ##------ Wed Mar 25 18:49:42 2020 ------## 
+it: 2000 acc: 263 ##------ Wed Mar 25 18:49:42 2020 ------## 
+it: 1300 acc: 285 ##------ Wed Mar 25 18:49:46 2020 ------## 
+it: 1300 acc: 151 ##------ Wed Mar 25 18:49:47 2020 ------## 
+it: 1700 acc: 431 ##------ Wed Mar 25 18:49:59 2020 ------## 
+it: 1300 acc: 307 ##------ Wed Mar 25 18:50:22 2020 ------## 
+it: 1300 acc: 164 ##------ Wed Mar 25 18:50:38 2020 ------## 
+it: 2000 acc: 262 ##------ Wed Mar 25 18:50:38 2020 ------## 
+it: 1500 acc: 487 ##------ Wed Mar 25 18:50:54 2020 ------## 
+it: 1400 acc: 195 ##------ Wed Mar 25 18:51:16 2020 ------## 
+it: 1400 acc: 350 ##------ Wed Mar 25 18:51:22 2020 ------## 
+it: 2100 acc: 279 ##------ Wed Mar 25 18:51:30 2020 ------## 
+it: 1400 acc: 164 ##------ Wed Mar 25 18:51:32 2020 ------## 
+it: 1400 acc: 249 ##------ Wed Mar 25 18:51:33 2020 ------## 
+it: 1400 acc: 304 ##------ Wed Mar 25 18:51:35 2020 ------## 
+it: 1800 acc: 468 ##------ Wed Mar 25 18:51:45 2020 ------## 
+it: 1400 acc: 323 ##------ Wed Mar 25 18:52:10 2020 ------## 
+it: 1400 acc: 182 ##------ Wed Mar 25 18:52:30 2020 ------## 
+it: 2100 acc: 283 ##------ Wed Mar 25 18:52:31 2020 ------## 
+it: 1600 acc: 526 ##------ Wed Mar 25 18:52:37 2020 ------## 
+it: 1500 acc: 217 ##------ Wed Mar 25 18:53:08 2020 ------## 
+it: 1500 acc: 366 ##------ Wed Mar 25 18:53:09 2020 ------## 
+it: 1500 acc: 177 ##------ Wed Mar 25 18:53:18 2020 ------## 
+it: 2200 acc: 290 ##------ Wed Mar 25 18:53:18 2020 ------## 
+it: 1500 acc: 318 ##------ Wed Mar 25 18:53:23 2020 ------## 
+it: 1500 acc: 267 ##------ Wed Mar 25 18:53:24 2020 ------## 
+it: 1900 acc: 503 ##------ Wed Mar 25 18:53:32 2020 ------## 
+it: 1500 acc: 345 ##------ Wed Mar 25 18:53:57 2020 ------## 
+it: 1500 acc: 198 ##------ Wed Mar 25 18:54:20 2020 ------## 
+it: 1700 acc: 566 ##------ Wed Mar 25 18:54:20 2020 ------## 
+it: 2200 acc: 302 ##------ Wed Mar 25 18:54:24 2020 ------## 
+it: 1600 acc: 388 ##------ Wed Mar 25 18:54:57 2020 ------## 
+it: 1600 acc: 234 ##------ Wed Mar 25 18:55:00 2020 ------## 
+it: 1600 acc: 194 ##------ Wed Mar 25 18:55:02 2020 ------## 
+it: 2300 acc: 298 ##------ Wed Mar 25 18:55:06 2020 ------## 
+it: 1600 acc: 343 ##------ Wed Mar 25 18:55:10 2020 ------## 
+it: 1600 acc: 283 ##------ Wed Mar 25 18:55:15 2020 ------## 
+it: 2000 acc: 524 ##------ Wed Mar 25 18:55:18 2020 ------## 
+it: 1600 acc: 373 ##------ Wed Mar 25 18:55:46 2020 ------## 
+it: 1800 acc: 607 ##------ Wed Mar 25 18:56:03 2020 ------## 
+it: 1600 acc: 211 ##------ Wed Mar 25 18:56:13 2020 ------## 
+it: 2300 acc: 327 ##------ Wed Mar 25 18:56:17 2020 ------## 
+it: 1700 acc: 415 ##------ Wed Mar 25 18:56:44 2020 ------## 
+it: 1700 acc: 207 ##------ Wed Mar 25 18:56:47 2020 ------## 
+it: 1700 acc: 258 ##------ Wed Mar 25 18:56:52 2020 ------## 
+it: 2400 acc: 314 ##------ Wed Mar 25 18:56:55 2020 ------## 
+it: 1700 acc: 356 ##------ Wed Mar 25 18:56:58 2020 ------## 
+it: 2100 acc: 563 ##------ Wed Mar 25 18:57:05 2020 ------## 
+it: 1700 acc: 306 ##------ Wed Mar 25 18:57:06 2020 ------## 
+it: 1700 acc: 408 ##------ Wed Mar 25 18:57:34 2020 ------## 
+it: 1900 acc: 653 ##------ Wed Mar 25 18:57:45 2020 ------## 
+it: 1700 acc: 236 ##------ Wed Mar 25 18:58:05 2020 ------## 
+it: 2400 acc: 347 ##------ Wed Mar 25 18:58:10 2020 ------## 
+it: 1800 acc: 445 ##------ Wed Mar 25 18:58:31 2020 ------## 
+it: 1800 acc: 220 ##------ Wed Mar 25 18:58:32 2020 ------## 
+it: 2500 acc: 328 ##------ Wed Mar 25 18:58:43 2020 ------## 
+it: 1800 acc: 272 ##------ Wed Mar 25 18:58:44 2020 ------## 
+it: 1800 acc: 371 ##------ Wed Mar 25 18:58:46 2020 ------## 
+it: 2200 acc: 587 ##------ Wed Mar 25 18:58:51 2020 ------## 
+it: 1800 acc: 320 ##------ Wed Mar 25 18:58:58 2020 ------## 
+it: 1800 acc: 431 ##------ Wed Mar 25 18:59:22 2020 ------## 
+it: 2000 acc: 692 ##------ Wed Mar 25 18:59:27 2020 ------## 
+it: 1800 acc: 251 ##------ Wed Mar 25 18:59:57 2020 ------## 
+it: 2500 acc: 361 ##------ Wed Mar 25 19:00:03 2020 ------## 
+it: 1900 acc: 237 ##------ Wed Mar 25 19:00:17 2020 ------## 
+it: 1900 acc: 471 ##------ Wed Mar 25 19:00:18 2020 ------## 
+it: 2600 acc: 347 ##------ Wed Mar 25 19:00:31 2020 ------## 
+it: 1900 acc: 381 ##------ Wed Mar 25 19:00:35 2020 ------## 
+it: 1900 acc: 297 ##------ Wed Mar 25 19:00:37 2020 ------## 
+it: 2300 acc: 629 ##------ Wed Mar 25 19:00:37 2020 ------## 
+it: 1900 acc: 341 ##------ Wed Mar 25 19:00:50 2020 ------## 
+it: 2100 acc: 740 ##------ Wed Mar 25 19:01:10 2020 ------## 
+it: 1900 acc: 464 ##------ Wed Mar 25 19:01:11 2020 ------## 
+it: 1900 acc: 262 ##------ Wed Mar 25 19:01:48 2020 ------## 
+it: 2600 acc: 379 ##------ Wed Mar 25 19:01:57 2020 ------## 
+it: 2000 acc: 250 ##------ Wed Mar 25 19:02:03 2020 ------## 
+it: 2000 acc: 499 ##------ Wed Mar 25 19:02:04 2020 ------## 
+it: 2700 acc: 367 ##------ Wed Mar 25 19:02:20 2020 ------## 
+it: 2400 acc: 665 ##------ Wed Mar 25 19:02:22 2020 ------## 
+it: 2000 acc: 409 ##------ Wed Mar 25 19:02:23 2020 ------## 
+it: 2000 acc: 316 ##------ Wed Mar 25 19:02:30 2020 ------## 
+it: 2000 acc: 358 ##------ Wed Mar 25 19:02:42 2020 ------## 
+it: 2200 acc: 772 ##------ Wed Mar 25 19:02:53 2020 ------## 
+it: 2000 acc: 486 ##------ Wed Mar 25 19:02:59 2020 ------## 
+it: 2000 acc: 275 ##------ Wed Mar 25 19:03:39 2020 ------## 
+it: 2100 acc: 263 ##------ Wed Mar 25 19:03:47 2020 ------## 
+it: 2700 acc: 398 ##------ Wed Mar 25 19:03:50 2020 ------## 
+it: 2100 acc: 529 ##------ Wed Mar 25 19:03:52 2020 ------## 
+it: 2800 acc: 381 ##------ Wed Mar 25 19:04:08 2020 ------## 
+it: 2500 acc: 702 ##------ Wed Mar 25 19:04:09 2020 ------## 
+it: 2100 acc: 430 ##------ Wed Mar 25 19:04:11 2020 ------## 
+it: 2100 acc: 346 ##------ Wed Mar 25 19:04:22 2020 ------## 
+it: 2100 acc: 377 ##------ Wed Mar 25 19:04:33 2020 ------## 
+it: 2300 acc: 806 ##------ Wed Mar 25 19:04:35 2020 ------## 
+it: 2100 acc: 515 ##------ Wed Mar 25 19:04:47 2020 ------## 
+it: 2100 acc: 290 ##------ Wed Mar 25 19:05:30 2020 ------## 
+it: 2200 acc: 272 ##------ Wed Mar 25 19:05:32 2020 ------## 
+it: 2200 acc: 552 ##------ Wed Mar 25 19:05:40 2020 ------## 
+it: 2800 acc: 410 ##------ Wed Mar 25 19:05:44 2020 ------## 
+it: 2600 acc: 746 ##------ Wed Mar 25 19:05:55 2020 ------## 
+it: 2900 acc: 396 ##------ Wed Mar 25 19:05:56 2020 ------## 
+it: 2200 acc: 456 ##------ Wed Mar 25 19:05:58 2020 ------## 
+it: 2200 acc: 365 ##------ Wed Mar 25 19:06:13 2020 ------## 
+it: 2400 acc: 847 ##------ Wed Mar 25 19:06:17 2020 ------## 
+it: 2200 acc: 393 ##------ Wed Mar 25 19:06:24 2020 ------## 
+it: 2200 acc: 539 ##------ Wed Mar 25 19:06:36 2020 ------## 
+it: 2300 acc: 288 ##------ Wed Mar 25 19:07:17 2020 ------## 
+it: 2200 acc: 299 ##------ Wed Mar 25 19:07:21 2020 ------## 
+it: 2300 acc: 573 ##------ Wed Mar 25 19:07:28 2020 ------## 
+it: 2900 acc: 429 ##------ Wed Mar 25 19:07:38 2020 ------## 
+it: 2700 acc: 772 ##------ Wed Mar 25 19:07:40 2020 ------## 
+it: 3000 acc: 412 ##------ Wed Mar 25 19:07:45 2020 ------## 
+it: 2300 acc: 479 ##------ Wed Mar 25 19:07:45 2020 ------## 
+it: 2500 acc: 883 ##------ Wed Mar 25 19:08:00 2020 ------## 
+it: 2300 acc: 388 ##------ Wed Mar 25 19:08:06 2020 ------## 
+it: 2300 acc: 415 ##------ Wed Mar 25 19:08:16 2020 ------## 
+it: 2300 acc: 568 ##------ Wed Mar 25 19:08:24 2020 ------## 
+it: 2400 acc: 305 ##------ Wed Mar 25 19:09:01 2020 ------## 
+it: 2300 acc: 314 ##------ Wed Mar 25 19:09:12 2020 ------## 
+it: 2400 acc: 599 ##------ Wed Mar 25 19:09:15 2020 ------## 
+it: 2800 acc: 801 ##------ Wed Mar 25 19:09:26 2020 ------## 
+it: 3000 acc: 443 ##------ Wed Mar 25 19:09:30 2020 ------## 
+it: 2400 acc: 496 ##------ Wed Mar 25 19:09:31 2020 ------## 
+it: 2600 acc: 922 ##------ Wed Mar 25 19:09:41 2020 ------## 
+it: 2400 acc: 409 ##------ Wed Mar 25 19:09:57 2020 ------## 
+it: 2400 acc: 436 ##------ Wed Mar 25 19:10:08 2020 ------## 
+it: 2400 acc: 590 ##------ Wed Mar 25 19:10:11 2020 ------## 
+it: 2500 acc: 313 ##------ Wed Mar 25 19:10:46 2020 ------## 
+it: 2500 acc: 621 ##------ Wed Mar 25 19:11:02 2020 ------## 
+it: 2400 acc: 331 ##------ Wed Mar 25 19:11:02 2020 ------## 
+it: 2900 acc: 826 ##------ Wed Mar 25 19:11:11 2020 ------## 
+it: 2500 acc: 519 ##------ Wed Mar 25 19:11:18 2020 ------## 
+it: 2700 acc: 956 ##------ Wed Mar 25 19:11:23 2020 ------## 
+it: 2500 acc: 430 ##------ Wed Mar 25 19:11:48 2020 ------## 
+it: 2500 acc: 623 ##------ Wed Mar 25 19:11:58 2020 ------## 
+it: 2500 acc: 458 ##------ Wed Mar 25 19:11:59 2020 ------## 
+it: 2600 acc: 329 ##------ Wed Mar 25 19:12:31 2020 ------## 
+it: 2600 acc: 649 ##------ Wed Mar 25 19:12:49 2020 ------## 
+it: 2500 acc: 344 ##------ Wed Mar 25 19:12:53 2020 ------## 
+it: 3000 acc: 860 ##------ Wed Mar 25 19:12:56 2020 ------## 
+it: 2800 acc: 996 ##------ Wed Mar 25 19:13:04 2020 ------## 
+it: 2600 acc: 545 ##------ Wed Mar 25 19:13:06 2020 ------## 
+it: 2600 acc: 451 ##------ Wed Mar 25 19:13:39 2020 ------## 
+it: 2600 acc: 652 ##------ Wed Mar 25 19:13:45 2020 ------## 
+it: 2600 acc: 476 ##------ Wed Mar 25 19:13:51 2020 ------## 
+it: 2700 acc: 337 ##------ Wed Mar 25 19:14:16 2020 ------## 
+it: 2700 acc: 676 ##------ Wed Mar 25 19:14:36 2020 ------## 
+it: 2600 acc: 355 ##------ Wed Mar 25 19:14:44 2020 ------## 
+it: 2900 acc: 1026 ##------ Wed Mar 25 19:14:46 2020 ------## 
+it: 2700 acc: 572 ##------ Wed Mar 25 19:14:52 2020 ------## 
+it: 2700 acc: 466 ##------ Wed Mar 25 19:15:30 2020 ------## 
+it: 2700 acc: 678 ##------ Wed Mar 25 19:15:32 2020 ------## 
+it: 2700 acc: 492 ##------ Wed Mar 25 19:15:42 2020 ------## 
+it: 2800 acc: 348 ##------ Wed Mar 25 19:16:00 2020 ------## 
+it: 2800 acc: 694 ##------ Wed Mar 25 19:16:22 2020 ------## 
+it: 3000 acc: 1070 ##------ Wed Mar 25 19:16:28 2020 ------## 
+it: 2700 acc: 367 ##------ Wed Mar 25 19:16:33 2020 ------## 
+it: 2800 acc: 598 ##------ Wed Mar 25 19:16:39 2020 ------## 
+it: 2800 acc: 702 ##------ Wed Mar 25 19:17:18 2020 ------## 
+it: 2800 acc: 489 ##------ Wed Mar 25 19:17:21 2020 ------## 
+it: 2800 acc: 515 ##------ Wed Mar 25 19:17:33 2020 ------## 
+it: 2900 acc: 358 ##------ Wed Mar 25 19:17:43 2020 ------## 
+it: 2900 acc: 715 ##------ Wed Mar 25 19:18:08 2020 ------## 
+it: 2800 acc: 388 ##------ Wed Mar 25 19:18:23 2020 ------## 
+it: 2900 acc: 615 ##------ Wed Mar 25 19:18:26 2020 ------## 
+it: 2900 acc: 723 ##------ Wed Mar 25 19:19:05 2020 ------## 
+it: 2900 acc: 503 ##------ Wed Mar 25 19:19:12 2020 ------## 
+it: 2900 acc: 525 ##------ Wed Mar 25 19:19:24 2020 ------## 
+it: 3000 acc: 367 ##------ Wed Mar 25 19:19:26 2020 ------## 
+it: 3000 acc: 745 ##------ Wed Mar 25 19:19:55 2020 ------## 
+it: 3000 acc: 634 ##------ Wed Mar 25 19:20:11 2020 ------## 
+it: 2900 acc: 410 ##------ Wed Mar 25 19:20:12 2020 ------## 
+it: 3000 acc: 748 ##------ Wed Mar 25 19:20:49 2020 ------## 
+it: 3000 acc: 517 ##------ Wed Mar 25 19:20:57 2020 ------## 
+it: 3000 acc: 545 ##------ Wed Mar 25 19:21:08 2020 ------## 
+it: 3000 acc: 420 ##------ Wed Mar 25 19:21:50 2020 ------## 
+Warning message:
+In mclapply(1:nexp, function(i) calib(i, nchains = 1), mc.cores = 20,  :
+  143 function calls resulted in an error
+> 
+> save.image('inversion_trial1.rda')
+> 
+> proc.time()
+      user     system    elapsed 
+158097.869    264.397   9665.832 

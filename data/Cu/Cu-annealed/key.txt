@@ -1,0 +1,7 @@
+#FILE NAME                T[K]   RATE[1/s]
+CuData/CuRT203.txt        298.0  2000.0 
+CuData/Cu20203.txt        473.0  2000.0 
+CuData/Cu40203.txt        673.0  2000.0 
+CuData/Cu60203.txt        873.0  2000.0 
+CuData/CuRT10-1.SRC.txt   298.0  0.1   
+CuData/CuRT10-3.SRC.txt   298.0  0.001 

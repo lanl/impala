@@ -1,0 +1,53 @@
+#taylor cylinder data harvested from D.J. Allen, 
+#Optimizing Material Strength Constraints Numerically Extracted from 
+#Taylor Impact Data, Experimental Mechanics 1997
+#why so many DJs?
+#initial length is 39.35 mm, initial diameter 7.87 mm
+#initial radius is 3.935 mm, velocity of cylinder 214 m/s
+#initial density 8.592 g/cc
+#error on numbers is about +/- 30 microns (0.03 mm)
+#from Sky Sjue data harvest technique
+#z     rho/radius   [mm]
+0.0    8.25
+0.25   8.20
+0.50   8.05
+0.76   7.79
+1.01   7.54
+1.26   7.24
+1.51   6.96
+1.77   6.66
+2.02   6.36
+2.27   6.05
+2.52   5.85
+2.77   5.70
+3.03   5.55
+3.28   5.42
+3.53   5.37
+3.83   5.31
+4.14   5.25
+4.44   5.20
+4.94   5.17
+5.45   5.12
+5.95   5.07
+6.46   5.02
+6.96   4.97
+7.47   4.92
+7.97   4.84
+8.48   4.77
+8.98   4.69
+9.48   4.62
+9.99   4.54
+10.49  4.49
+11.0   4.41
+11.50  4.34
+12.01  4.29
+12.51  4.21
+13.02  4.16
+13.52  4.14
+14.02  4.09
+14.53  4.04
+15.03  4.01
+15.54  3.99
+18.92  3.96
+20.63  3.935
+27.19  3.935
