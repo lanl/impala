@@ -132,37 +132,61 @@ cpdef np.ndarray[dtype = np.float_t, ndim = 2] localcov(
         ):
     """
     Localized Covariance Matrix window
+    Arguments:
+    -   obs:    Observations prior to current one
+    -   current:    target location
+    -   distance:   Covariance matrix window radius
+    -   nu:     prior weighting for proposal matrix
+    -   psi0:   prior diagonal value for proposal matrix
     """
-    cdef int d = target.shape[0]
-    cdef int nlobs = 0
-    cdef int nobs = obs.shape[0]
-    cdef int keep = 0
-    cdef int drop = 0
-    cdef np.ndarray[dtype = np.float_t, ndim = 1] curr_diff = \
-            np.empty(d, dtype = np.float)
+    cdef int d = target.shape[0]  # dimension of data
+    cdef int nobs = obs.shape[0]  # number of observations
+    cdef int nlobs = 0            # Counter for number of local observations
+
+    # Matrix to store local observations.  Declare as empty, fill later
     cdef np.ndarray[dtype = np.float_t, ndim = 2] local = \
             np.empty((nobs, d), dtype = np.float)
+    # Vector to store sum (and then mean) of local Observations
+    cdef np.ndarray[dtype = np.float_t, ndim = 1] lsm = \
+            np.zeros(d, dtype = np.float)
 
+    # Iterators
     cdef int i, j
 
+    # Loop through data by row
     for i in range(nobs):
+        # For each column
         for j in range(d):
-            curr_diff[j] = obs[i,j] - target[j]
-            if abs(curr_diff[j]) > distance:
-                drop += 1
+            # Check if local.  If not, break out of loop.
+            if abs(obs[i,j] - target[j]) > distance:
                 break
+        # If all dimensions of row are local, add observation to local Matrix
+        # Iterate counter for local observations, add observation to sum
         else:
-            local[nlobs] = curr_diff
-            curr_diff = np.empty(d, dtype = np.float)
+            local[nlobs] = obs[i]
             nlobs += 1
+            for j in range(d):
+                lsm[j] += obs[i,j]
 
+    # Verify if number of local observations exceeds minimum
     try:
         assert nlobs > d
     except AssertionError:
         return np.eye(d) * (psi0 / nu)
 
+    # Compute column-wise means
+    for j in range(d):
+        lsm[j] = lsm[j] / nlobs
+
+    # Calculate deivations from mean for local observations
+    for i in range(nlobs):
+        for j in range(d):
+            local[i,j] -= lsm[j]
+
+    # Compute sum of squares matrix
     ssq = (local[:nlobs]).T.dot(local[:nlobs])
 
+    # Return MAP estimate for inv. Wishart assuming diagonal prior
     return (ssq + np.eye(d) * psi0) / (nlobs + nu - d - 1)
 
 # EOF
