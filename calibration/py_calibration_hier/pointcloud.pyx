@@ -100,7 +100,7 @@ cpdef LocalSSq localssq4(
     cdef int nlobs = local.shape[0]
     return LocalSSq(np.cov(local.T) * (nlobs - 1), nlobs)
 
-cpdef np.ndarray[dtype = np.float_t, ndim = 2] localcov(
+cpdef np.ndarray[dtype = np.float_t, ndim = 2] localcovold(
         np.ndarray[dtype = np.float_t, ndim = 2] obs,
         np.ndarray[dtype = np.float_t, ndim = 1] current,
         double distance, double nu, double psi0,
@@ -112,7 +112,7 @@ cpdef np.ndarray[dtype = np.float_t, ndim = 2] localcov(
     -   current:    target location
     -   distance:   Covariance matrix window radius
     -   nu:     prior weighting for proposal matrix
-    -   psi0:   prior diagonal value for proposal matrix    
+    -   psi0:   prior diagonal value for proposal matrix
     """
     cdef int d = current.shape[0]
     cdef np.ndarray[dtype = np.float_t, ndim = 2] absdiff = np.abs(obs - current)
@@ -124,5 +124,45 @@ cpdef np.ndarray[dtype = np.float_t, ndim = 2] localcov(
     except AssertionError:
         return np.eye(d) * (psi0 / nu)
     return (np.cov(local.T) * (nlobs - 1) + np.eye(d) * psi0) / (nu + nlobs - d - 1)
+
+cpdef np.ndarray[dtype = np.float_t, ndim = 2] localcov(
+        np.ndarray[dtype = np.float_t, ndim = 2] obs,
+        np.ndarray[dtype = np.float_t, ndim = 1] target,
+        np.float_t distance, np.float_t nu, np.float_t psi0,
+        ):
+    """
+    Localized Covariance Matrix window
+    """
+    cdef int d = target.shape[0]
+    cdef int nlobs = 0
+    cdef int nobs = obs.shape[0]
+    cdef int keep = 0
+    cdef int drop = 0
+    cdef np.ndarray[dtype = np.float_t, ndim = 1] curr_diff = \
+            np.empty(d, dtype = np.float)
+    cdef np.ndarray[dtype = np.float_t, ndim = 2] local = \
+            np.empty((nobs, d), dtype = np.float)
+
+    cdef int i, j
+
+    for i in range(nobs):
+        for j in range(d):
+            curr_diff[j] = obs[i,j] - target[j]
+            if abs(curr_diff[j]) > distance:
+                drop += 1
+                break
+        else:
+            local[nlobs] = curr_diff
+            curr_diff = np.empty(d, dtype = np.float)
+            nlobs += 1
+
+    try:
+        assert nlobs > d
+    except AssertionError:
+        return np.eye(d) * (psi0 / nu)
+
+    ssq = (local[:nlobs]).T.dot(local[:nlobs])
+
+    return (ssq + np.eye(d) * psi0) / (nlobs + nu - d - 1)
 
 # EOF
