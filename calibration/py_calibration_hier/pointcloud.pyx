@@ -2,6 +2,7 @@ cimport numpy as np
 import numpy as np
 import numpy.ma as ma
 np.seterr(all = 'raise')
+from libc.math cimport fabs
 
 cdef class LocalSSq():
     cdef object ssqmat
@@ -128,7 +129,7 @@ cpdef np.ndarray[dtype = np.float_t, ndim = 2] localcovold(
 cpdef np.ndarray[dtype = np.float_t, ndim = 2] localcov(
         np.ndarray[dtype = np.float_t, ndim = 2] obs,
         np.ndarray[dtype = np.float_t, ndim = 1] target,
-        np.float_t distance, np.float_t nu, np.float_t psi0,
+        double distance, double nu, double psi0,
         ):
     """
     Localized Covariance Matrix window
@@ -136,7 +137,7 @@ cpdef np.ndarray[dtype = np.float_t, ndim = 2] localcov(
     -   obs:    Observations prior to current one
     -   current:    target location
     -   distance:   Covariance matrix window radius
-    -   nu:     prior weighting for proposal matrix
+    -   nu:     prior degrees of freedom for proposal matrix
     -   psi0:   prior diagonal value for proposal matrix
     """
     cdef int d = target.shape[0]  # dimension of data
@@ -149,6 +150,8 @@ cpdef np.ndarray[dtype = np.float_t, ndim = 2] localcov(
     # Vector to store sum (and then mean) of local Observations
     cdef np.ndarray[dtype = np.float_t, ndim = 1] lsm = \
             np.zeros(d, dtype = np.float)
+    # Matrix to store sum of squares.
+    cdef np.ndarray[dtype = np.float_t, ndim = 2] ssq
 
     # Iterators
     cdef int i, j
@@ -158,7 +161,7 @@ cpdef np.ndarray[dtype = np.float_t, ndim = 2] localcov(
         # For each column
         for j in range(d):
             # Check if local.  If not, break out of loop.
-            if abs(obs[i,j] - target[j]) > distance:
+            if fabs(obs[i,j] - target[j]) > distance:
                 break
         # If all dimensions of row are local, add observation to local Matrix
         # Iterate counter for local observations, add observation to sum
@@ -172,13 +175,13 @@ cpdef np.ndarray[dtype = np.float_t, ndim = 2] localcov(
     try:
         assert nlobs > d
     except AssertionError:
-        return np.eye(d) * (psi0 / nu)
+        return np.eye(d) * psi0 / nu
 
     # Compute column-wise means
     for j in range(d):
-        lsm[j] = lsm[j] / nlobs
+        lsm[j] /= nlobs
 
-    # Calculate deivations from mean for local observations
+    # Calculate deviations from mean for local observations
     for i in range(nlobs):
         for j in range(d):
             local[i,j] -= lsm[j]
