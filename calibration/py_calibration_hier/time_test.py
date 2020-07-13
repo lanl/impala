@@ -68,8 +68,10 @@ if __name__ == '__main__':
     #print(timeit("res = localssq4(x, target, 0.5)", setup = setup, number = 10000))
     #print(timeit(testc, setup = setupc, number = 10000))
     #print(timeit(testp, setup = setupp, number = 10000))
-
-    print(timeit(test_gpy, setup = setup_gpy, number = 100000))
+    setup = "from pointcloud import localcovold, localcov; import numpy as np; from numpy.random import normal; x1 = normal(0,3, 100000); x2 = normal(0.7*x1 + 1, 3); x3 = normal(0.2*x2 + 0.3*x1, 3); x4 = normal(0.2*x3 + 0.3*x2, 3);  x5 = normal(0.1*x4 + 0.7*x3, 3);  x = np.vstack((x1,x2,x3,x4,x5)).T; target = np.mean(x, axis = 0)"
+    #print(timeit('res = localcovold(x, target, 0.5, 40, 1e-4)', setup = setup, number = 10000)) # 45 seconds
+    print(timeit('res = localcov(x, target, 0.5, 40, 1e-4)', setup = setup, number = 10000)) # 5.5 seconds
+    #print(timeit(test_gpy, setup = setup_gpy, number = 100000))
 
 
 # EOF
