@@ -14,11 +14,10 @@ from scipy.stats import invgamma, multivariate_normal as mvnorm
 from scipy.special import erf, erfinv
 from numpy.linalg import cholesky
 from numpy.random import normal, uniform
-from random import sample
+from random import sample, shuffle
 from math import ceil, sqrt, pi, log, exp
 from itertools import combinations
 from pointcloud import localcov
-from random import shuffle
 
 from submodel import SubModelHB, SubModelTC, SubModelFP
 from transport import TransportHB, TransportTC, TransportFP
@@ -39,6 +38,7 @@ class BreakException(Exception):
 
 class Transformer(object):
     """ Class to hold transformations (logit, probit) """
+    parameter_order = []
 
     @staticmethod
     def logit(x):
@@ -101,8 +101,7 @@ class Transformer(object):
         plt.savefig(path)
         return
 
-    @staticmethod
-    def parameter_pairwise_plot(sample_parameters, path):
+    def parameter_pairwise_plot(self, sample_parameters, path):
         """ """
         def off_diag(x, y, **kwargs):
             plt.scatter(x, y, **kwargs)
@@ -147,7 +146,7 @@ class Transformer(object):
         plt.savefig(path)
         return
 
-class Chain(object, Transformer):
+class Chain(Transformer):
     N = 0
     s2_a = 1; s2_b = 1
     temperature = 1.
@@ -159,7 +158,7 @@ class Chain(object, Transformer):
         return self.s_theta[self.iter]
 
     @property
-    def curr_s2(self):
+    def curr_sigma2(self):
         return self.s_sigma2[self.iter]
 
     def set_temperature(self, temperature):
@@ -182,8 +181,8 @@ class Chain(object, Transformer):
         tdiff = theta - self.curr_theta
         return sum(tdiff * tdiff)
 
-    def log_posterior(self, sse, ldetjac, s2, temp = self.temperature):
-        loglik = ()
+    def log_posterior(self, sse, ldetjac, s2, temp = 1.):
+        loglik = - 0.5 * sse / s2
         logpri = ()
         return logpri + ldetjac + loglik / temp
 
@@ -191,7 +190,7 @@ class Chain(object, Transformer):
         """ Sample Sigma2 for the pooled parameter set """
         aa = 0.5 * self.N / self.temperature + self.s2_a
         bb = 0.5 * self.curr_sse / self.temperature + self.s2_b
-        return invgamma.rvs(aa, scale = b)
+        return invgamma.rvs(aa, scale = bb)
 
     def localcov(self, target):
         lc = localcov(
@@ -199,6 +198,74 @@ class Chain(object, Transformer):
             self.radius, self.nu, self.psi0
             )
         return lc
+
+    def check_constraints(self, theta):
+        """ Check the Material Model constraints """
+        th = self.unnormalize(self.invprobit(theta))
+        self.materialmodel.update_parameters(th)
+        return self.materialmodel.check_constraints()
+
+    def iter_sample(self):
+        self.iter += 1
+
+        # Generate new sigma^2
+        self.s_sigma2[self.iter] = self.sample_sigma2()
+
+        # Setting up Covariance Matrix at current
+        curr_theta = self.s_theta[self.iter - 1]
+        curr_cov = self.localcov(curr_theta)
+        curr_theta_diff = curr_theta - self.parent.curr_theta
+        curr_ssd = sum(curr_theta_diff * curr_theta_diff)
+
+        # Generating Proposal, computing Covariance Matrix at proposal
+        S = cholesky(curr_cov)
+
+        prop_theta = curr_theta + normal(size = self.d).dot(S)
+
+        while not self.check_constraints(prop_theta):
+            prop_theta = curr_theta + normal(size = self.d).dot(S)
+
+        prop_cov = self.localcov(prop_theta)
+        prop_sse = self.probit_sse(prop_theta)
+        prop_theta_diff = prop_theta - self.parent.curr_theta
+        prop_ssd = sum(prop_theta_diff * prop_theta_diff)
+        prop_ldj = self.invprobitlogjac(prop_theta)
+
+        # Log-Posterior for theta at current and proposal
+        curr_lp = self.log_posterior(
+                self.curr_sse,
+                self.curr_ldj,
+                self.curr_s2,
+                curr_ssd,
+                self.parent.curr_s2,
+                self.temperature,
+                )
+        prop_lp = self.log_posterior(
+                prop_sse,
+                prop_ldj,
+                self.curr_s2,
+                prop_ssd,
+                self.parent.curr_s2,
+                self.temperature,
+                )
+
+        # Log-density of proposal dist from current to proposal (and visa versa)
+        cp_ld = mvnorm.logpdf(prop_theta, curr_theta, curr_cov)
+        pc_ld = mvnorm.logpdf(curr_theta, prop_theta, prop_cov)
+
+        # Compute alpha
+        log_alpha = prop_lp + pc_ld - curr_lp - cp_ld
+
+        # Conduct Metropolis step:
+        if log(uniform()) < log_alpha:
+            self.accepted[self.iter] = 1
+            self.s_theta[self.iter] = prop_theta
+            self.curr_sse = prop_sse
+            self.curr_ldj = prop_ldj
+        else:
+            self.s_theta[self.iter] = curr_theta
+            self.curr_sse = self.probit_sse(curr_theta)
+        return
 
     def get_state(self):
         """ Extracts the current state of the chain, returns it as a dictionary.
@@ -211,7 +278,7 @@ class Chain(object, Transformer):
         sse0    = sum((thetas - self.curr_theta) * (thetas - self.curr_theta))
 
         state = {
-            'theta0' : self.curr_theta,
+            'theta0'  : self.curr_theta,
             'sigma20' : self.curr_sigma2,
             'sse0'    : sse0,
             'theta'   : thetas,
@@ -223,26 +290,67 @@ class Chain(object, Transformer):
 
     def get_history(self, nburn = 0, thin = 1):
         theta = self.invprobit(self.s_theta[(nburn + 1)::thin])
-        s2    = self.s_s2[(nburn + 1)::thin]
+        s2    = self.s_sigma2[(nburn + 1)::thin]
         return (theta, s2)
 
     def initialize_sampler(self, ns, starting):
         self.s_theta  = np.empty((ns, self.d))
-        self.s_s2     = np.empty(ns)
+        self.s_sigma2 = np.empty(ns)
         self.accepted = np.zeros(ns)
         self.iter     = 0
 
         for subchain in self.subchains:
             subchain.initialize_sampler(ns, starting)
 
-        self.s_theta[0] = starting
-        self.s_s2[0]    = 1e-5
-        self.curr_sse   = self.probit_sse(self.curr_theta)
-        self.curr_ldj   = self.invprobitlogjac(self.curr_theta)
+        self.s_theta[0]  = starting
+        self.s_sigma2[0] = 1e-5
+        self.curr_sse    = self.probit_sse(self.curr_theta)
+        self.curr_ldj    = self.invprobitlogjac(self.curr_theta)
         return
 
-    def __init__(self, ):
-        pass
+    def __init__(self, xps, bounds, consts, nu = 40, psi0 = 1e-4,
+                    r0 = 0.5, temp = 1., **kwargs):
+        """
+        Initialization of Hopkinson Bar Model.
+
+        xp     - dictionary of inputs to transport class (HB)
+        bounds - boundaries of parameters
+        consts - dictionary of constant Values
+        nu     - prior weighting for sampling covariance Matrix
+        psi0   - prior diagonal for sampling covariance Matrix
+        r0     - search radius for sampling covariance matrix (modified by temp)
+        temp   - tempering temperature
+        kwargs - Additional arguments to go to MaterialModel
+        """
+        self.materialmodel = MaterialModel(**kwargs)
+        self.subchains = [
+            SubChainHB(parent = self, xp = xp, bounds = bounds, consts = consts,
+                     nu = nu, psi0 = psi0, r0 = r0, temp = temp, **kwargs)
+            for xp in xps
+            ]
+        self.nu = nu
+        self.psi0 = psi0
+        self.r0 = r0
+        self.set_temperature(temp)
+
+        self.N = len(self.subchains)
+
+        self.parameter_order = self.subchains[0].parameter_order
+        self.d = len(self.parameter_order)
+
+        self.bounds = np.array([bounds[key] for key in self.parameter_order])
+
+        params = {x:y for x,y in zip(self.parameter_order, np.zero(self.d))}
+        self.initialize_submodel(params, consts)
+        return
+
+class ChainPlaceholder(Transformer):
+    curr_theta = np.array([0.] * 8)
+    curr_sigma2 = 0.25
+
+    def __init__(self):
+        return
+
 
 class SubChainHB(Chain):
     """ A sub-chain conducts sampling of PTW parameters and error terms for a
@@ -255,7 +363,7 @@ class SubChainHB(Chain):
     temperature = 1.
     curr_sse = 1e10
 
-    def log_posterior(self, sse, ldetjac, s2, ssd, ps2, temp = self.temperature):
+    def log_posterior(self, sse, ldetjac, s2, ssd, ps2, temp = 1.):
         loglik = (
             - 0.5 * self.N * log(s2)
             - 0.5 * (sse / s2 + ssd / ps2)
@@ -271,7 +379,7 @@ class SubChainHB(Chain):
         return logpri + ldetjac + loglik / temp
 
     def initialize_submodel(self, params, consts):
-        self.submodel.initialize_model(params, consts)
+        self.submodel.initialize_submodel(params, consts)
         return
 
     def sse(self, parameters):
@@ -294,7 +402,7 @@ class SubChainHB(Chain):
         self.iter += 1
 
         # Generate new sigma^2
-        self.s_s2[self.iter] = self.sample_sigma2()
+        self.s_sigma2[self.iter] = self.sample_sigma2()
 
         # Setting up Covariance Matrix at current
         curr_theta = self.s_theta[self.iter - 1]
@@ -314,16 +422,18 @@ class SubChainHB(Chain):
         curr_lp = self.log_posterior(
                 self.curr_sse,
                 self.curr_ldj,
-                self.curr_s2,
+                self.curr_sigma2,
                 curr_ssd,
-                self.parent.curr_s2,
+                self.parent.curr_sigma2,
+                self.temperature,
                 )
         prop_lp = self.log_posterior(
                 prop_sse,
                 prop_ldj,
-                self.curr_s2,
+                self.curr_sigma2,
                 prop_ssd,
-                self.parent.curr_s2,
+                self.parent.curr_sigma2,
+                self.temperature,
                 )
 
         # Log-density of proposal dist from current to proposal (and visa versa)
@@ -352,7 +462,7 @@ class SubChainHB(Chain):
     def get_state(self):
         state = {
             'theta' : self.curr_theta,
-            's2'    : self.curr_s2,
+            's2'    : self.curr_sigma2,
             'sse'   : self.curr_sse,
             'ldj'   : self.curr_ldj,
             'temp'  : self.temperature,
@@ -361,21 +471,22 @@ class SubChainHB(Chain):
 
     def initialize_sampler(self, ns, starting):
         self.s_theta  = np.empty((ns, self.d))
-        self.s_s2     = np.empty(ns)
+        self.s_sigma2 = np.empty(ns)
         self.accepted = np.zeros(ns)
         self.iter     = 0
 
-        self.s_theta[0] = starting
-        self.s_s2[0]    = 1e-5
-        self.curr_sse   = self.probit_sse(self.curr_theta)
-        self.curr_ldj   = self.invprobitlogjac(self.curr_theta)
+        self.s_theta[0]  = starting
+        self.s_sigma2[0] = 1e-5
+        self.curr_sse    = self.probit_sse(self.curr_theta)
+        self.curr_ldj    = self.invprobitlogjac(self.curr_theta)
         return
 
     def __init__(
             self,
+            parent,
             xp,
             bounds,
-            consts,
+            constants,
             nu = 40,
             psi0 = 1e-4,
             r0 = 0.5,
@@ -393,6 +504,8 @@ class SubChainHB(Chain):
         temp   - tempering temperature
         kwargs - Additional arguments to go to MaterialModel
         """
+        self.parent = parent
+
         self.nu = nu
         self.psi0 = psi0
         self.r0 = r0
@@ -400,8 +513,8 @@ class SubChainHB(Chain):
 
         self.submodel = SubModelHB(TransportHB(**xp), **kwargs)
         self.N = self.submodel.N
+        self.parameter_order = self.submodel.parameter_order
 
-        self.set_parameter_order()
         self.d = len(self.parameter_order)
 
         self.bounds = np.array([bounds[key] for key in self.parameter_order])
@@ -413,7 +526,7 @@ class SubChainHB(Chain):
                 self.unnormalize(np.ones(self.d) * 0.5)
                 )
             }
-        self.initialize_submodel(params, consts)
+        self.initialize_submodel(params, constants)
         return
 
 if __name__ == '__main__':

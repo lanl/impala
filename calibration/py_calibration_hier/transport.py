@@ -34,10 +34,10 @@ class TransportHB(object):
     def import_strain_curve(path):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            print('asdf')
-            data = pd.read_csv(path, skiprows = range(0,17)).values
+            #data = pd.read_csv(path, skiprows = range(0,17)).values
+            data = pd.read_csv(path, sep = '\s+').values
         data[:,1] = data[:,1] * 1.e-5 # this is going from MPa to Mbar?
-        return data[1:,:]
+        return data[1:]
 
     def __init__(self, path, temp, emax, edot, Nhist):
         self.data = self.import_strain_curve(path)

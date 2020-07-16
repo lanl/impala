@@ -38,6 +38,10 @@ cdef class BaseModel(object):
         """ Return Value """
         return 0.
 
+    cpdef bint check_constraints(self):
+        """ Checks the constraints of the model """
+        return True
+
     def __init__(self, MaterialModel parent, int p_idx, int c_idx):
         self.parent = parent
         self.p_idx = p_idx
@@ -136,16 +140,19 @@ cdef class SimpleShearModulus(BaseModel):
         return self.G0 * (1. - self.alpha * (temp / tmelt))
 
 cdef class SteinShearModulus(BaseModel):
-    constant_list = ['G0', 'sgB']
-    cdef double eta = 1.
-    cdef double G0, sgB
+    constant_list = ['G0', 'sgB', 'eta']
+    cdef double G0, sgB, eta
+
+    cpdef dict report_constants(self):
+        return {'G0' : self.G0, 'sgB' : self.sgB, 'eta' : self.eta}
 
     cpdef void initialize_constants(self, np.ndarray[np.float64_t, ndim = 1] input):
         self.G0  = input[0]
         self.sgB = input[1]
+        self.eta = input[2]
         return
 
-    cpdef double value(self, double edot):
+    cpdef double value(self, double edot = 0.):
         cdef double temp, tmelt, aterm, bterm, gnow
 
         temp  = self.parent.state.T
@@ -222,8 +229,8 @@ cdef class JCYieldStress(BaseModel):
 
 cdef class PTWYieldStress(BaseModel):
     """ Preston Tonks Wallace Yield Stress Model """
-    parameter_list = ['theta','p','s0','sInf','kappa','gamma','y0','yInf','y1','y2']
-    constant_list  = ['beta','matomic']
+    parameter_list = ['theta','p','s0','sInf','kappa','gamma','y0','yInf']
+    constant_list  = ['beta','matomic', 'y1','y2']
 
     cdef double theta, p, s0, sInf, kappa, gamma, y0, yInf, y1, y2
     cdef double beta, matomic
@@ -246,14 +253,21 @@ cdef class PTWYieldStress(BaseModel):
         self.gamma = input[5]
         self.y0    = input[6]
         self.yInf  = input[7]
-        self.y1    = input[8]
-        self.y2    = input[9]
         return
 
     cpdef void initialize_constants(self, np.ndarray[np.float64_t, ndim = 1] input):
         self.beta    = input[0]
         self.matomic = input[1]
+        self.y1     = input[2]
+        self.y2     = input[3]
         return
+
+    cpdef bint check_constraints(self):
+        if ((self.sInf > self.s0) or (self.yInf > self.y0)   or
+            (self.y0   > self.s0) or (self.yInf > self.sInf)):
+            return False
+        else:
+            return True
 
     cpdef double value(self, double edot = 0.):
         cdef:
@@ -268,11 +282,8 @@ cdef class PTWYieldStress(BaseModel):
         cdef double rho   = self.parent.state.rho
         cdef double ledot = edot * 1.e6
 
-        if ((self.sInf > self.s0)         or
-                (self.yInf > self.y0)     or
-                (self.y0 > self.s0)       or
-                (self.yInf > self.sInf)):
-            return -999.
+        if not self.check_constraints():
+            return -999
 
         t_hom = temp / tmelt
         ainv = cbrt((4./3.) * pi * rho / self.matomic)
@@ -322,6 +333,13 @@ cdef class SteinFlowStress(BaseModel):
 
     cdef double y0,a, b, beta, n, ymax
     cdef double G0, epsi, chi
+
+    cpdef dict report_parameters(self):
+        return {'y0'   : self.y0,   'a' : self.a, 'b'    : self.b,
+                'beta' : self.beta, 'n' : self.n, 'ymax' : self.ymax}
+
+    cpdef dict report_constants(self):
+        return {'G0' : self.G0, 'epsi' : self.epsi, 'chi' : self.chi}
 
     cpdef void update_parameters(self, np.ndarray[np.float64_t, ndim = 1] input):
         self.y0   = input[0]
@@ -441,10 +459,12 @@ cdef class MaterialModel:
         cdef np.ndarray[dtype = np.float64_t, ndim = 2] results = np.empty((self.Nhist, 6))
 
         self.update_state(strain_rate[0], 0.)
-        results[0] = (times[0], self.state.strain, self.state.stress, self.state.T, self.state.G, self.state.rho)
+        results[0] = (times[0], self.state.strain, self.state.stress,
+                      self.state.T, self.state.G, self.state.rho)
         for i in range(1, self.Nhist):
             self.update_state(strain_rate[i-1], delta_t[i-1])
-            results[i] = (times[i], self.state.strain, self.state.stress, self.state.T, self.state.G, self.state.rho)
+            results[i] = (times[i], self.state.strain, self.state.stress,
+                          self.state.T, self.state.G, self.state.rho)
         return results
 
     cpdef void initialize_state(self, double T = 300., double strain = 0., double stress = 0.):
@@ -467,7 +487,7 @@ cdef class MaterialModel:
     cpdef void update_parameters(self, np.ndarray[np.float64_t, ndim = 1] param):
         """ Updates the Parameters for each of the sub-models """
         self.flow_stress.update_parameters(
-                param[self.flow_stress_idx[0] : self.specific_heat_idx[0]]
+                param[self.flow_stress_idx[0]   : self.specific_heat_idx[0]]
                 )
         self.specific_heat.update_parameters(
                 param[self.specific_heat_idx[0] : self.shear_modulus_idx[0]]
@@ -476,7 +496,7 @@ cdef class MaterialModel:
                 param[self.shear_modulus_idx[0] : self.melt_model_idx[0]]
                 )
         self.melt_model.update_parameters(
-                param[self.melt_model_idx[0] : self.density_model_idx[1]]
+                param[self.melt_model_idx[0]    : self.density_model_idx[0]]
                 )
         self.density_model.update_parameters(
                 param[self.density_model_idx[0] : ]
@@ -532,9 +552,19 @@ cdef class MaterialModel:
         self.initialize_state(T, strain, stress)
         return
 
-    def get_chi(self):
+    cpdef double get_chi(self):
         """ Get current value of chi """
         return self.chi
+
+    cpdef bint check_constraints(self):
+        checked = [
+            self.flow_stress.check_constraints(),
+            self.specific_heat.check_constraints(),
+            self.shear_modulus.check_constraints(),
+            self.melt_model.check_constraints(),
+            self.density_model.check_constraints(),
+            ]
+        return all(checked)
 
     def __init__(
             self,

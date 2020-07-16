@@ -71,6 +71,9 @@ class SubModelBase(object):
     def sse(self, *args):
         return 0.
 
+    def check_constraints(self):
+        return True
+
     def __init__(self, transport, **kwargs):
         return
 
@@ -165,6 +168,9 @@ class SubModelHB(SubModelBase):
         self.model.initialize(parameters, constants)
         return
 
+    def check_constraints(self):
+        return self.model.check_constraints()
+    
     def __init__(self, transport, **kwargs):
         """
         Already described what "StatisticalSubModel" is.
