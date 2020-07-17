@@ -3,8 +3,8 @@ statistical_models_hier_redux.py
 
 Defines the Statistical models
 
-Chain - Defines the
-SubChain -
+Chain      - Defines the Chain object (Hierarchy)
+SubChainHB - Defines the Subchain relating to Hopkinson Bar (1 Experiment)
 """
 import numpy as np
 import pandas as pd
@@ -150,7 +150,7 @@ class Chain(Transformer):
     N = 0
     s2_a = 1; s2_b = 1
     temperature = 1.
-
+    rank = 0  # placeholder for MPI rank
     curr_sse = 1e10
 
     @property
@@ -181,10 +181,10 @@ class Chain(Transformer):
         tdiff = theta - self.curr_theta
         return sum(tdiff * tdiff)
 
-    def log_posterior(self, sse, ldetjac, s2, temp = 1.):
+    def log_posterior(self, sse, s2, ssd, ps2, temp = 1.):
         loglik = - 0.5 * sse / s2
-        logpri = ()
-        return logpri + ldetjac + loglik / temp
+        logpri = - 0.5 * ssd / ps2
+        return (logpri + loglik) / temp
 
     def sample_sigma2(self):
         """ Sample Sigma2 for the pooled parameter set """
@@ -285,8 +285,15 @@ class Chain(Transformer):
             'sigma2'  : sigma2s,
             'sse'     : sses,
             'temp'    : self.temperature,
+            'rank'    : self.rank
             }
         return state
+
+    def set_state(self, state):
+        self.s_theta[self.iter] = state['theta0']
+        self.s_sigma2[self.iter] = state['sigma20']
+        for i in
+        pass
 
     def get_history(self, nburn = 0, thin = 1):
         theta = self.invprobit(self.s_theta[(nburn + 1)::thin])
@@ -351,7 +358,6 @@ class ChainPlaceholder(Transformer):
     def __init__(self):
         return
 
-
 class SubChainHB(Chain):
     """ A sub-chain conducts sampling of PTW parameters and error terms for a
     particular experiment.  Each experiment gets its own sub-chain.
@@ -368,15 +374,7 @@ class SubChainHB(Chain):
             - 0.5 * self.N * log(s2)
             - 0.5 * (sse / s2 + ssd / ps2)
             )
-
-        # logpri = (
-        #    - (self.s2_a - 1) * log(s2)
-        #    - self.s2_b / s2
-        #    )
-
-        logpri = 0
-
-        return logpri + ldetjac + loglik / temp
+        return ldetjac + loglik / temp
 
     def initialize_submodel(self, params, consts):
         self.submodel.initialize_submodel(params, consts)
@@ -527,6 +525,71 @@ class SubChainHB(Chain):
                 )
             }
         self.initialize_submodel(params, constants)
+        return
+
+class ParallelTemperMaster(Transformer):
+    temp_ladder = np.array([1.])
+    chains = []
+
+    swap_yes = []
+    swap_no  = []
+
+    def initialize_chains(self, kwargs):
+        self.chains = [Chain(**kwargs, temp = t) for t in self.temp_ladder]
+        return
+
+    def log_posterior(self,):
+        pass
+
+    def get_states(self):
+        states = [chain.get_state() for chain in self.chains]
+        return states
+
+    def swap_state(self, state_1, state_2):
+        rank_1 = state_1['rank'] - 1
+        rank_2 = state_2['rank'] - 1
+        self.chains[rank_1].set_state(state_2)
+        self.chains[rank_2].set_state(state_1)
+        pass
+
+    @staticmethod
+    def log_chain_posterior(state, temp):
+        lp = (
+            - 0.5 * sum((state['sse'] / state['sigma2'])) / temp
+            - 0.5 * (state['sse0'] / state['sigma20']) / temp
+            )
+        return lp
+
+    def log_alpha(state_a, state_b):
+        lpxx = self.log_posterior(x, x['temp'])
+        lpyy = self.log_posterior(y, y['temp'])
+        lpxy = self.log_posterior(x, y['temp'])
+        lpyx = self.log_posterior(y, x['temp'])
+        return lpxy + lpyx - lpxx - lpyy
+
+    def try_swap_states(self):
+        states = self.get_states()
+        shuffle(states)
+
+        for x, y in list(zip(states[::2], states[1::2])):
+            if log(uniform()) < self.log_alpha(x,y):
+                self.swap_state(x,y)
+                self.swap_yes.append((x['rank'], y['rank']))
+            else:
+                self.swap_no.append((x['rank'], y['rank']))
+        return
+
+    def sample(self, ns):
+        for chain in self.chains:
+            chain.sample(ns)
+        return
+
+    def __init__(self, **kwargs):
+        self.size = size
+        self.temp_ladder = temp_ladder
+
+        self.initialize_chains(kwargs)
+        self.set_chain_temperatures()
         return
 
 if __name__ == '__main__':
