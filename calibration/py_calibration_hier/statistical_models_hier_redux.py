@@ -182,9 +182,12 @@ class Chain(Transformer):
         return sum(tdiff * tdiff)
 
     def log_posterior(self, sse, s2, ssd, ps2, temp = 1.):
-        loglik = - 0.5 * sse / s2
-        logpri = - 0.5 * ssd / ps2
-        return (logpri + loglik) / temp
+        lp = (
+            - 0.5 * (self.n / temp + self.s2_a) * log(s2)
+            - 0.5 * (sse) / temp / s2
+            - 0.5 * 
+            )
+        return lp
 
     def sample_sigma2(self):
         """ Sample Sigma2 for the pooled parameter set """
@@ -397,6 +400,7 @@ class SubChainHB(Chain):
         return self.scaled_sse(self.invlogit(logit_parameters))
 
     def iter_sample(self):
+        """ Performs the sample step for 1 iteration. """
         self.iter += 1
 
         # Generate new sigma^2
@@ -553,10 +557,12 @@ class ParallelTemperMaster(Transformer):
         pass
 
     @staticmethod
-    def log_chain_posterior(state, temp):
+    def log_posterior(state, temp):
         lp = (
-            - 0.5 * sum((state['sse'] / state['sigma2'])) / temp
-            - 0.5 * (state['sse0'] / state['sigma20']) / temp
+            - 0.5 * (state['n'] / temp + state['s2_a'] + 1) * log(state['sigma2'])
+            - 0.5 * sum((state['sse'] / temp + state['s2_b']) / state['sigma2'])
+            - 0.5 * (state['N'] / temp + self.s2_a) + 1
+            - 0.5 * ((state['sse0'] / temp + self.s2_b) / state['sigma20'])
             )
         return lp
 
