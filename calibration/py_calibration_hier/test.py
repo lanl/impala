@@ -12,7 +12,7 @@ paths_hb = [
     ]
 temps_hb = array([298., 473., 673., 873., 298., 298.], dtype = float64)
 edots_hb = array([2000., 2000., 2000., 2000., 0.1, 0.001], dtype = float64) * 1.e-6
-xp_hb = [
+xps_hb = [
     {'path' : x, 'temp' : y, 'edot' : z, 'emax' : 0.65, 'Nhist' : 100}
     for x,y,z in zip(paths_hb, temps_hb, edots_hb)
     ]
@@ -36,14 +36,14 @@ starting_consts = {
     }
 
 if __name__ == '__main__':
-    subchain = SubChainHB(
-        xp = xp_hb[0],
-        parent = ChainPlaceholder(),
+    chain = Chain(
+        xps_hb,
+        # parent = ChainPlaceholder(),
         bounds = parameter_bounds,
         constants = starting_consts,
         flow_stress_model  = PTWYieldStress,
         shear_modulus_model = SimpleShearModulus,
         )
-    subchain.initialize_sampler(10000, array([0.]*8))
+    chain.initialize_sampler(10000)
 
 # EOF

@@ -29,6 +29,8 @@ from GPy.kern import Matern32, Matern52, RBF, Bias, Linear, Coregionalize
 from GPy.inference.mcmc import HMC
 from numpy.random import normal
 
+from methodtools import lru_cache
+
 import matplotlib.pyplot as plt
 import os, sys
 
@@ -85,6 +87,7 @@ class SubModelHB(SubModelBase):
     then returns the sum of squared error from the supplied data values to the
     interpolated values.
     """
+
     def load_data(self, data, temp):
         """
         Loads the data frame into the model
@@ -155,14 +158,16 @@ class SubModelHB(SubModelBase):
         plt.text(0.65,0.12, plot_text, transform = ax.transAxes)
         return
 
+    @lru_cache(maxsize = 12)
     def sse(self, parameters):
         """
         Computes predictions for stress at supplied strain values, then sums
         the squared difference between measured stress and estimated stress.
         """
-        preds = self.prediction(parameters, self.X)
+        preds = self.prediction(np.array(parameters), self.X)
         diffs = self.Y - preds
-        return (diffs * diffs).sum()
+        sse   = (diffs * diffs).sum()
+        return sse
 
     def initialize_submodel(self, parameters, constants):
         self.model.initialize(parameters, constants)
@@ -170,7 +175,7 @@ class SubModelHB(SubModelBase):
 
     def check_constraints(self):
         return self.model.check_constraints()
-    
+
     def __init__(self, transport, **kwargs):
         """
         Already described what "StatisticalSubModel" is.
@@ -211,6 +216,9 @@ class SubModelHBAR1(SubModelHB):
 
     def sse(self, parameters):
         """ Sum-squared errors (accounting for AR1 Error structure) """
+        if parameters == stored_parameters:
+            return self.stored_sse
+
         self.curr_lcd = self.lcd(parameters[-1])
         preds = self.prediction(parameters[:-1], self.X)
         diffs = self.Y - preds
