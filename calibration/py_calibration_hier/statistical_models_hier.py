@@ -1,266 +1,55 @@
-#import cProfile
-from physical_models import *
+"""
+statistical_models_hier_redux.py
+
+Defines the Statistical models
+
+Chain      - Defines the Chain object (Hierarchy)
+SubChainHB - Defines the Subchain relating to Hopkinson Bar (1 Experiment)
+"""
 import numpy as np
 import pandas as pd
-#import ipdb
-import time
-from scipy.interpolate import interp1d
-from scipy.special import erf, erfinv
-from scipy.stats import invgamma, multivariate_normal as mvnorm
-from numpy.linalg import cholesky
-from numpy.random import normal, uniform
-from random import sample
-from math import ceil, sqrt, pi, log
-from itertools import combinations
-from pointcloud import localssq
-import warnings
-warnings.filterwarnings("ignore", message="Degrees of freedom <= 0 for slice")
 
-#import multiprocessing as mp
+# from mpi4py import MPI
+from scipy.stats import invgamma, invwishart, norm, multivariate_normal as mvnorm
+from scipy.special import erf, erfinv
+from scipy.linalg import cho_factor, cho_solve
+from numpy.linalg import cholesky, slogdet
+from numpy.random import normal, uniform
+from random import sample, shuffle
+from math import ceil, sqrt, pi, log, exp
+from itertools import combinations
+from pointcloud import localcov
+
+from submodel import SubModelHB, SubModelTC, SubModelFP
+from transport import TransportHB, TransportTC, TransportFP
+from physical_models_c import MaterialModel
+
 import matplotlib.pyplot as plt
 import seaborn as sea
+import time
+
 sea.set(style = 'ticks')
 
-class StatisticalModel(object):
+# class MPI_Error(Exception):
+#     pass
+
+class BreakException(Exception):
+    pass
+
+# Statistical Models
+
+class Transformer(object):
+    """ Class to hold transformations (logit, probit) """
     parameter_order = []
-
-    def parameter_trace_plot(self, sample_parameters):
-        palette = plt.get_cmap('Set1')
-        if len(sample_parameters.shape) == 1:
-            n = sample_parameters.shape[0]
-            plt.plot(range(n), sample_parameters, marker = '', linewidth = 1)
-        else:
-            # df = pd.DataFrame(sample_parameters, self.parameter_order)
-            n, d = sample_parameters.shape
-            for i in range(d):
-                plt.subplot(d, 1, i+1)
-                plt.plot(range(n), sample_parameters[:,i], marker = '',
-                        color = palette(i), linewidth = 1)
-                ax = plt.gca()
-                ax.set_ylim(0,1)
-        plt.show()
-        return
-
-    def parameter_pairwise_plot(self, sample_parameters):
-        def off_diag(x, y, **kwargs):
-            plt.scatter(x, y, **kwargs)
-            ax = plt.gca()
-            ax.set_xlim(0,1)
-            ax.set_ylim(0,1)
-            return
-
-        #def on_diag(x, **kwargs):
-        #    sea.distplot(x, bins = 20, **kwargs)
-        #    ax = plt.gca()
-        #    ax.set_xlim(0,1)
-        #    return
-        def on_diag(x, **kwargs):
-            plt.hist(x, **kwargs)
-            ax = plt.gca()
-            ax.set_xlim(0,1)
-            return
-
-        d = sample_parameters.shape[1]
-        df = pd.DataFrame(sample_parameters, columns = self.parameter_order)
-        g = sea.PairGrid(df)
-        g = g.map_offdiag(off_diag, s = 1)
-        g = g.map_diag(on_diag)
-        for i in range(d):
-            g.axes[i,i].annotate(self.parameter_order[i], xy = (0.05, 0.9))
-        for ax in g.axes.flatten():
-            ax.set_ylabel('')
-            ax.set_xlabel('')
-
-        plt.show()
-        return
-
-class StatisticalSubModel(object):
-    """
-    The sub-model computes sum-squared-error (sse) for a given set of parameters.
-    So, taking the set of parameters, it builds the stress/strain curve, computes
-    an interpolation of the stress strain curve at the supplied data points, and
-    then returns the sum of squared error from the supplied data values to the
-    interpolated values.
-
-    I'm expecting that this class can be sub-classed to add in functionality for
-    emulators outside of Hopkinson-Bar data.   Everything should be opaque to the
-    StatisticalModel class, which just expects to use the sse method, and the
-    N value.
-    """
-    def load_data(self, data, temp):
-        """
-        Loads the data frame into the model
-        """
-        self.X = data[:,0]
-        self.Y = data[:,1]
-        self.N = len(self.X)
-        self.temp = temp
-        return
-
-    def get_state_history(self, parameters, starting_temp):
-        """
-        Compute State History based on supplied parameters, starting temp.
-        First, initializes the state with the supplied starting temp.
-        Then supplies the given parameters to the model.
-        Then generates the state history.  Returns columns [strain, stress].
-        """
-        self.model.initialize_state(T = starting_temp)
-        self.model.update_parameters(parameters)
-        
-        try:
-            res = self.model.compute_state_history(self.shist)
-        except ConstraintError:
-            res = np.append(self.shist[:,1,None],np.full([len(self.shist),1],-1000.),1) # -1000 if constraint, violated, will cause rejection in M-h
-            return res
-            
-        return res[:,1:3]
-
-    def prediction(self, parameters, x_new):
-        """
-        Generates the stress-strain curve at the supplied parameters, temp.\
-        Interpolates the stress strain curve at the data values using a cubic
-        spline interpolation.
-        """
-        model_curve = self.get_state_history(parameters, self.temp)
-        est_curve = interp1d(model_curve[:,0], model_curve[:,1], kind = 'cubic')
-        return est_curve(x_new)
-
-    def prediction_plot(self, parameters, sigma2):
-        n_curves = parameters.shape[0]
-        emax, edot, Nhist = self.model.report_history_variables()
-        result_y = np.empty((Nhist, n_curves))
-        result_x = np.linspace(0., emax, Nhist)
-
-        msigma = np.sqrt(sigma2.mean())
-
-        for i in range(n_curves):
-            if i == 0:
-                temp = self.get_state_history(parameters[i,:], self.temp)
-                result_y[:,i] = temp[:,1]
-                result_x = temp[:,0]
-            else:
-                result_y[:,i] = self.get_state_history(parameters[i,:], self.temp)[:,1]
-
-        for i in range(n_curves):
-            plt.plot(result_x, result_y[:,i], color = 'gray',
-                        linestyle = '-', linewidth = 0.25,)
-
-        plt.plot(self.X, self.Y, 'bo')
-        #plt.ylim(0.002,0.8)
-        plt.errorbar(self.X, self.Y, fmt = 'none', yerr = msigma)
-        ax = plt.gca()
-        plot_text = '$T_0$ = {} °K\n ε̇ = {}/s'.format(int(self.temp),int(self.edot*1.e6))
-        plt.text(0.65,0.12, plot_text, transform = ax.transAxes)
-        return
-
-    def prediction_plot2(self, parameters, sigma2):
-        n_curves = parameters.shape[0]
-        emax, edot, Nhist = self.model.get_history_variables()
-        result_y = np.empty((Nhist, n_curves))
-        result_x = np.linspace(0., emax, Nhist)
-
-        msigma = np.sqrt(sigma2.mean())
-
-        for i in range(n_curves):
-            if i == 0:
-                temp = self.get_state_history(parameters[i,:], self.temp)
-                result_y[:,i] = temp[:,1]
-                result_x = temp[:,0]
-            else:
-                result_y[:,i] = self.get_state_history(parameters[i,:], self.temp)[:,1]
-
-        quantiles = np.linspace(0.05,0.95,19)
-        qcurves = np.quantile(result_y, quantiles, axis = 1).T
-
-        for i in range(9):
-            alpha = 1. - 2*(quantiles[i] - 0.5)**2
-            plt.plot(result_x, qcurves[:,i], alpha = alpha, color = 'gray',
-                        linestyle = '-', linewidth = 0.25,)
-
-        plt.plot(self.X, self.Y, 'bo')
-        #plt.ylim(0.002,0.8)
-        plt.errorbar(self.X, self.Y, fmt = 'none', yerr = msigma)
-        ax = plt.gca()
-        plot_text = '$T_0$ = {} °K\n ε̇ = {}/s'.format(int(self.temp),int(self.edot*1.e6))
-        plt.text(0.65,0.12, plot_text, transform = ax.transAxes)
-        return
-
-    def sse(self, parameters):
-        """
-        Computes predictions for stress at supplied strain values, then sums
-        the squared difference between measured stress and estimated stress.
-        """
-        preds = self.prediction(parameters, self.X)
-        sse = (self.Y - preds).dot(self.Y - preds)
-        #sum(np.power((self.Y - preds),2.))
-        return sse
-
-    def initialize_model(self, parameters, constants):
-        self.model.initialize(parameters, constants)
-        return
-
-    def __init__(self, transport, **kwargs):
-        """
-        Already described what "StatisticalSubModel" is.
-        Inputs:-----
-        - transport: Object of Transport class.  this supplies data, starting
-        temperature, etc.
-        - **kwargs - Additional inputs concerning the MaterialModel.  E.g.,
-            flow_stress_model = PTW_Yield_Stress
-        """
-        self.model = MaterialModel(**kwargs)
-        self.parameter_order = self.model.get_parameter_list()
-        self.model.set_history_variables(transport.emax, transport.edot, transport.Nhist)
-        self.load_data(transport.data, transport.temp)
-        self.edot = transport.edot
-        self.shist = generate_strain_history(transport.emax, transport.edot, transport.Nhist)
-        return
-
-class MetropolisHastingsModel(StatisticalModel):
-    """
-    Structurally, StatisticalModel is the parent of StatisticalSubModel.
-
-    All sampling, manipulation of parameters, etc. happens here.
-    """
-    s2_alpha = 50.    # 0 # 2
-    s2_beta  = 5.e-6  # 0 # 0.001
+    bounds = None
 
     def normalize(self, x):
-        """
-        Normalize transforms the variable x to be bounded between 0 and 1,
-        based on (x - min) / range(x)
-        """
+        """ Transform real scale to 0-1 scale """
         return (x - self.bounds[:,0]) / (self.bounds[:,1] - self.bounds[:,0])
 
     def unnormalize(self, z):
-        """
-        Unnormalize transforms variable (bounded between 0:1) back to its
-        original scale.
-        """
+        """ Transform 0-1 scale to real scale """
         return z * (self.bounds[:,1] - self.bounds[:,0]) + self.bounds[:,0]
-
-    @staticmethod
-    def logit(x):
-        """
-        Logit Transformation:
-        For x bounded to 0-1, y is unbounded; between -inf and inf
-        """
-        return np.log(x / (1 - x))
-
-    @staticmethod
-    def invlogit(y):
-        """
-        Inverse Logit Transformation:
-        For real-valued variable y, result x is bounded 0-1
-        """
-        return 1 / (1 + np.exp(-y))
-
-    @staticmethod
-    def invlogitlogjac(y):
-        """
-        Computes the log jacobian for the inverse logit transformation.
-        """
-        return - y - 2 * np.log(1. + np.exp(-y))
 
     @staticmethod
     def probit(x):
@@ -280,433 +69,561 @@ class MetropolisHastingsModel(StatisticalModel):
 
     @staticmethod
     def invprobitlogjac(y):
+        """ Computes the log jacobian for the inverse probit transformation """
+        return (-0.5 * np.log(2 * pi) - y * y / 2.).sum()
+
+    @staticmethod
+    def parameter_trace_plot(sample_parameters, path):
+        """ Plots the trace of the sampler """
+        palette = plt.get_cmap('Set1')
+        if len(sample_parameters.shape) == 1:
+            n = sample_parameters.shape[0]
+            plt.plot(range(n), sample_parameters, marker = '', linewidth = 1)
+        else:
+            n, d = sample_parameters.shape
+            for i in range(d):
+                plt.subplot(d, 1, i+1)
+                plt.plot(range(n), sample_parameters[:,i], marker = '',
+                        color = palette(i), linewidth = 1)
+        #plt.show()
+        plt.savefig(path)
+        return
+
+    def parameter_pairwise_plot(self, sample_parameters, path):
+        """ """
+        def off_diag(x, y, **kwargs):
+            plt.scatter(x, y, **kwargs)
+            ax = plt.gca()
+            ax.set_xlim(0,1)
+            ax.set_ylim(0,1)
+            return
+
+        def on_diag(x, **kwargs):
+            sea.distplot(x, bins = 20, kde = False, rug = True, **kwargs)
+            ax = plt.gca()
+            ax.set_xlim(0,1)
+            return
+
+        def uniquify(df_columns):
+            seen = set()
+            for item in df_columns:
+                fudge = 1
+                newitem = item
+
+                while newitem in seen:
+                    fudge += 1
+                    newitem = "{}_{}".format(item, fudge)
+
+                yield newitem
+                seen.add(newitem)
+
+        d = sample_parameters.shape[1]
+        df = pd.DataFrame(sample_parameters, columns = self.parameter_order)
+        df.columns = list(uniquify(df.columns))
+        g = sea.PairGrid(df)
+        g = g.map_offdiag(off_diag, s = 1)
+        g = g.map_diag(on_diag)
+
+        for i in range(d):
+            g.axes[i,i].annotate(self.parameter_order[i], xy = (0.05, 0.9))
+        for ax in g.axes.flatten():
+            ax.set_ylabel('')
+            ax.set_xlabel('')
+
+        #plt.show()
+        plt.savefig(path)
+        return
+
+class Chain(Transformer):
+    N = 0
+    temperature = 1.
+
+    # Hyperparameter storage slots
+    prior_Sigma_nu    = None
+    prior_Sigma_psi   = None
+    prior_theta0_mu   = None
+    prior_theta0_Sinv = None
+
+
+    rank = 0  # placeholder for MPI rank
+
+    @property
+    def curr_theta0(self):
+        return self.s_theta0[self.iter]
+
+    @property
+    def curr_Sigma(self):
+        return self.s_Sigma[self.iter]
+
+    @property
+    def curr_theta(self):
+        theta = np.array([subchain.curr_theta for subchain in self.subchains])
+        return theta
+
+    @property
+    def curr_sigma2(self):
+        sigma2 = np.array([subchain.curr_sigma2 for subchain in self.subchains])
+        return sigma2
+
+    def set_temperature(self, temperature):
+        self.temperature = temperature
+        for subchain in self.subchains:
+            subchain.set_temperature(temperature)
+        return
+
+    def sample_theta0(self, theta, Sigma):
+        theta_bar = theta.mean(axis = 0)
+        SigL = cho_factor(Sigma)
+        Siginv = cho_solve(SigL, np.eye(self.d))
+        S0 = cho_solve(
+            cho_factor(self.N * Siginv + self.prior_theta0_Sinv),
+            np.eye(self.d)
+            )
+        m0 = (
+            self.N * theta_bar.T.dot(Siginv) +
+            self.prior_theta0_mu.T.dot(self.prior_theta0_Sinv)
+            ).dot(S0)
+        S0L = cholesky(S0)
+        theta0_try = m0 + S0L.dot(norm.rvs(size = self.d))
+        while not self.check_constraints(theta0_try):
+            theta0_try = m0 + S0L.dot(norm.rvs(size = self.d))
+        return theta0_try
+
+    def sample_Sigma(self, theta, theta0):
+        """ Sample Sigma """
+        tdiff = (theta - theta0)
+        C = sum([np.outer(tdiff[i],tdiff[i]) for i in range(tdiff.shape[0])])
+        # Compute parameters for Sigma
+        psi0 = self.prior_Sigma_psi + C
+        nu0  = self.prior_Sigma_nu + self.N
+        # Compute Sigma
+        Sigma = invwishart.rvs(df = nu0, scale = psi0)
+        return Sigma
+
+    def sample_subchains(self):
+        pass
+
+    def log_posterior_state(self, state):
+        """ Computes the posterior for a given state, at the chain's temp. """
+        # Contribution to log-posterior from subchains
+        lps_sc = sum([
+            self.subchains[i].log_posterior_state(
+                state['theta0'],   state['Sigma'],
+                state['theta'][i], state['sigma2'][i],
+                )
+            for i in range(self.N)
+            ])
+        # sum of squares between theta0 and prior mean
+        t0_diff = state['theta0'] - self.prior_theta0_mu
+        lp = (
+            - (0.5 * self.N * slogdet(state['Sigma'])[1]) / self.temperature
+            - (0.5 * t0_diff.T.dot(self.prior_theta0_Sinv).dot(t0_diff))
+            )
+        return lps_sc + lp
+
+    def check_constraints(self, theta):
+        """ Check the Material Model constraints """
+        th = self.unnormalize(self.invprobit(theta))
+        self.materialmodel.update_parameters(th)
+        return self.materialmodel.check_constraints()
+
+    def iter_sample(self):
+        """ Pushes the sampler one iteration """
+        # Push each subchain one iteration
+        for subchain in self.subchains:
+            subchain.iter_sample()
+
+        # Start iteration for main chain
+        self.iter += 1
+
+        # Sample new theta0, Sigma
+        self.s_Sigma[self.iter] = self.sample_Sigma(
+            self.curr_theta, self.s_theta0[self.iter - 1]
+            )
+        self.s_theta0[self.iter] = self.sample_theta0(
+            self.curr_theta, self.s_Sigma[self.iter]
+            )
+        return
+
+    def sample(self, ns):
+        for _ in range(ns):
+            self.iter_sample()
+        return
+
+    def get_state(self):
+        """ Extracts the current state of the chain, returns it as a dictionary.
+        Expecting to send it as a pickled object back to the host process. """
+        state = {
+            'theta0' : self.curr_theta0,
+            'Sigma'  : self.curr_Sigma,
+            'theta'  : self.curr_theta,
+            'sigma2' : self.curr_sigma2,
+            'rank'   : self.rank,
+            }
+        return state
+
+    def set_state(self, state):
+        """ Sets the current state of the chain using supplied dictionary """
+        self.s_theta0[self.iter] = state['theta0']
+        self.s_Sigma[self.iter]  = state['Sigma']
+        for i in range(self.N):
+            self.subchains[i].set_state(state['theta'][i], state['sigma2'][i])
+        return
+
+    def get_history(self, nburn = 0, thin = 1):
+        theta = self.invprobit(self.s_theta[nburn::thin])
+        return theta
+
+    def initialize_sampler(self, ns):
+        self.s_theta0 = np.empty((ns, self.d))
+        self.s_Sigma  = np.empty((ns, self.d, self.d))
+        self.accepted = np.zeros(ns)
+        self.iter     = 0
+
+        for subchain in self.subchains:
+            subchain.initialize_sampler(ns)
+
+        try_theta = normal(size = self.d)
+        while not self.check_constraints(try_theta):
+            try_theta = normal(size = self.d)
+
+        self.s_theta0[0] = try_theta
+        self.s_Sigma[0]  = np.eye(self.d) * 1
+        self.curr_ldj    = self.invprobitlogjac(self.curr_theta)
+        return
+
+    def __init__(self, xps, bounds, constants, nu = 40,
+                    psi0 = 1e-4, r0 = 0.5, temperature = 1., **kwargs):
         """
-        Computes the log jacobian for the inverse probit transformation
+        Initialization of Hopkinson Bar Model.
+
+        xp     - dictionary of inputs to transport class (HB)
+        bounds - boundaries of parameters
+        consts - dictionary of constant Values
+        nu     - prior weighting for sampling covariance Matrix
+        psi0   - prior diagonal for sampling covariance Matrix
+        r0     - search radius for sampling covariance matrix (modified by temp)
+        temp   - tempering temperature
+        kwargs - Additional arguments to go to MaterialModel
         """
-        return -0.5 * np.log(2 * pi) - y * y / 2.
+        self.materialmodel = MaterialModel(**kwargs)
+        self.subchains = [
+            SubChainHB(parent = self, xp = xp, temperature = temperature,
+                        bounds = bounds, constants = constants,
+                        nu = nu, psi0 = psi0, r0 = r0, **kwargs)
+            for xp in xps
+            ]
+        self.nu = nu
+        self.psi0 = psi0
+        self.r0 = r0
+        self.temperature = temperature
+
+        self.N = len(self.subchains)
+        self.n = np.array([subchain.N for subchain in self.subchains])
+
+        self.parameter_order = self.materialmodel.get_parameter_list()
+        self.d = len(self.parameter_order)
+
+        self.prior_Sigma_nu    = self.d
+        self.prior_Sigma_psi   = 0.5 * np.eye(self.d) / self.d
+        self.prior_theta0_mu   = np.zeros(self.d)
+        self.prior_theta0_Sinv = 4 * np.eye(self.d)
+
+        self.bounds = np.array([bounds[key] for key in self.parameter_order])
+        return
+
+class SubChainHB(Transformer):
+    """ A sub-chain conducts sampling of PTW parameters and error terms for a
+    particular experiment.  Each experiment gets its own sub-chain.
+
+    SubChainHB is developed for use with Hopkinson Bars and quasistatics.
+    """
+    N = 0
+    prior_sigma2_a = 100
+    prior_sigma2_b = 5e-6
+    temperature = 1.
+
+    @property
+    def curr_theta(self):
+        return self.s_theta[self.iter]
+
+    @property
+    def curr_sigma2(self):
+        return self.s_sigma2[self.iter]
+
+    def log_posterior_theta(self, theta0, Sigma, theta, sigma2):
+        """ Computes the log-posterior / full conditional for theta.  Note that
+            we are tempering the likelihood, and not the prior. Care is taken to
+            maintain that. """
+        ssse = self.probit_sse(theta) / sigma2 # scaled sum squared error
+        tdiff = theta - theta0                 # diff (hier)
+        sssd = tdiff.dot(Sigma).dot(tdiff)     # scaled sum squared diff (hier)
+        ldj = self.invprobitlogjac(theta)      # Log determinant of jacobian
+        tll = - 0.5 * (ssse + sssd) / self.temperature # tempered log Likelihood
+        return ldj + tll
+
+    def log_posterior_state(self, theta0, Sigma, theta, sigma2):
+        """ Computes the log-posterior for a given sub-chain state at the
+            chain's temperature.  This consists of the log-posterior for theta,
+            additional contribution from posterior from sigma2.  Only Tempering
+            the likelihood, not the prior. """
+        # Contribution to total log posterior relevant to theta
+        lld = self.log_posterior_theta(theta0, Sigma, theta, sigma2)
+        # Additional Contributions to log posterior relevant to sigma2
+        lpd = (
+            - (0.5 * self.N / self.temperature + self.prior_sigma2_a + 1) * log(sigma2)
+            - self.prior_sigma2_b / sigma2
+            )
+        return lld + lpd
+
+    def initialize_submodel(self, params, consts):
+        self.submodel.initialize_submodel(params, consts)
+        return
+
+    def sample_sigma2(self, theta):
+        sse = self.probit_sse(theta)
+        aa = 0.5 * self.N / self.temperature + self.prior_sigma2_a
+        bb = 0.5 * sse / self.temperature + self.prior_sigma2_b
+        return invgamma.rvs(aa, scale = bb)
 
     def sse(self, parameters):
-        """
-        Sums the sum squared errors from each of the component models.
+        """ Calls submodel.sse for a given set of parameters. """
+        # since submodel.sse is cached, the input needs to be hashable.
+        # mutable objects (like numpy arrays) are not hashable, so translating
+        # to tuple is necessary.
+        return self.submodel.sse(tuple(parameters))
 
-        Inputs have been scaled to real values
-        """
-        return sum([submodel.sse(parameters) for submodel in self.submodels])
+    def check_constraints(self, theta):
+        """ Check the Material Model constraints """
+        th = self.unnormalize(self.invprobit(theta))
+        self.materialmodel.update_parameters(th)
+        return self.materialmodel.check_constraints()
 
     def scaled_sse(self, normalized_parameters):
-        """
-        Unnormalizes the inputs, then computes the sum of squared errors
-        """
-        parameters = self.unnormalize(normalized_parameters)
-        return self.sse(parameters)
+        """ de-scales the SSE from the 0-1 scale to the real-scale, passes
+        on to sse """
+        return self.sse(self.unnormalize(normalized_parameters))
 
     def probit_sse(self, probit_parameters):
-        normalized_parameters = self.invprobit(probit_parameters)
-        return(self.scaled_sse(normalized_parameters))
+        """ transforms parameters from probit scale, passes on to scaled_sse """
+        return self.scaled_sse(self.invprobit(probit_parameters))
 
-    def logit_sse(self, logit_parameters):
-        normalized_parameters = self.invlogit(logit_parameters)
-        return(self.scaled_sse(normalized_parameters))
+    def localcov(self, target):
+        lc = localcov(self.s_theta[:(self.iter - 1)], target,
+                      self.radius, self.nu, self.psi0)
+        return lc
 
-    def log_posterior(self, sse, logdetjac, sigma2):
-        lp = (
-            - (0.5 * self.N + self.s2_alpha + 1) * np.log(sigma2)
-            - (0.5 * sse + self.s2_beta) / sigma2
-            + logdetjac
+    def iter_sample(self):
+        """ Performs the sample step for 1 iteration. """
+        self.iter += 1
+
+        # Generate new sigma^2
+        curr_theta = self.s_theta[self.iter - 1]
+        self.s_sigma2[self.iter] = self.sample_sigma2(curr_theta)
+
+        # Setting up Covariance Matrix at current
+        curr_cov = self.localcov(curr_theta)
+
+        # Generating Proposal, check if meets constraints.  If it doesn't, skip
+        prop_theta = curr_theta + normal(size = self.d).dot(cholesky(curr_cov))
+        if not self.check_constraints(prop_theta):
+            self.s_theta[self.iter] = curr_theta
+            return
+
+        # If meets constraints, compute local covariance at proposal.
+        prop_cov = self.localcov(prop_theta)
+
+        # Log-Posterior for theta at current and proposal
+        curr_lp = self.log_posterior_theta(
+            self.parent.curr_theta0,
+            self.parent.curr_Sigma,
+            curr_theta,
+            self.curr_sigma2
             )
-        return lp
-
-    def sampler(self, ns):
-        """
-        Metropolis within Gibbs MCMC sampler
-        -- Physical parameters modelled with a metropolis hastings step
-           using a multivariate normal proposal.  Parameters are real valued
-           (as the parameters have been transformed to be on the real line)
-        -- Sigma^2 follows a standard Gibbs step.
-        """
-        d = len(self.parameter_order)
-        s_sigma2 = np.empty(ns)
-        s_theta  = np.empty((ns, d))
-        s_theta[0,:] = 0
-        s_sigma2[0]  = 0.001
-
-        log_sum_cov = np.empty(ns)
-        eps = 1.e-9
-
-        #Si = np.eye(d) * eps * 5.76 / d
-        #S = cholesky(Si)
-        log_sum_cov[0] = 0. #log(abs(S).sum() + 1.)
-
-
-        print('Beginning Sampling\n---------------------')
-
-        # finish this part for tempering
-
-        curr_sse = self.probit_sse(s_theta[0,:])
-        curr_ldj = sum(self.invprobitlogjac(s_theta[0,:]))
-
-        accept = 0
-        for i in range(1,ns):
-            s_sigma2[i] = invgamma.rvs(
-                self.N / 2. + self.s2_alpha,
-                scale = curr_sse / 2. + self.s2_beta,
-                )
-            try:
-                lssq, ns = localssq(s_theta[:i,], s_theta[i-1,:])
-            except FloatingPointError:
-                lssq, ns = np.zeros(d), 0.
-            S = cholesky((lssq + diag(d) * 1.e-7)/(ns + 300 - d - 1))
-                #S = cholesky((np.cov(s_theta[:i,:].T) + Si) * 5.76 / d)
-            log_sum_cov[i] = log(abs(S).sum() + 1.)
-
-            proposal = s_theta[i-1,:] + normal(size = d).dot(S)
-
-            prop_sse = self.probit_sse(proposal)
-            prop_ldj = self.invprobitlogjac(proposal).sum()
-            prop_lp  = self.log_posterior(prop_sse, prop_ldj, s_sigma2[i])
-            curr_lp  = self.log_posterior(curr_sse, curr_ldj, s_sigma2[i])
-
-            if np.log(uniform()) < (prop_lp - curr_lp):
-                accept += 1
-                s_theta[i,:] = proposal
-                curr_sse, curr_ldj = prop_sse, prop_ldj
-            else:
-                s_theta[i,:] = s_theta[i-1,:]
-
-            if i % 50 == 0:
-                print('\rSampling {:.1%} Done'.format(i/ns), end = '')
-        print('\rSampling 100.0% Done\n---------------------\nSampling Completed')
-        print('{:.4f} Sampling Efficiency Achieved'.format(accept/ns))
-        return s_theta, s_sigma2, log_sum_cov
-
-    def sample(self, nsamp, nburn, thin = 1):
-        result_theta, result_sigma2, log_sum_cov = self.sampler(nsamp + nburn)
-        result_param = self.invprobit(result_theta)
-        return result_param[nburn::thin,:], result_sigma2[nburn::thin], log_sum_cov
-
-    def initialize_model(self, parameters, constants):
-        for submodel in self.submodels:
-            submodel.initialize_model(parameters, constants)
-        return
-
-    def prediction_plot(self, normalized_parameters, sigma2, ylim = (0.,0.04)):
-        parameters = np.apply_along_axis(self.unnormalize, 1, normalized_parameters)
-        plot_count = len(self.submodels)
-        d_across = ceil(sqrt(plot_count))
-        d_down   = ceil(float(plot_count) / d_across)
-        k = 0
-        for i in range(d_across):
-            for j in range(d_down):
-                k += 1
-                if k <= len(self.submodels):
-                    plt.subplot(d_across, d_down, k)
-                    self.submodels[k-1].prediction_plot2(parameters, sigma2)
-        plt.show()
-        return
-
-    def __init__(self, transports, bounds, constants, params = None, **kwargs):
-        self.submodels = [
-                StatisticalSubModel(
-                        transport,
-                        **kwargs
-                        )
-                for transport in transports
-                ]
-        self.parameter_order = self.submodels[0].parameter_order
-        self.N = sum([submodel.N for submodel in self.submodels])
-        self.bounds = np.array([bounds[key] for key in self.parameter_order])
-
-        if type(params) is dict:
-            pass
-        else:
-            params = {
-                x:y
-                for x,y in zip(
-                    self.parameter_order,
-                    self.unnormalize(np.array([0.5] * len(self.parameter_order)))
-                    )
-                }
-        self.initialize_model(params, constants)
-        return
-
-class Chain(MetropolisHastingsModel):
-    n_accept        = 0
-    n_try           = 0
-    n_swaps         = 0
-    n_swap_attempts = 0
-    nu              = None
-    psi             = None
-
-    def log_posterior(self, sse, logdetjac, sigma2):
-        lp = (
-            - (0.5 * self.inv_temper_temp * self.N + self.s2_alpha + 1) * np.log(sigma2)
-            - (0.5 * self.inv_temper_temp * sse + self.s2_beta) / sigma2
-            + self.inv_temper_temp * logdetjac
+        prop_lp = self.log_posterior_theta(
+            self.parent.curr_theta0,
+            self.parent.curr_Sigma,
+            curr_theta,
+            self.curr_sigma2
             )
-        return lp
 
-    def sampler(self):
-        raise NotImplementedError('Chain.sampler has been deprecated')
+        # Log-density of proposal dist from current to proposal (and visa versa)
+        cp_ld = mvnorm.logpdf(prop_theta, curr_theta, curr_cov)
+        pc_ld = mvnorm.logpdf(curr_theta, prop_theta, prop_cov)
 
-    def sample(self):
-        raise NotImplementedError('Chain.sample has been deprecated')
+        # Compute alpha
+        log_alpha = prop_lp + pc_ld - curr_lp - cp_ld
 
-    def draw(self, iter):
-        self.n_try += 1
-        alpha = 0.5 * self.inv_temper_temp * self.N + self.s2_alpha
-        beta  = 0.5 * self.inv_temper_temp * self.curr_sse + self.s2_beta
-        self.s_sigma2[iter] = invgamma.rvs(alpha, scale = beta)
-        if iter > 1:
-            res = localssq(self.s_theta[:iter-1], self.s_theta[iter-1], self.radius)
-            lssq, ns = res.mat, res.n
+        # Conduct Metropolis step:
+        if log(uniform()) < log_alpha:
+            self.accepted[self.iter] = 1
+            self.s_theta[self.iter]  = prop_theta
         else:
-            lssq, ns = np.zeros((self.d,self.d)), 0.
-        curr_cov = (lssq + self.psi) / (ns + self.nu - self.d - 1)
-        S = cholesky(curr_cov)
-        self.log_sum_cov[iter] = log(abs(S).sum() + 1)
-
-        proposal = self.s_theta[iter - 1] + normal(size = self.d).dot(S)
-        if iter > 1:
-            pres = localssq(self.s_theta[:iter-1], proposal, self.radius)
-            plssq, pns = pres.mat, pres.n
-        else:
-            plssq, pns = np.zeros((self.d,self.d)), 0.
-        prop_cov = (plssq + self.psi) / (pns + self.nu - self.d - 1)
-        prop_sse = self.probit_sse(proposal)
-        prop_ldj = self.invprobitlogjac(proposal).sum()
-        self.curr_lp = self.log_posterior(
-                self.curr_sse, self.curr_ldj, self.s_sigma2[iter],
-                )
-        prop_lp = self.log_posterior(
-                prop_sse, prop_ldj, self.s_sigma2[iter],
-                )
-
-        cp_ld = mvnorm.logpdf(proposal, self.s_theta[iter-1], curr_cov)
-        pc_ld = mvnorm.logpdf(self.s_theta[iter-1], proposal, prop_cov)
-
-        if np.log(uniform()) < (prop_lp  + pc_ld - self.curr_lp - cp_ld):
-            self.n_accept += 1
-            self.s_theta[iter,:] = proposal
-            self.curr_sse = prop_sse
-            self.curr_ldj = prop_ldj
-            self.curr_lp  = prop_lp
-            self.accepted[iter] = 1.
-        else:
-            self.s_theta[iter,:] = self.s_theta[iter - 1,:]
+            self.s_theta[self.iter]  = curr_theta
         return
 
-    def init_sampler(self, ns):
-        temp_theta  = self.s_theta[-1,:]
-        temp_sigma2 = self.s_sigma2[-1]
+    def set_state(self, theta, sigma2):
+        self.s_theta[self.iter]  = theta
+        self.s_sigma2[self.iter] = sigma2
+        return
 
+    def initialize_sampler(self, ns):
         self.s_theta  = np.empty((ns, self.d))
         self.s_sigma2 = np.empty(ns)
         self.accepted = np.zeros(ns)
+        self.iter     = 0
 
-        self.s_theta[0,:] = temp_theta
-        self.s_sigma2[0]  = temp_sigma2
+        try_theta = normal(size = self.d)
+        while not self.check_constraints(try_theta):
+            try_theta = normal(size = self.d)
 
-        self.log_sum_cov = np.empty(ns)
-        self.log_sum_cov[0] = 0
+        self.s_theta[0]  = try_theta
+        self.s_sigma2[0] = 1e-2
         return
 
-    def __init__(self, parent = None, temper_temp = 1, params = None,
-                    nu = 200, psi_diag = 1.e-7, base_radius = 0.5, **kwargs):
-        super().__init__(**kwargs)
+    def set_temperature(self, temperature):
+        """ Set the tempering temperature """
+        self.temperature = temperature
+        self.radius = self.r0 * log(temperature + 1, 10)
+        return
+
+    def __init__(
+            self,
+            parent,
+            xp,
+            bounds,
+            constants,
+            nu = 40,
+            psi0 = 1e-4,
+            r0 = 0.5,
+            temperature = 1.,
+            **kwargs
+            ):
+        """ Initialization of Hopkinson Bar Model.
+
+        xp     - dictionary of inputs to transport class (HB)
+        bounds - boundaries of parameters
+        consts - dictionary of constant Values
+        nu     - prior weighting for sampling covariance Matrix
+        psi0   - prior diagonal for sampling covariance Matrix
+        r0     - search radius for sampling covariance matrix (modified by temp)
+        temp   - tempering temperature
+        kwargs - Additional arguments to go to MaterialModel
+        """
         self.parent = parent
-        self.inv_temper_temp = 1. / temper_temp
-        self.d = len(self.parameter_order)
+
         self.nu = nu
-        self.psi = np.eye(self.d) * psi_diag
-        self.s_theta = np.empty((1, self.d))
-        self.s_sigma2 = np.empty(1)
+        self.psi0 = psi0
+        self.r0 = r0
+        self.set_temperature(temperature)
 
-        if type(params) is dict:
-            self.s_theta[0,:] = np.array([
-                    params[key]
-                    for key in self.parameter_order
-                    ])
-        elif type(params) is np.ndarray:
-            self.s_theta[0,:] = params
-        else:
-            self.s_theta[0,:] = 0
+        self.submodel = SubModelHB(TransportHB(**xp), **kwargs)
+        self.N = self.submodel.N
+        self.parameter_order = self.submodel.parameter_order
+        self.d = len(self.parameter_order)
 
-        self.radius = base_radius * log(temper_temp + 1, 10)
+        # Expose the submodel's materialmodel object and methods (check constraint)
+        self.materialmodel = self.submodel.model
 
-        self.s_sigma2[0]  = 0.01
-        self.curr_sse = self.probit_sse(self.s_theta[0,:])
-        self.curr_ldj = self.invprobitlogjac(self.s_theta[0,:]).sum()
-        self.curr_lp  = self.log_posterior(
-                self.curr_sse, self.curr_ldj, self.s_sigma2[0],
-                )
+        self.bounds = np.array([bounds[key] for key in self.parameter_order])
+
+        params = {
+            x : y
+            for x, y in
+            zip(self.parameter_order,np.zeros(self.d))
+            }
+        self.initialize_submodel(params, constants)
         return
 
-class ParallelTemperingModel(StatisticalModel):
-    def sampler(self, nsamp, nburn, tburn):
-        """
-        Implements the Parallel Tempering sampler.
-        """
-        ns = nsamp + nburn + tburn
+class ParallelTemperMaster(Transformer):
+    temperature_ladder = np.array([1.])
+    chains = []
 
-        n_chains = len(self.chains)
+    swap_yes = []
+    swap_no  = []
 
-        for chain in self.chains:
-            chain.init_sampler(ns)
-
-        tstart = time.time()
-
-        n_swap_attempts = self.NChains - 1
-
-        print('Beginning Sampling\n---------------------')
-        for i in range(1, ns):
-            if i % 50 == 0:
-                print('\rSampling {:.1%} Done'.format(i/ns), end = '')
-
-            for chain in self.chains:
-                chain.draw(i)
-
-            if (i > tburn):
-                candidate_swaps = sample(self.possible_swaps, n_swap_attempts)
-                for s1,s2 in candidate_swaps:
-                    self.try_exchange_state(s1, s2, i)
-
-        print('\rSampling 100.0% Done\n---------------------\nSampling Completed')
-        tend = time.time()
-        print('{:.2f} Hours Taken'.format((tend - tstart)/3600))
-        return
-
-    def log_posterior(self, sse, n, sigma2, ldj):
-        lp = (
-            - (0.5 * n + self.s2_alpha + 1) * log(sigma2)
-            - (0.5 * sse + self.s2_beta) / sigma2
-            + ldj
-            )
-        return lp
-
-    def try_exchange_state(self, ca, cb, i):
-        """
-
-        """
-        c1 = self.chains[ca]; c2 = self.chains[cb]
-
-        temp_delta = c2.inv_temper_temp - c1.inv_temper_temp
-
-        c1_lp = self.log_posterior(c1.curr_sse, c1.N, c1.s_sigma2[i], c1.curr_ldj)
-        c2_lp = self.log_posterior(c2.curr_sse, c2.N, c2.s_sigma2[i], c2.curr_ldj)
-
-        c1.n_swap_attempts += 1
-        c2.n_swap_attempts += 1
-
-        alpha = temp_delta * (c1_lp - c2_lp)
-
-        if np.log(uniform()) < alpha:
-            self.swapped.append((ca, cb, i))
-
-            c1.s_theta[i,:], c2.s_theta[i,:] = \
-                    c2.s_theta[i,:].copy(), c1.s_theta[i,:].copy()
-            c1.s_sigma2[i],  c2.s_sigma2[i]  = \
-                    c2.s_sigma2[i].copy(),  c1.s_sigma2[i].copy()
-
-            # Exchange current SSE, logdetJac
-            c1.curr_sse, c2.curr_sse = c2.curr_sse, c1.curr_sse
-            c1.curr_ldj, c2.curr_ldj = c2.curr_ldj, c1.curr_ldj
-
-            # Calculate new log posteriors given current state
-            c1.curr_lp = c1.log_posterior(c1.curr_sse, c1.curr_ldj, c1.s_sigma2[i])
-            c2.curr_lp = c2.log_posterior(c2.curr_sse, c2.curr_ldj, c2.s_sigma2[i])
-
-            # iterate number of swaps
-            c1.n_swaps += 1
-            c2.n_swaps += 1
-        else:
-            self.failed_swap.append((ca,cb,i))
-        return
-
-    def plot_swap_matrix(self):
-        swaps = np.zeros((self.NChains,self.NChains))
-        failed_swaps = np.zeros((self.NChains,self.NChains))
-        for a, b, i in self.swapped:
-            swaps[a,b] += 1
-            swaps[b,a] += 1
-
-        for a, b, i in self.failed_swap:
-            failed_swaps[a,b] += 1
-            failed_swaps[b,a] += 1
-
-        swap_prob =  swaps / (swaps + failed_swaps  + np.eye(swaps.shape[0]))
-        plt.matshow(swap_prob)
-        plt.colorbar()
-        plt.show()
-        return
-
-    def plot_accept_prob(self):
-        accept_prob = self.get_accept_prob()
-        idx = range(len(accept_prob))
-        temps = ['{:.4g}'.format(1/chain.inv_temper_temp) for chain in self.chains]
-        plt.bar(idx, height = accept_prob, tick_label = temps)
-        plt.xticks(rotation = 60)
-        plt.title('Acceptance Probability by Chain')
-        plt.show()
-        return
-
-    def get_swap_prob(self,):
-        swaps = [chain.n_swaps for chain in self.chains]
-        swap_attempts = self.chains[0].n_swap_attempts
-        swaps_up = list()
-        swaps_up.append(swaps[0])
-        for i in range(1, len(swaps)):
-            swaps_up.append(swaps[i] - swaps_up[i-1])
-        return np.array(swaps_up[:-1]) / swap_attempts
-
-    def get_accept_prob(self,):
-        return [float(chain.n_accept) / chain.n_try for chain in self.chains]
-
-    def sample(self,  nsamp,  nburn, tburn, thin = 1):
-        self.sampler(nsamp, nburn, tburn)
-        s_theta  = self.invprobit(self.chains[0].s_theta[(nburn + tburn)::thin,:])
-        s_sigma2 = self.chains[0].s_sigma2[(nburn + tburn)::thin]
-        history = [chain.s_theta for chain in self.chains]
-        return s_theta, s_sigma2, history
-
-    def __init__(self, temp_ladder = np.array([1.,]), cpus = 4, **kwargs):
-        #self.pool   = mp.Pool(processes = cpus)
+    def initialize_chains(self, kwargs):
+        # Initialization
         self.chains = [
-                Chain(self, temper_temp = temp, **kwargs)
-                for temp in temp_ladder
-                ]
-        self.probit          = Chain.probit
-        self.logit           = Chain.logit
-        self.invprobit       = Chain.invprobit
-        self.invlogit        = Chain.invlogit
-        self.invlogitlogjac  = Chain.invlogitlogjac
-        self.invprobitlogjac = Chain.invprobitlogjac
-
-        self.NChains         = len(self.chains)
-        self.possible_swaps  = list(combinations(range(self.NChains), 2))
-        self.N               = self.chains[0].N
-        self.s2_alpha        = self.chains[0].s2_alpha
-        self.s2_beta         = self.chains[0].s2_beta
-        self.parameter_order = self.chains[0].parameter_order
-        self.prediction_plot = self.chains[0].prediction_plot
-        self.swapped         = []
-        self.failed_swap     = []
+            Chain(**kwargs, temperature = t)
+            for t in self.temperature_ladder
+            ]
+        # Approximation to MPI Rank (for tracking)
+        for i in range(len(self.chains)):
+            self.chains[i].rank = i + 1
         return
 
-class Transport(object):
-    def __init__(self, data, temp, emax, edot, Nhist):
-        self.data = data
-        self.temp = temp
-        self.emax = emax
-        self.edot = edot
-        self.Nhist = Nhist
+    def get_states(self):
+        states = [chain.get_state() for chain in self.chains]
+        return states
+
+    def try_swap_states(self, chain1, chain2):
+        state1 = chain1.get_state()
+        state2 = chain2.get_state()
+
+        lp11 = chain1.log_posterior_state(state1)
+        lp12 = chain1.log_posterior_state(state2)
+        lp21 = chain2.log_posterior_state(state1)
+        lp22 = chain2.log_posterior_state(state2)
+
+        log_alpha = lp12 + lp21 - lp11 - lp22
+
+        if log(uniform()) < log_alpha:
+            chain1.set_state(state2)
+            chain2.set_state(state1)
+            self.swap_yes.append((state1['rank'], state2['rank']))
+        else:
+            self.swap_no.append((state1['rank'], state2['rank']))
         return
 
-def import_strain_curve(path):
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        data = pd.read_csv(path, skiprows = range(0,17)).values
-    data[:,1] = data[:,1] * 1.e-5
-    return data[1:,:]
+    def initialize_sampler(self, tns):
+        for chain in self.chains:
+            chain.initialize_sampler(tns)
+        return
+
+    def temper_chains(self):
+        chain_idx = list(range(self.size))
+        shuffle(chain_idx)
+
+        for cidx1, cidx2 in zip(chain_idx[::2], chain_idx[1::2]):
+            self.try_swap_states(self.chains[cidx1], self.chains[cidx2])
+
+        return
+
+    def sample_chains(self, ns = 1):
+        for chain in self.chains:
+            chain.sample(ns)
+        return
+
+    def sample(self, nburn = 40000, nsamp = 60000, kswap = 5):
+        sampled = 1
+        tns = nsamp + nburn + 1
+        print('Beginning sampling for {} total samples'.format(tns - 1))
+        self.initialize_sampler(tns)
+        print('\rSampling {:.1%} Complete'.format(sampled / tns), end = '')
+        for _ in range(nburn // kswap):
+            self.temper_chains()
+            self.sample_chains(kswap)
+            sampled += kswap
+            print('\rSampling {:.1%} Complete'.format(sampled / tns), end = '')
+        self.sample_chains(nburn % kswap)
+        sampled += nburn % kswap
+        for _ in range(nsamp // kswap):
+            self.temper_chains()
+            self.sample_chains(kswap)
+            sampled += kswap
+            print('\rSampling {:.1%} Complete'.format(sampled / tns), end = '')
+        self.sample_chains(nsamp % kswap)
+        sampled += nsamp % kswap
+        print('\rSampling {:.1%} Complete'.format(sampled / tns))
+        print('Sampling Complete for {} Samples'.format(nsamp))
+        return
+
+    def __init__(self, temperature_ladder, **kwargs):
+        self.size = len(temperature_ladder)
+        self.temperature_ladder = temperature_ladder
+        self.initialize_chains(kwargs)
+        return
 
 if __name__ == '__main__':
     pass
