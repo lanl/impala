@@ -1,5 +1,5 @@
 from physical_models_c import PTWYieldStress, SimpleShearModulus
-from statistical_models_hier_redux import Chain, SubChainHB, ChainPlaceholder
+from statistical_models_hier_redux_decruft import Chain, SubChainHB
 from numpy import array, float64
 
 paths_hb = [
