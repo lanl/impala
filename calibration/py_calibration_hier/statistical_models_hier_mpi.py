@@ -21,12 +21,12 @@ class ParallelTemperMaster(smh.ParallelTemperMaster):
             for temp, chain_rank
             in zip(self.temperature_ladder, self.chain_ranks)
             )]
-        # for
+        return
 
-        
-
-
-
+    def try_swap_states(rank_1, rank_2):
+        self.comm.isend(('try_swap_state_sup', rank_2), dest = rank_1)
+        self.comm.isend(('try_swap_state_inf', rank_1), dest = rank_2)
+        return self.comm.irecv(source = rank_1)
 
 
     def __init__(self, comm, rank, temperature_ladder, **kwargs):
@@ -35,12 +35,7 @@ class ParallelTemperMaster(smh.ParallelTemperMaster):
         self.size = comm.Get_size()
         self.temperature_ladder = temperature_ladder
         self.chain_ranks = tuple(range(1, self.size))
-
-
-
-        self.initialize_chains
-
-
+        self.initialize_chains(kwargs)
         pass
 
 class Dispatcher(object):
@@ -65,6 +60,7 @@ class Dispatcher(object):
 
     def initialize_chain(self, args):
         self.chain = smh.Chain(**args)
+        self.chain.rank = self.rank
         return
 
     def set_temperature(self, args):
@@ -147,6 +143,8 @@ class Dispatcher(object):
             'set_state'          : self.set_state,
             'get_accept_prob'    : self.get_accept_prob,
             'get_history'        : self.get_history,
+            'try_swap_state_inf' : self.try_swap_state_inf,
+            'try_swap_state_sub' : self.try_swap_state_sub,
             }
         return
 

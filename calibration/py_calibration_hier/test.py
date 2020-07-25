@@ -1,5 +1,6 @@
 from physical_models_c import PTWYieldStress, SimpleShearModulus
-from statistical_models_hier_redux_decruft import Chain, SubChainHB
+#from statistical_models_hier_redux_decruft import Chain, SubChainHB, ParallelTemperMaster
+from statistical_models_hier_redux_decruft import ParallelTemperMaster
 from numpy import array, float64
 
 paths_hb = [
@@ -36,14 +37,14 @@ starting_consts = {
     }
 
 if __name__ == '__main__':
-    chain = Chain(
-        xps_hb,
-        # parent = ChainPlaceholder(),
+    pt = ParallelTemperMaster(
+        temperature_ladder = 1.6 ** array(list(range(6))),
+        xps = xps_hb,
         bounds = parameter_bounds,
         constants = starting_consts,
         flow_stress_model  = PTWYieldStress,
         shear_modulus_model = SimpleShearModulus,
         )
-    chain.initialize_sampler(10000)
+    pt.sample(20000,80000)
 
 # EOF
