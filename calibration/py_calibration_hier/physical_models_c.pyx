@@ -375,12 +375,15 @@ cdef class MaterialState:
     """ Current Material State, based on outputs of supplied models """
     cdef double T, Tmelt, stress, strain, G, Cv, rho
     cdef MaterialModel parent
+    cdef double edotcrit
 
     cdef update(self, double edot, double dt):
         self.Cv      = self.parent.specific_heat.value()
         self.rho     = self.parent.density_model.value()
 
-        self.T      += self.parent.chi * self.stress * edot * dt / (self.Cv * self.rho)
+        if edot > self.edotcrit:
+            self.T += self.parent.chi * self.stress * edot * dt / (self.Cv * self.rho)
+
         self.strain += edot * dt
 
         self.Tmelt   = self.parent.melt_model.value()
@@ -394,8 +397,10 @@ cdef class MaterialState:
         self.stress = stress
         return
 
-    def __init__(self, parent, double T = 300., double strain = 0., double stress = 0.):
+    def __init__(self, parent, double T = 300., double strain = 0.,
+                  double stress = 0., double edotcrit = 1e-6):
         self.parent = parent
+        self.edotcrit = edotcrit
         self.set(T, strain, stress)
         return
 

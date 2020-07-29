@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 # from mpi4py import MPI
-from scipy.stats import invgamma, multivariate_normal as mvnorm
+from scipy.stats import invgamma, invwishart, norm, multivariate_normal as mvnorm
 from scipy.special import erf, erfinv
 from numpy.linalg import cholesky
 from numpy.random import normal, uniform
@@ -21,6 +21,7 @@ from pointcloud import localcov
 
 from submodel import SubModelHB, SubModelTC, SubModelFP
 from transport import TransportHB, TransportTC, TransportFP
+from physical_models_c import MaterialModelltivariate_normal as mvnorm
 
 import matplotlib.pyplot as plt
 import seaborn as sea
@@ -148,10 +149,11 @@ class Transformer(object):
 
 class Chain(Transformer):
     N = 0
-    s2_a = 1; s2_b = 1
+    s2_a = 0.1; s2_b = 0.1
+    mu = 0
+    ps2 = 4
     temperature = 1.
     rank = 0  # placeholder for MPI rank
-    curr_sse = 1e10
 
     @property
     def curr_theta(self):
@@ -160,6 +162,67 @@ class Chain(Transformer):
     @property
     def curr_sigma2(self):
         return self.s_sigma2[self.iter]
+
+    @property
+    def curr_sse(self):
+        return self.sse(self.curr_theta)
+
+    @property
+    def last_sse(self):
+        return self.sse(self.s_theta[self.iter - 1])
+
+    def sample_theta0(self, theta, Sigma):
+        theta_bar = theta.mean(axis = 0)
+        SigL = cholesky(Sigma)
+        Siginv = cho_solve(SigL)
+        S0 = cho_solve(cholesky(self.N * Siginv + self.prior_theta0_Sinv))
+        m0 = (
+            self.N * theta_bar.T.dot(Siginv) +
+            self.prior_theta0_mu.T.dot(self.prior_theta0_Sinv)
+            ).dot(S0)
+        S0L = cholesky(S0)
+        theta0_try = m0 + S0L.dot(norm.rvs(size = self.d))
+        while not self.check_constraints(theta0_try):
+            theta0_try = m0 + S0L.dot(norm.rvs(size = self.d))
+        return theta0_try
+
+    def sample_Sigma(theta, theta0):
+        """ Sample Sigma """
+        psi0 = self.prior_Sigma_psi + (theta - theta0).T.dot(theta - theta0)
+        nu0  = self.prior_Sigma_nu + self.N
+
+        Sigma = invwishart.rvs(df = nu0, scale = psi0)
+        return Sigma
+
+    def log_posterior_para(self, theta0, sigma20, theta):
+        # Compute the log-posterior for a given theta
+        sse = ((theta - theta0) * (theta - theta0)).sum()
+        ssd = ((theta0 - self.mu) * (theta0 - self.mu)).sum()
+
+        ll = (
+            - 0.5 * sse / sigma20
+            - 0.5 * ssd / self.prior_sigma2
+            )
+
+        return ll / self.temperature
+
+    def log_posterior_state(self, state):
+        """ Computes the posterior for a given state, at the chain's temp. """
+        # Contribution to log-posterior from subchains
+        lps_sc = np.array([
+            self.subchains[i].log_posterior_state(
+                {'theta0'  : state['theta0'],  'theta'  : state['theta'][i],
+                 'sigma20' : state['sigma20'], 'sigma2' : state['sigma2'][i],}
+                )
+            for i in range(len(self.subchains))
+            ]).sum()
+        # sum of squares between theta0 and prior mean
+        ssd = ((state['theta0'] - self.mu) * (state['theta0'] - self.mu)).sum()
+        lp = (
+            - (0.5 * self.N + self.s2_a + 1) * log(state['sigma20'])
+            - (0.5 * ssd + self.s2_b) / state['sigma20']
+            )
+        return lp
 
     def set_temperature(self, temperature):
         """ Set the tempering temperature """
@@ -178,21 +241,20 @@ class Chain(Transformer):
     def sse(self, parameters):
         """ computes sse between subchain and chain """
         theta = np.array([subchain.curr_theta for subchain in self.subchains])
-        tdiff = theta - self.curr_theta
-        return sum(tdiff * tdiff)
+        tdiff = theta - parameters
+        return (tdiff * tdiff).sum()
 
     def log_posterior(self, sse, s2, ssd, ps2, temp = 1.):
         lp = (
-            - 0.5 * (self.n / temp + self.s2_a) * log(s2)
-            - 0.5 * (sse) / temp / s2
-            - 0.5 * 
+            - 0.5 * (self.N / temp + self.s2_a) * log(s2)
+            - 0.5 * (sse / s2 + ssd / self.ps2) / temp
             )
         return lp
 
     def sample_sigma2(self):
         """ Sample Sigma2 for the pooled parameter set """
         aa = 0.5 * self.N / self.temperature + self.s2_a
-        bb = 0.5 * self.curr_sse / self.temperature + self.s2_b
+        bb = 0.5 * self.last_sse / self.temperature + self.s2_b
         return invgamma.rvs(aa, scale = bb)
 
     def localcov(self, target):
@@ -209,46 +271,54 @@ class Chain(Transformer):
         return self.materialmodel.check_constraints()
 
     def iter_sample(self):
-        self.iter += 1
+        """ Pushes the sampler one iteration """
+        # Push each subchain one iteration
+        for subchain in self.subchains:
+            subchain.iter_sample()
 
+        # Start iteration for main chain
+        self.iter += 1
+        
         # Generate new sigma^2
         self.s_sigma2[self.iter] = self.sample_sigma2()
 
         # Setting up Covariance Matrix at current
         curr_theta = self.s_theta[self.iter - 1]
         curr_cov = self.localcov(curr_theta)
-        curr_theta_diff = curr_theta - self.parent.curr_theta
+        curr_theta_diff = curr_theta - self.mu
         curr_ssd = sum(curr_theta_diff * curr_theta_diff)
 
         # Generating Proposal, computing Covariance Matrix at proposal
         S = cholesky(curr_cov)
 
         prop_theta = curr_theta + normal(size = self.d).dot(S)
-
-        while not self.check_constraints(prop_theta):
-            prop_theta = curr_theta + normal(size = self.d).dot(S)
+        if not self.check_constraints(prop_theta):
+            # If proposal violates constraints, don't bother calculating
+            # log-posteriors, or proposal SSE's, etc.  Immediately do logic as
+            # if failed the proposal.
+            self.s_theta[self.iter] = curr_theta
+            self.curr_sse = self.probit_sse(curr_theta)
+            return
 
         prop_cov = self.localcov(prop_theta)
-        prop_sse = self.probit_sse(prop_theta)
-        prop_theta_diff = prop_theta - self.parent.curr_theta
+        prop_sse = self.sse(prop_theta)
+        prop_theta_diff = prop_theta - self.mu
         prop_ssd = sum(prop_theta_diff * prop_theta_diff)
         prop_ldj = self.invprobitlogjac(prop_theta)
 
         # Log-Posterior for theta at current and proposal
         curr_lp = self.log_posterior(
                 self.curr_sse,
-                self.curr_ldj,
-                self.curr_s2,
+                self.curr_sigma2,
                 curr_ssd,
-                self.parent.curr_s2,
+                self.ps2,
                 self.temperature,
                 )
         prop_lp = self.log_posterior(
                 prop_sse,
-                prop_ldj,
-                self.curr_s2,
+                self.curr_sigma2,
                 prop_ssd,
-                self.parent.curr_s2,
+                self.ps2,
                 self.temperature,
                 )
 
@@ -263,11 +333,15 @@ class Chain(Transformer):
         if log(uniform()) < log_alpha:
             self.accepted[self.iter] = 1
             self.s_theta[self.iter] = prop_theta
-            self.curr_sse = prop_sse
             self.curr_ldj = prop_ldj
         else:
             self.s_theta[self.iter] = curr_theta
             self.curr_sse = self.probit_sse(curr_theta)
+        return
+
+    def sample(self, ns):
+        for _ in range(ns):
+            self.iter_sample()
         return
 
     def get_state(self):
@@ -278,6 +352,7 @@ class Chain(Transformer):
         thetas  = np.array([sc_state['theta'] for sc_state in sc_states])
         sigma2s = np.array([sc_state['sigma2'] for sc_state in sc_states])
         sses    = np.array([subchain.curr_sse for subchain in self.subchains])
+        ldjs    = np.array([sc_state['ldj'] for sc_state in sc_states])
         sse0    = sum((thetas - self.curr_theta) * (thetas - self.curr_theta))
 
         state = {
@@ -287,38 +362,45 @@ class Chain(Transformer):
             'theta'   : thetas,
             'sigma2'  : sigma2s,
             'sse'     : sses,
+            'ldj'     : ldjs,
             'temp'    : self.temperature,
-            'rank'    : self.rank
+            'rank'    : self.rank,
             }
         return state
 
     def set_state(self, state):
         self.s_theta[self.iter] = state['theta0']
         self.s_sigma2[self.iter] = state['sigma20']
-        for i in
-        pass
+        self.curr_sse = state['sse0']
+        for i in range(len(self.subchains)):
+            self.subchains[i].set_state(state['theta'][i], state['sigma2'][i],
+                                        state['sse'][i],   state['ldj'][i]    )
+        return
 
     def get_history(self, nburn = 0, thin = 1):
         theta = self.invprobit(self.s_theta[(nburn + 1)::thin])
         s2    = self.s_sigma2[(nburn + 1)::thin]
         return (theta, s2)
 
-    def initialize_sampler(self, ns, starting):
+    def initialize_sampler(self, ns):
         self.s_theta  = np.empty((ns, self.d))
         self.s_sigma2 = np.empty(ns)
         self.accepted = np.zeros(ns)
         self.iter     = 0
 
         for subchain in self.subchains:
-            subchain.initialize_sampler(ns, starting)
+            subchain.initialize_sampler(ns)
 
-        self.s_theta[0]  = starting
+        try_theta = normal(scale = 1e-3, size = self.d)
+        while not self.check_constraints(try_theta):
+            try_theta = normal(scale = 1e-3, size = self.d)
+
+        self.s_theta[0]  = try_theta
         self.s_sigma2[0] = 1e-5
-        self.curr_sse    = self.probit_sse(self.curr_theta)
         self.curr_ldj    = self.invprobitlogjac(self.curr_theta)
         return
 
-    def __init__(self, xps, bounds, consts, nu = 40, psi0 = 1e-4,
+    def __init__(self, xps, bounds, constants, nu = 40, psi0 = 1e-4,
                     r0 = 0.5, temp = 1., **kwargs):
         """
         Initialization of Hopkinson Bar Model.
@@ -334,8 +416,9 @@ class Chain(Transformer):
         """
         self.materialmodel = MaterialModel(**kwargs)
         self.subchains = [
-            SubChainHB(parent = self, xp = xp, bounds = bounds, consts = consts,
-                     nu = nu, psi0 = psi0, r0 = r0, temp = temp, **kwargs)
+            SubChainHB(parent = self, xp = xp, temp = temp,
+                        bounds = bounds, constants = constants,
+                        nu = nu, psi0 = psi0, r0 = r0, **kwargs)
             for xp in xps
             ]
         self.nu = nu
@@ -344,14 +427,12 @@ class Chain(Transformer):
         self.set_temperature(temp)
 
         self.N = len(self.subchains)
+        self.n = np.array([subchain.N for subchain in self.subchains])
 
-        self.parameter_order = self.subchains[0].parameter_order
+        self.parameter_order = self.materialmodel.get_parameter_list()
         self.d = len(self.parameter_order)
 
         self.bounds = np.array([bounds[key] for key in self.parameter_order])
-
-        params = {x:y for x,y in zip(self.parameter_order, np.zero(self.d))}
-        self.initialize_submodel(params, consts)
         return
 
 class ChainPlaceholder(Transformer):
@@ -379,12 +460,40 @@ class SubChainHB(Chain):
             )
         return ldetjac + loglik / temp
 
+    def log_posterior_para(self, theta, sigma2, theta0, sigma20):
+        sse = self.probit_sse(theta)
+        ssd = ((theta - theta0) * (theta - theta0)).sum()
+
+        ldj = self.invprobitlogjac(theta)
+
+        ll = (
+            - 0.5 * sse / sigma2
+            - 0.5 * ssd / sigma20
+            )
+
+        return ldj + ll / self.temperature
+
+    def log_posterior_state(self, state):
+        """ Computes the posterior for a given sub-chain
+            state at the chain's temperature """
+        lld = self.log_posterior_para(state['theta'],  state['sigma2'],
+                                      state['theta0'], state['sigma20'])
+        lpd = (
+            - (0.5 * self.N / self.temperature + self.s2_a + 1) * log(state['sigma2'])
+            - self.s2_b / state['sigma2']
+            )
+        return lld + lpd
+
     def initialize_submodel(self, params, consts):
         self.submodel.initialize_submodel(params, consts)
         return
 
     def sse(self, parameters):
-        return self.submodel.sse(parameters)
+        """ Calls submodel.sse for a given set of parameters. """
+        # since submodel.sse is cached, the input needs to be hashable.
+        # mutable objects (like numpy arrays) are not hashable, so translating
+        # to tuple is necessary.
+        return self.submodel.sse(tuple(parameters))
 
     def scaled_sse(self, normalized_parameters):
         """ de-scales the SSE from the 0-1 scale to the real-scale, passes
@@ -414,6 +523,11 @@ class SubChainHB(Chain):
 
         # Generating Proposal, computing Covariance Matrix at proposal
         prop_theta = curr_theta + normal(size = self.d).dot(cholesky(curr_cov))
+        if not self.check_constraints(prop_theta):
+            self.s_theta[self.iter] = curr_theta
+            self.curr_sse = self.probit_sse(curr_theta)
+            return
+
         prop_cov = self.localcov(prop_theta)
         prop_sse = self.probit_sse(prop_theta)
         prop_theta_diff = prop_theta - self.parent.curr_theta
@@ -456,28 +570,34 @@ class SubChainHB(Chain):
             self.curr_sse = self.probit_sse(curr_theta)
         return
 
-    def sample(self, n):
-        for _ in range(n):
-            self.iter_sample()
-        return
-
     def get_state(self):
         state = {
-            'theta' : self.curr_theta,
-            's2'    : self.curr_sigma2,
-            'sse'   : self.curr_sse,
-            'ldj'   : self.curr_ldj,
-            'temp'  : self.temperature,
+            'theta'  : self.curr_theta,
+            'sigma2' : self.curr_sigma2,
+            'sse'    : self.curr_sse,
+            'ldj'    : self.curr_ldj,
+            'temp'   : self.temperature,
             }
         return state
 
-    def initialize_sampler(self, ns, starting):
+    def set_state(self, theta, s2, sse, ldj):
+        self.s_theta[self.iter]  = theta
+        self.s_sigma2[self.iter] = s2
+        self.curr_sse = sse
+        self.curr_ldj = ldj
+        return
+
+    def initialize_sampler(self, ns):
         self.s_theta  = np.empty((ns, self.d))
         self.s_sigma2 = np.empty(ns)
         self.accepted = np.zeros(ns)
         self.iter     = 0
 
-        self.s_theta[0]  = starting
+        try_theta = normal(scale = 1e-2, size = self.d)
+        while not self.check_constraints(try_theta):
+            try_theta = normal(scale = 1e-2, size = self.d)
+
+        self.s_theta[0]  = try_theta
         self.s_sigma2[0] = 1e-5
         self.curr_sse    = self.probit_sse(self.curr_theta)
         self.curr_ldj    = self.invprobitlogjac(self.curr_theta)
@@ -516,17 +636,17 @@ class SubChainHB(Chain):
         self.submodel = SubModelHB(TransportHB(**xp), **kwargs)
         self.N = self.submodel.N
         self.parameter_order = self.submodel.parameter_order
-
         self.d = len(self.parameter_order)
+
+        # Expose the submodel's materialmodel object and methods (check constraint)
+        self.materialmodel = self.submodel.model
 
         self.bounds = np.array([bounds[key] for key in self.parameter_order])
 
         params = {
             x : y
-            for x, y in zip(
-                self.parameter_order,
-                self.unnormalize(np.ones(self.d) * 0.5)
-                )
+            for x, y in
+            zip(self.parameter_order,np.zeros(self.d))
             }
         self.initialize_submodel(params, constants)
         return
@@ -541,9 +661,6 @@ class ParallelTemperMaster(Transformer):
     def initialize_chains(self, kwargs):
         self.chains = [Chain(**kwargs, temp = t) for t in self.temp_ladder]
         return
-
-    def log_posterior(self,):
-        pass
 
     def get_states(self):
         states = [chain.get_state() for chain in self.chains]
@@ -561,7 +678,7 @@ class ParallelTemperMaster(Transformer):
         lp = (
             - 0.5 * (state['n'] / temp + state['s2_a'] + 1) * log(state['sigma2'])
             - 0.5 * sum((state['sse'] / temp + state['s2_b']) / state['sigma2'])
-            - 0.5 * (state['N'] / temp + self.s2_a) + 1
+            - 0.5 * (state['N'] / temp + state['ps2_a']) + 1
             - 0.5 * ((state['sse0'] / temp + self.s2_b) / state['sigma20'])
             )
         return lp
