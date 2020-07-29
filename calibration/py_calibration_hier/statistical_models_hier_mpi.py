@@ -1,9 +1,11 @@
 """ Extension to Statistical Models Hier """
 from mpi4py import MPI
 from random import sample, shuffle
+from numpy.random import uniform
 from itertools import combinations
 from transport import TransportHB, TransportTC, TransportFP
 import statistical_models_hier as smh
+from math import log
 
 class MPI_Error(Exception):
     pass
@@ -13,6 +15,7 @@ class ParallelTemperMaster(smh.ParallelTemperMaster):
         in an MPI environment. """
 
     def initialize_chains(self, kwargs):
+        # Send initialization routine for each chain to each node
         sent = [
             self.comm.isend(
                 ('initialize_chain',{**kwargs, 'temperature' : temp}),
@@ -21,13 +24,24 @@ class ParallelTemperMaster(smh.ParallelTemperMaster):
             for temp, chain_rank
             in zip(self.temperature_ladder, self.chain_ranks)
             ]
+        # Recieve Done from chains
+        rcvd = [self.comm.irecv(source = i) for i in self.chain_ranks]
+        parcels = [rec.wait() for rec in rcvd]
+        # Verify that all are done
+        assert all(parcels)
         return
 
     def initialize_sampler(self, tns):
+        # Send Initialization routine for sampler to each chain
         sent = [
-            self.comm.isend(('initialize_sampler', tns), dest = chain_rank)
+            self.comm.send(('initialize_sampler', tns), dest = chain_rank)
             for chain_rank in self.chain_ranks
             ]
+        # Recieve Done from chains
+        rcvd = [self.comm.irecv(source = i) for i in self.chain_ranks]
+        parcels = [rec.wait() for rec in rcvd]
+        # Verify that all are done
+        assert all(parcels)
         return
 
     def write_to_disk(self, path):
@@ -64,18 +78,17 @@ class ParallelTemperMaster(smh.ParallelTemperMaster):
             ]
         return
 
-    def get_history(self):
-        self.comm.isend(('get_history',0), dest = 1)
+    def get_history(self, *args):
+        self.comm.isend(('get_history',args), dest = 1)
         return self.comm.recv(source = 1)
 
     def parameter_pairwise_plot(self, theta, path):
         self.comm.send(('parameter_pairwise_plot',(theta, path)), dest = 1)
         return
 
-    def __init__(self, comm, rank, temperature_ladder, **kwargs):
+    def __init__(self, comm, size, temperature_ladder, **kwargs):
         self.comm = comm
-        self.rank = rank
-        self.size = comm.Get_size()
+        self.size = size
         self.temperature_ladder = temperature_ladder
         self.chain_ranks = tuple(range(1, self.size))
         self.initialize_chains(kwargs)
@@ -104,18 +117,22 @@ class Dispatcher(object):
     def initialize_chain(self, args):
         self.chain = smh.Chain(**args)
         self.chain.rank = self.rank
+        self.return_value(True)
         return
 
     def set_temperature(self, args):
         self.chain.set_temperature(args)
+        self.return_value(True)
         return
 
     def initialize_sampler(self, args):
         self.chain.initialize_sampler(args)
+        self.return_value(True)
         return
 
     def sample(self, args):
         self.chain.sample(args)
+        self.return_value(True)
         return
 
     def get_state(self, args):
@@ -200,7 +217,7 @@ class Dispatcher(object):
             'get_accept_prob'    : self.get_accept_prob,
             'get_history'        : self.get_history,
             'try_swap_state_inf' : self.try_swap_state_inf,
-            'try_swap_state_sub' : self.try_swap_state_sub,
+            'try_swap_state_sup' : self.try_swap_state_sup,
             'write_to_disk'      : self.write_to_disk,
             }
         return

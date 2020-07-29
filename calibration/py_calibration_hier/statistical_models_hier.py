@@ -6,6 +6,7 @@ Defines the Statistical models
 Chain      - Defines the Chain object (Hierarchy)
 SubChainHB - Defines the Subchain relating to Hopkinson Bar (1 Experiment)
 ParallelTemperMaster - Defines the Parallel Tempering Class and methods
+
 """
 import numpy as np
 import pandas as pd
@@ -667,15 +668,15 @@ class ParallelTemperMaster(Transformer):
         self.initialize_sampler(tns)
         print('\rSampling {:.1%} Complete'.format(sampled / tns), end = '')
         for _ in range(nburn // kswap):
-            self.temper_chains()
             self.sample_chains(kswap)
+            self.temper_chains()
             sampled += kswap
             print('\rSampling {:.1%} Complete'.format(sampled / tns), end = '')
         self.sample_chains(nburn % kswap)
         sampled += nburn % kswap
         for _ in range(nsamp // kswap):
-            self.temper_chains()
             self.sample_chains(kswap)
+            self.temper_chains()
             sampled += kswap
             print('\rSampling {:.1%} Complete'.format(sampled / tns), end = '')
         self.sample_chains(nsamp % kswap)
