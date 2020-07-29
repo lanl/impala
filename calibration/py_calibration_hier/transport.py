@@ -19,6 +19,7 @@ specified by physical_models_c.MaterialModel
 import numpy as np
 import pandas as pd
 import warnings
+import sqlite3 as sql
 
 # Transport Classes
 
@@ -45,6 +46,22 @@ class TransportHB(object):
         self.emax = emax
         self.edot = edot
         self.Nhist = Nhist
+        return
+
+class TransportHB_sql(object):
+    data = None
+    temp = None
+    emax = None
+    edot = None
+    Nhist = None
+    data_query = 'select strain, stress from {};'
+    meta_query = 'select temperature, edot from {} where table_name = {}'
+
+    def __init__(self, cursor, table_name, emax, Nhist):
+        self.data = np.array(list(cursor.execute(self.data_query.format(table_name))))
+        meta_table_name = '_'.join(table_name.split('_')[:2]) + '_meta'
+        meta = list(cursor.execute(self.meta_query.format(meta_table_name, table_name)))[0]
+        self.temp, self.edot = meta
         return
 
 class TransportTC(object):
@@ -78,5 +95,12 @@ class TransportFP(object):
         self.Y_actual = pd.read_table(path_y_actual, sep = '\s+|\t|,|;',
                                         engine = 'python').values
         return
+
+
+if __name__ == '__main__':
+    conn = sql.connect('./data.db?mode=ro', uri = True)
+    curs = conn.cursor()
+    xp = TransportHB_sql(curs, 'ti64_shpb_00vmySJBdi', 0.7, 100)
+
 
 # EOF

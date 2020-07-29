@@ -15,19 +15,62 @@ class ParallelTemperMaster(smh.ParallelTemperMaster):
     def initialize_chains(self, kwargs):
         sent = [
             self.comm.isend(
-                ('initialize_chain',{**kwargs, temperature = temp}),
+                ('initialize_chain',{**kwargs, 'temperature' : temp}),
                 dest = chain_rank
                 )
             for temp, chain_rank
             in zip(self.temperature_ladder, self.chain_ranks)
-            )]
+            ]
         return
 
-    def try_swap_states(rank_1, rank_2):
+    def initialize_sampler(self, tns):
+        sent = [
+            self.comm.isend(('initialize_sampler', tns), dest = chain_rank)
+            for chain_rank in self.chain_ranks
+            ]
+        return
+
+    def write_to_disk(self, path):
+        self.comm.send(('write_to_disk', path), dest = 1)
+        return
+
+    def try_swap_states(self, rank_1, rank_2):
         self.comm.isend(('try_swap_state_sup', rank_2), dest = rank_1)
         self.comm.isend(('try_swap_state_inf', rank_1), dest = rank_2)
         return self.comm.irecv(source = rank_1)
 
+    def temper_chains(self):
+        chain_idx = list(self.chain_ranks)
+        shuffle(chain_idx)
+
+        swaps = []
+        for cidx1, cidx2 in zip(chain_idx[::2], chain_idx[1::2]):
+            swaps.append(self.try_swap_states(cidx1, cidx2))
+            return
+
+        received = [x.wait() for x in swaps]
+
+        for x in received:
+            if x[0] == 1: # if swap successful, append to succeeded swaps
+                self.swap_yes.append(tuple(x[1:]))
+            elif x[0] == 0: # if swap failed, append to failed swaps
+                self.swap_no.append(tuple(x[1:]))
+        return
+
+    def sample_chains(self, ns):
+        sent = [
+            self.comm.isend(('sample', ns), dest = i)
+            for i in self.chain_ranks
+            ]
+        return
+
+    def get_history(self):
+        self.comm.isend(('get_history',0), dest = 1)
+        return self.comm.recv(source = 1)
+
+    def parameter_pairwise_plot(self, theta, path):
+        self.comm.send(('parameter_pairwise_plot',(theta, path)), dest = 1)
+        return
 
     def __init__(self, comm, rank, temperature_ladder, **kwargs):
         self.comm = comm
@@ -87,6 +130,10 @@ class Dispatcher(object):
         self.return_value(self.chain.get_accept_probability())
         return
 
+    def get_history(self, args):
+        self.return_value(self.chain.get_history(*args))
+        return
+
     def try_swap_state_sup(self, args):
         inf_rank = args
 
@@ -110,7 +157,7 @@ class Dispatcher(object):
         return
 
     def try_swap_state_inf(self, args):
-        sup_rank = args[0]
+        sup_rank = args
 
         state_b = self.chain.get_state()
         self.comm.send(state_b, dest = sup_rank)
@@ -129,6 +176,15 @@ class Dispatcher(object):
             pass
         return
 
+    def write_to_disk(self, args):
+        path = args
+        self.chain.write_to_disk(path)
+        return
+
+    def parameter_pairwise_plot(self, args):
+        self.chain.parameter_pairwise_plot(*args)
+        return
+
     def __init__(self, comm, rank):
         """ Initialization Routine """
         self.comm = comm
@@ -145,6 +201,7 @@ class Dispatcher(object):
             'get_history'        : self.get_history,
             'try_swap_state_inf' : self.try_swap_state_inf,
             'try_swap_state_sub' : self.try_swap_state_sub,
+            'write_to_disk'      : self.write_to_disk,
             }
         return
 

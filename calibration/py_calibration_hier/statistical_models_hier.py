@@ -1,15 +1,17 @@
 """
-statistical_models_hier_redux.py
+statistical_models_hier.py
 
 Defines the Statistical models
 
 Chain      - Defines the Chain object (Hierarchy)
 SubChainHB - Defines the Subchain relating to Hopkinson Bar (1 Experiment)
+ParallelTemperMaster - Defines the Parallel Tempering Class and methods
 """
 import numpy as np
 import pandas as pd
+import sqlite3 as sql
+import os
 
-# from mpi4py import MPI
 from scipy.stats import invgamma, invwishart, norm, multivariate_normal as mvnorm
 from scipy.special import erf, erfinv
 from scipy.linalg import cho_factor, cho_solve
@@ -18,8 +20,8 @@ from numpy.random import normal, uniform
 from random import sample, shuffle
 from math import ceil, sqrt, pi, log, exp
 from itertools import combinations
-from pointcloud import localcov
 
+from pointcloud import localcov
 from submodel import SubModelHB, SubModelTC, SubModelFP
 from transport import TransportHB, TransportTC, TransportFP
 from physical_models_c import MaterialModel
@@ -29,9 +31,6 @@ import seaborn as sea
 import time
 
 sea.set(style = 'ticks')
-
-# class MPI_Error(Exception):
-#     pass
 
 class BreakException(Exception):
     pass
@@ -144,8 +143,10 @@ class Chain(Transformer):
     prior_theta0_mu   = None
     prior_theta0_Sinv = None
 
-
     rank = 0  # placeholder for MPI rank
+
+    create_statement = """ CREATE TABLE {}({}); """
+    insert_statement = """ INSERT INTO {}({}) values ({}); """
 
     @property
     def curr_theta0(self):
@@ -271,8 +272,8 @@ class Chain(Transformer):
         return
 
     def get_history(self, nburn = 0, thin = 1):
-        theta = self.invprobit(self.s_theta[nburn::thin])
-        return theta
+        theta0 = self.invprobit(self.s_theta0[nburn::thin])
+        return theta0
 
     def initialize_sampler(self, ns):
         self.s_theta0 = np.empty((ns, self.d))
@@ -290,6 +291,70 @@ class Chain(Transformer):
         self.s_theta0[0] = try_theta
         self.s_Sigma[0]  = np.eye(self.d) * 1
         self.curr_ldj    = self.invprobitlogjac(self.curr_theta)
+        return
+
+    def write_to_disk(self, path):
+
+        # If output previously exists, delete
+        if os.path.exists(path):
+            os.remove(path)
+
+        # Create the SQL database
+        conn = sql.connect(path)
+        curs = conn.cursor()
+
+        # Table Creation and insertion statements
+        theta0_create_statement = self.create_statement.format(
+            'theta0',
+            ','.join([x + ' REAL' for x in self.parameter_order]),
+            )
+        theta0_insert_statement = self.insert_statement.format(
+            'theta0',
+            ','.join(self.parameter_order),
+            ','.join(['?'] * len(self.parameter_order)),
+            )
+        thetai_create_statement = self.create_statement.format(
+            'theta_{}',
+            ','.join([x + ' REAL' for x in self.parameter_order]),
+            )
+        thetai_insert_statement = self.insert_statement.format(
+            'theta_{}',
+            ','.join(self.parameter_order),
+            ','.join(['?'] * len(self.parameter_order)),
+            )
+        sigma2i_create_statement = self.create_statement.format(
+            'sigma2_{}',
+            'sigma2 REAL',
+            )
+        sigma2i_insert_statement = self.insert_statement.format(
+            'sigma2_{}',
+            'sigma2',
+            '?',
+            )
+
+        # Insert hierarchical theta
+        curs.execute(theta0_create_statement)
+        curs.executemany(
+            theta0_insert_statement,
+            self.unnormalize(self.invprobit(self.s_theta0)).tolist(),
+            )
+        for i, subchain in zip(range(1, len(self.subchains) + 1), self.subchains):
+            # Insert componenent thetas
+            curs.execute(thetai_create_statement.format(i))
+            curs.executemany(
+                thetai_insert_statement.format(i),
+                self.unnormalize(self.invprobit(subchain.s_theta)).tolist(),
+                )
+            # insert component sigma2's
+            curs.execute(sigma2i_create_statement.format(i))
+            curs.executemany(
+                sigma2i_insert_statement.format(i),
+                [(x,) for x in subchain.s_sigma2.tolist()]
+                )
+
+        # Write changes to disk, close connection.
+        conn.commit()
+        conn.close()
         return
 
     def __init__(self, xps, bounds, constants, nu = 40,
@@ -617,6 +682,17 @@ class ParallelTemperMaster(Transformer):
         sampled += nsamp % kswap
         print('\rSampling {:.1%} Complete'.format(sampled / tns))
         print('Sampling Complete for {} Samples'.format(nsamp))
+        return
+
+    def write_to_disk(self, path):
+        self.chains[0].write_to_disk(path)
+        return
+
+    def get_history(self, *args):
+        return self.chains[0].get_history(*args)
+
+    def parameter_pairwise_plot(self, theta, path):
+        self.chains[0].parameter_pairwise_plot(theta, path)
         return
 
     def __init__(self, temperature_ladder, **kwargs):

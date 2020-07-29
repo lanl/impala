@@ -16,13 +16,13 @@ def calib_use_list(i, use_list, lookup):
     paths = []
     for i in use:
         paths.append(base_path + lookup['paper'][i] + '/' + lookup['file'][i])
-    
+
     datas = []
     for path in paths:
         data = pd.read_csv(path, skiprows = range(0,17)).values
         data[:,1] = data[:,1] * 1.e-5 # this is going from MPa to Mbar
         datas.append(data[1:,:])
-        
+
     transports = [
         Transport(data = x, temp = y, emax = 0.7, edot = z, Nhist = 100)
         for x,y,z in zip(datas, temps, edots)
@@ -49,7 +49,7 @@ def calib_use_list(i, use_list, lookup):
             'y0'    : (0.0001,   0.05),
             'yInf'  : (0.0001,   0.01),
             }
-    
+
     model = ParallelTemperingModel(
             temp_ladder = 1.3 ** array(range(6)),
             transports  = transports,
@@ -63,13 +63,13 @@ def calib_use_list(i, use_list, lookup):
 
 
 if __name__ == '__main__':
-    
+
     dill.settings['recurse'] = True
-    
+
     base_path = '../../data/ti-6al-4v/Data/SHPB/'
     papers = glob.glob(base_path + '*')
     papers = [temp.split('/')[-1] for temp in papers]
-    
+
     index = []
     temps = []
     edots = []
@@ -88,27 +88,28 @@ if __name__ == '__main__':
             pname.append(temp[-2])
             index.append(k)
             k = k + 1
-    
-    lookup = pd.DataFrame(list(zip(index, temps, edots, fname, pname)), columns = ['index', 'temp', 'edot', 'file', 'paper'])
-    
-    
+
+    lookup = pd.DataFrame(list(zip(index, temps, edots, fname, pname)),
+                        columns = ['index', 'temp', 'edot', 'file', 'paper'])
+
+
     use_list = list(map(lambda el:[el], list(range(len(lookup))))) # list of combinations
-    
+
 
     use = list(range(len(lookup))) # which of use_list to actually do
-    
+
     # use = [0,2,37]
     # res_list = list(map(calib_use_list, use, itertools.repeat(use_list, len(use)),itertools.repeat(lookup, len(use))))
-    
+
     pool = Pool()
     res_list = list(pool.map(calib_use_list, use, itertools.repeat(use_list, len(use)),itertools.repeat(lookup, len(use))))
     pool.close()
     pool.join()
-    
+
 
     with open("store_results.dill", "wb") as dill_file:
         dill.dump(res_list, dill_file)
-    
+
     #lookup.to_csv('file_index.csv', encoding='utf-8', index=False)
 # =============================================================================
 #     i = 1
@@ -118,8 +119,8 @@ if __name__ == '__main__':
 #     res_list[i][1].parameter_trace_plot(res_list[i][0][0])
 #     res_list[i][1].parameter_trace_plot(res_list[i][0][1])
 # =============================================================================
-    
+
     #with open("store_results.dill", "rb") as dill_file:
     #    res_list = dill.load(dill_file)
-    
+
 #EOF
