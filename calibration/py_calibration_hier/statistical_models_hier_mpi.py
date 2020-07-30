@@ -10,6 +10,9 @@ from math import log
 class MPI_Error(Exception):
     pass
 
+class BreakException(Exception):
+    pass
+
 class ParallelTemperMaster(smh.ParallelTemperMaster):
     """ overwrites relevant functions from smh.ParallelTemperMaster to operate
         in an MPI environment. """
