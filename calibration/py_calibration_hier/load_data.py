@@ -13,7 +13,6 @@ import random
 
 # Defining strings for creating and updating tables
 
-
 # Meta Table Creation String
 meta_table_create = """CREATE TABLE meta (
     type TEXT,
@@ -26,7 +25,7 @@ meta_table_create = """CREATE TABLE meta (
 """
 
 def load_Ti64_shpb(curs):
-    nonlocal current_id
+    global ti64_curr_id
     data_table_create = """ CREATE TABLE {}(strain REAL, stress REAL); """
     meta_table_insert = """ INSERT INTO
             meta(type, temperature, edot, pname, fname, table_name)
@@ -57,8 +56,8 @@ def load_Ti64_shpb(curs):
     # For each experiment:
     for xp in xps:
         # Set the ID
-        current_id += 1
-        table_name = 'data_{}'.format(current_id)
+        ti64_curr_id += 1
+        table_name = 'data_{}'.format(ti64_curr_id)
         # Create the relevant data table
         curs.execute(data_table_create.format(table_name))
         # Create the corresponding line in the meta table
@@ -75,21 +74,23 @@ def load_Ti64_shpb(curs):
     return
 
 def load_Ti64_tc(curs):
-    nonlocal current_id
+    global ti64_curr_id
     return
 
 def load_Ti64_fp(curs):
-    nonlocal current_id
+    global ti64_curr_id
     return
 
 def load_Ti64():
+    global ti64_curr_id
+    ti64_curr_id = 0
     # Clear the old database
     if os.path.exists('./data_Ti64.db'):
         os.remove('./data_Ti64.db')
 
     # Start the SQLite connection
     connection = sql.connect('./data_Ti64.db')
-    cursor = conn.cursor()
+    cursor = connection.cursor()
     cursor.execute(meta_table_create)
     connection.commit()
     # Load the data
