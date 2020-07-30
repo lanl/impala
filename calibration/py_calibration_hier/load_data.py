@@ -12,28 +12,27 @@ import random
 
 
 # Defining strings for creating and updating tables
-current_id = 0
 
-def load_Ti64_shpb(conn):
-    global current_id
-    if True:
-        meta_table_create = """CREATE TABLE {} (
-            type TEXT,
-            temperature REAL,
-            edot REAL,
-            pname TEXT,
-            fname TEXT,
-            table_name TEXT
-            );
-        """
-        data_table_create = """ CREATE TABLE {}(strain REAL, stress REAL); """
-        meta_table_insert = """ INSERT INTO
-            {}(type, temperature, edot, pname, fname, table_name)
+
+# Meta Table Creation String
+meta_table_create = """CREATE TABLE meta (
+    type TEXT,
+    temperature REAL,
+    edot REAL,
+    pname TEXT,
+    fname TEXT,
+    table_name TEXT
+    );
+"""
+
+def load_Ti64_shpb(curs):
+    nonlocal current_id
+    data_table_create = """ CREATE TABLE {}(strain REAL, stress REAL); """
+    meta_table_insert = """ INSERT INTO
+            meta(type, temperature, edot, pname, fname, table_name)
             values (?,?,?,?,?,?);
             """
-        data_table_insert = """ INSERT INTO {}(strain, stress) values (?,?); """
-
-    curs = conn.cursor()
+    data_table_insert = """ INSERT INTO {}(strain, stress) values (?,?); """
 
     base_path = '../../data/ti-6al-4v/Data/SHPB'
     papers = [os.path.split(f)[1] for f in glob.glob(base_path + '/*')]
@@ -55,20 +54,16 @@ def load_Ti64_shpb(conn):
             xps.append({'data' : data[1:,:], 'temp' : temp, 'edot' : edot,
                         'pname' : pname, 'fname' : fname})
 
-    # Create the meta table
-    curs.execute(meta_table_create.format('meta'))
-    conn.commit()
-
     # For each experiment:
     for xp in xps:
         # Set the ID
         current_id += 1
-        table_name = 'shpb_{}'.format(current_id)
+        table_name = 'data_{}'.format(current_id)
         # Create the relevant data table
         curs.execute(data_table_create.format(table_name))
         # Create the corresponding line in the meta table
         curs.execute(
-            meta_table_insert.format('meta'),
+            meta_table_insert,
             ('shpb', xp['temp'], xp['edot'],
                 xp['pname'], xp['fname'], table_name)
             )
@@ -77,30 +72,37 @@ def load_Ti64_shpb(conn):
             data_table_insert.format(table_name),
             xp['data'].tolist()
             )
-
-    # Commit the writes
-    conn.commit()
     return
 
-def load_Ti64_tc(conn):
-    global current_id
+def load_Ti64_tc(curs):
+    nonlocal current_id
     return
 
-def load_Ti64_fp(conn):
-    global current_id
+def load_Ti64_fp(curs):
+    nonlocal current_id
     return
 
-if __name__ == '__main__':
+def load_Ti64():
     # Clear the old database
     if os.path.exists('./data_Ti64.db'):
         os.remove('./data_Ti64.db')
 
     # Start the SQLite connection
-    connection = sql.connect('data_ti64.db')
-    load_Ti64_shpb(connection)
-    load_Ti64_tc(connection)
-    load_Ti64_fp(connection)
+    connection = sql.connect('./data_Ti64.db')
+    cursor = conn.cursor()
+    cursor.execute(meta_table_create)
+    connection.commit()
+    # Load the data
+    current_id = 0
+    load_Ti64_shpb(cursor)
+    load_Ti64_tc(cursor)
+    load_Ti64_fp(cursor)
+    # close the connection
+    connection.commit()
     connection.close()
+    return
+
+if __name__ == '__main__':
 
 
 # EOF
