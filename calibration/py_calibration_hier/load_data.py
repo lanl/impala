@@ -103,6 +103,6 @@ def load_Ti64():
     return
 
 if __name__ == '__main__':
-
+    load_Ti64()
 
 # EOF
