@@ -18,6 +18,7 @@ meta_table_create = """CREATE TABLE meta (
     type TEXT,
     temperature REAL,
     edot REAL,
+    emax REAL,
     pname TEXT,
     fname TEXT,
     table_name TEXT
@@ -26,10 +27,12 @@ meta_table_create = """CREATE TABLE meta (
 
 def load_Ti64_shpb(curs):
     global ti64_curr_id
+    shpb_emax = 0
+
     data_table_create = """ CREATE TABLE {}(strain REAL, stress REAL); """
     meta_table_insert = """ INSERT INTO
-            meta(type, temperature, edot, pname, fname, table_name)
-            values (?,?,?,?,?,?);
+            meta(type, temperature, edot, emax, pname, fname, table_name)
+            values (?,?,?,?,?,?,?);
             """
     data_table_insert = """ INSERT INTO {}(strain, stress) values (?,?); """
 
@@ -52,6 +55,7 @@ def load_Ti64_shpb(curs):
             data[:,1] = data[:,1] * 1e-5 # Transform from MPa to Mbar
             xps.append({'data' : data[1:,:], 'temp' : temp, 'edot' : edot,
                         'pname' : pname, 'fname' : fname})
+            shpb_emax = max(shpb_emax, data[:,0].max())
 
     # For each experiment:
     for xp in xps:
@@ -63,7 +67,7 @@ def load_Ti64_shpb(curs):
         # Create the corresponding line in the meta table
         curs.execute(
             meta_table_insert,
-            ('shpb', xp['temp'], xp['edot'],
+            ('shpb', xp['temp'], xp['edot'], shpb_emax,
                 xp['pname'], xp['fname'], table_name)
             )
         # Fill the data tables
@@ -82,8 +86,10 @@ def load_Ti64_fp(curs):
     return
 
 def load_Ti64():
-    global ti64_curr_id
+    global ti64_curr_id, ti64_shpb_emax
     ti64_curr_id = 0
+    ti64_shpb_emax = 0
+
     # Clear the old database
     if os.path.exists('./data_Ti64.db'):
         os.remove('./data_Ti64.db')

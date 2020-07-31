@@ -37,31 +37,33 @@ class TransportHB(object):
             warnings.simplefilter("ignore")
             #data = pd.read_csv(path, skiprows = range(0,17)).values
             data = pd.read_csv(path, sep = '\s+').values
+
         data[:,1] = data[:,1] * 1.e-5 # this is going from MPa to Mbar?
         return data[1:]
 
-    def __init__(self, path, temp, emax, edot, Nhist):
-        self.data = self.import_strain_curve(path)
+    def __init__(self, data, temp, emax, edot, Nhist = 100):
+        # self.data = self.import_strain_curve(path)
+        self.data = data
         self.temp = temp
         self.emax = emax
         self.edot = edot
         self.Nhist = Nhist
         return
 
-class TransportHB_sql(object):
+class TransportSHPB(object):
+    """ Hopkinson Bar Transport """
     data = None
     temp = None
     emax = None
     edot = None
     Nhist = None
-    data_query = 'select strain, stress from {};'
-    meta_query = 'select temperature, edot from {} where table_name = {}'
 
-    def __init__(self, cursor, table_name, emax, Nhist):
-        self.data = np.array(list(cursor.execute(self.data_query.format(table_name))))
-        meta_table_name = '_'.join(table_name.split('_')[:2]) + '_meta'
-        meta = list(cursor.execute(self.meta_query.format(meta_table_name, table_name)))[0]
-        self.temp, self.edot = meta
+    def __init__(self, data, temp, emax, edot, Nhist = 100):
+        self.data = data
+        self.temp = temp
+        self.emax = emax
+        self.edot = edot
+        self.Nhist = Nhist
         return
 
 class TransportTC(object):
@@ -95,7 +97,6 @@ class TransportFP(object):
         self.Y_actual = pd.read_table(path_y_actual, sep = '\s+|\t|,|;',
                                         engine = 'python').values
         return
-
 
 if __name__ == '__main__':
     conn = sql.connect('./data.db?mode=ro', uri = True)
