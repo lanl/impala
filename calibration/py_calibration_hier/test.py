@@ -91,6 +91,7 @@ elif rank == 0:
     theta0 = model.invprobit(model.get_history(0,1))
     model.parameter_pairwise_plot(theta0, 'Ti64_pairwise.png')
     model.parameter_trace_plot(theta0, 'Ti64_trace.png')
+    model.complete()
 
 if __name__ == '__main__':
     pass

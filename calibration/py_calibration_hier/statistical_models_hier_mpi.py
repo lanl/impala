@@ -7,6 +7,8 @@ from transport import TransportHB, TransportTC, TransportFP
 import statistical_models_hier as smh
 from math import log
 
+MPI_MESSAGE_SIZE = None
+
 class MPI_Error(Exception):
     pass
 
@@ -87,6 +89,11 @@ class ParallelTemperMaster(smh.ParallelTemperMaster):
 
     def parameter_pairwise_plot(self, theta, path):
         self.comm.send(('parameter_pairwise_plot',(theta, path)), dest = 1)
+        return
+
+    def complete(self):
+        for chain_rank in self.chain_ranks:
+            self.comm.isend(('complete',0), dest = chain_rank)
         return
 
     def __init__(self, comm, size, temperature_ladder, **kwargs):
@@ -205,6 +212,9 @@ class Dispatcher(object):
         self.chain.parameter_pairwise_plot(*args)
         return
 
+    def complete(self, args):
+        return BreakException('Done')
+
     def __init__(self, comm, rank):
         """ Initialization Routine """
         self.comm = comm
@@ -222,6 +232,7 @@ class Dispatcher(object):
             'try_swap_state_inf' : self.try_swap_state_inf,
             'try_swap_state_sup' : self.try_swap_state_sup,
             'write_to_disk'      : self.write_to_disk,
+            'complete'           : self.complete,
             }
         return
 

@@ -624,7 +624,6 @@ class Chain(Transformer):
         conn.close()
         return
 
-
 class ParallelTemperMaster(Transformer):
     temperature_ladder = np.array([1.])
     chains = []
@@ -718,6 +717,9 @@ class ParallelTemperMaster(Transformer):
 
     def parameter_pairwise_plot(self, theta, path):
         self.chains[0].parameter_pairwise_plot(theta, path)
+        return
+
+    def complete(self):
         return
 
     def __init__(self, temperature_ladder, **kwargs):
