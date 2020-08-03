@@ -1,21 +1,20 @@
 from physical_models_c import PTWYieldStress, SimpleShearModulus
-#from statistical_models_hier_redux_decruft import Chain, SubChainHB, ParallelTemperMaster
-#from statistical_models_hier_mpi import ParallelTemperMaster, Dispatcher
-from statistical_models_hier import ParallelTemperMaster
+from statistical_models_hier_mpi import ParallelTemperMaster, Dispatcher
+#from statistical_models_hier import ParallelTemperMaster
 from numpy import array, float64
-# from mpi4py import MPI
+from mpi4py import MPI
 
-# comm = MPI.COMM_WORLD
-# rank = comm.Get_rank()
-# size = comm.Get_size()
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+size = comm.Get_size()
 
-rank = 0
-size = 6
+# rank = 0
+# size = 6
 
 if rank > 0:
     pass
-    # dispatcher = Dispatcher(comm, rank)
-    # dispatcher.watch()
+    dispatcher = Dispatcher(comm, rank)
+    dispatcher.watch()
 
 elif rank == 0:
     # if True:
@@ -78,8 +77,8 @@ elif rank == 0:
 
     # Define the Model
     model = ParallelTemperMaster(
-        #comm = comm,
-        #size = size,
+        comm = comm,
+        size = size,
         temperature_ladder = 1.3 ** array(range(size - 1)),
         path = './data_Ti64.db',
         bounds = parameter_bounds,
