@@ -118,7 +118,7 @@ class ParallelTemperMaster(smh.ParallelTemperMaster):
         return history
 
     def parameter_pairwise_plot(self, theta, path):
-        sent = self.comm.isend(('parameter_trace_plot', (path, theta.shape), dest = 1)
+        sent = self.comm.isend(('parameter_trace_plot', (path, theta.shape)), dest = 1)
         sent = self.comm.Send([theta, MPI.DOUBLE], dest = 1)
         return
 
