@@ -21,6 +21,7 @@ from numpy.random import normal, uniform
 from random import sample, shuffle
 from math import ceil, sqrt, pi, log, exp
 from itertools import combinations
+from functools import lru_cache
 
 from pointcloud import localcov
 from submodel import SubModelHB, SubModelTC, SubModelFP
@@ -32,6 +33,13 @@ import seaborn as sea
 import time
 
 sea.set(style = 'ticks')
+
+# What will send me to the Hell of the Matrix Inverters
+
+@lru_cache(maxsize = 128)
+def cholesky_inversion(Sigma_as_tuple):
+    Sigma = np.array(Sigma_as_tuple)
+    return cho_solve(cho_factor(Sigma), np.eye(Sigma.shape[0]))
 
 class BreakException(Exception):
     pass
@@ -156,24 +164,24 @@ class SubChainSHPB(Transformer):
     def curr_sigma2(self):
         return self.s_sigma2[self.iter]
 
-    def log_posterior_theta(self, theta0, Sigma, theta, sigma2):
+    def log_posterior_theta(self, theta0, SigmaInv, theta, sigma2):
         """ Computes the log-posterior / full conditional for theta.  Note that
             we are tempering the likelihood, and not the prior. Care is taken to
             maintain that. """
         ssse = self.probit_sse(theta) / sigma2 # scaled sum squared error
         tdiff = theta - theta0                 # diff (hier)
-        sssd = tdiff.dot(Sigma).dot(tdiff)     # scaled sum squared diff (hier)
+        sssd = tdiff.dot(SigmaInv).dot(tdiff) # scaled sum squared diff (hier)
         ldj = self.invprobitlogjac(theta)      # Log determinant of jacobian
         tll = - 0.5 * (ssse + sssd) / self.temperature # tempered log Likelihood
         return ldj + tll
 
-    def log_posterior_state(self, theta0, Sigma, theta, sigma2):
+    def log_posterior_state(self, theta0, SigmaInv, theta, sigma2):
         """ Computes the log-posterior for a given sub-chain state at the
             chain's temperature.  This consists of the log-posterior for theta,
             additional contribution from posterior from sigma2.  Only Tempering
             the likelihood, not the prior. """
         # Contribution to total log posterior relevant to theta
-        lld = self.log_posterior_theta(theta0, Sigma, theta, sigma2)
+        lld = self.log_posterior_theta(theta0, SigmaInv, theta, sigma2)
         # Additional Contributions to log posterior relevant to sigma2
         lpd = (
             - (0.5 * self.N / self.temperature + self.prior_sigma2_a + 1) * log(sigma2)
@@ -347,6 +355,9 @@ class SubChainSHPB(Transformer):
         self.initialize_submodel(params, constants)
         return
 
+# As we define other subchain types, add them to this dictionary.
+# Then the "type" field will invoke the particular subchain class
+# e.g., subchain = SubChain[type](**kwargs)
 SubChain = {
     'shpb' : SubChainSHPB,
     }
@@ -376,6 +387,10 @@ class Chain(Transformer):
         return self.s_Sigma[self.iter]
 
     @property
+    def curr_Sigma_inv(self):
+        return self.pd_matrix_inversion(self.curr_Sigma)
+
+    @property
     def curr_theta(self):
         theta = np.array([subchain.curr_theta for subchain in self.subchains])
         return theta
@@ -385,6 +400,10 @@ class Chain(Transformer):
         sigma2 = np.array([subchain.curr_sigma2 for subchain in self.subchains])
         return sigma2
 
+    @staticmethod
+    def pd_matrix_inversion(mat):
+        return cholesky_inversion(tuple(map(tuple, mat)))
+
     def set_temperature(self, temperature):
         self.temperature = temperature
         for subchain in self.subchains:
@@ -393,14 +412,18 @@ class Chain(Transformer):
 
     def sample_theta0(self, theta, Sigma):
         theta_bar = theta.mean(axis = 0)
-        SigL = cho_factor(Sigma)
-        Siginv = cho_solve(SigL, np.eye(self.d))
-        S0 = cho_solve(
-            cho_factor((self.N / self.temperature) * Siginv + self.prior_theta0_Sinv),
-            np.eye(self.d)
+        SigInv = self.pd_matrix_inversion(Sigma)
+        #SigL = cho_factor(Sigma)
+        #Siginv = cho_solve(SigL, np.eye(self.d))
+        S0 = self.pd_matrix_inversion(
+            (self.N / self.temperature) * SigInv + self.prior_theta0_Sinv
             )
+        #S0 = cho_solve(
+        #    cho_factor((self.N / self.temperature) * Siginv + self.prior_theta0_Sinv),
+        #    np.eye(self.d)
+        #    )
         m0 = (
-            (self.N / self.temperature) * theta_bar.T.dot(Siginv) +
+            (self.N / self.temperature) * theta_bar.T.dot(SigInv) +
             self.prior_theta0_mu.T.dot(self.prior_theta0_Sinv)
             ).dot(S0)
         S0L = cholesky(S0)
@@ -420,15 +443,12 @@ class Chain(Transformer):
         Sigma = invwishart.rvs(df = nu0, scale = psi0)
         return Sigma
 
-    def sample_subchains(self):
-        pass
-
     def log_posterior_state(self, state):
         """ Computes the posterior for a given state, at the chain's temp. """
         # Contribution to log-posterior from subchains
         lps_sc = sum([
             self.subchains[i].log_posterior_state(
-                state['theta0'],   state['Sigma'],
+                state['theta0'],   state['SigmaInv'],
                 state['theta'][i], state['sigma2'][i],
                 )
             for i in range(self.N)
@@ -474,11 +494,12 @@ class Chain(Transformer):
         """ Extracts the current state of the chain, returns it as a dictionary.
         Expecting to send it as a pickled object back to the host process. """
         state = {
-            'theta0' : self.curr_theta0,
-            'Sigma'  : self.curr_Sigma,
-            'theta'  : self.curr_theta,
-            'sigma2' : self.curr_sigma2,
-            'rank'   : self.rank,
+            'theta0'   : self.curr_theta0,
+            'Sigma'    : self.curr_Sigma,
+            'SigmaInv' : self.curr_Sigma_inv,
+            'theta'    : self.curr_theta,
+            'sigma2'   : self.curr_sigma2,
+            'rank'     : self.rank,
             }
         return state
 
