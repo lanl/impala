@@ -13,7 +13,9 @@ import random
 
 # Defining strings for creating and updating tables
 
-# Meta Table Creation String
+# Meta Table Creation String;
+#  Add additional meta information necessary to other experiment types to this
+#  table.  Also need to add chemistry to this table.
 meta_create = """CREATE TABLE meta (
     type TEXT,
     temperature REAL,
@@ -24,7 +26,6 @@ meta_create = """CREATE TABLE meta (
     table_name TEXT
     );
 """
-
 shpb_data_create = """ CREATE TABLE {}(strain REAL, stress REAL); """
 shpb_meta_insert = """ INSERT INTO
         meta(type, temperature, edot, emax, pname, fname, table_name)

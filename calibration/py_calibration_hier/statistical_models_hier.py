@@ -455,9 +455,12 @@ class Chain(Transformer):
             ])
         # sum of squares between theta0 and prior mean
         t0_diff = state['theta0'] - self.prior_theta0_mu
+        p = t0_diff.shape[0]
         lp = (
-            - (0.5 * self.N * slogdet(state['Sigma'])[1]) / self.temperature
+            - 0.5 * ((self.N / self.temperature) +
+                     self.prior_Sigma_nu + p + 1 ) * slogdet(state['Sigma'])[1]
             - (0.5 * t0_diff.T.dot(self.prior_theta0_Sinv).dot(t0_diff))
+            - (0.5 * (self.prior_Sigma_psi.dot(state['SigmaInv'])).trace())
             )
         return lps_sc + lp
 
