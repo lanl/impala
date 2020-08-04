@@ -5,6 +5,7 @@ from numpy.random import uniform
 from itertools import combinations
 from transport import TransportHB, TransportTC, TransportFP
 import statistical_models_hier as smh
+import numpy as np
 from math import log
 
 MPI_MESSAGE_SIZE = 2**18  # Maximum MPI message size for pickled sends
