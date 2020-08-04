@@ -118,7 +118,8 @@ class ParallelTemperMaster(smh.ParallelTemperMaster):
         return history
 
     def parameter_pairwise_plot(self, theta, path):
-        self.comm.send(('parameter_pairwise_plot',(theta, path)), dest = 1)
+        sent = self.comm.isend(('parameter_trace_plot', (path, theta.shape), dest = 1)
+        sent = self.comm.Send([theta, MPI.DOUBLE], dest = 1)
         return
 
     def complete(self):
@@ -250,7 +251,10 @@ class Dispatcher(object):
         return
 
     def parameter_pairwise_plot(self, args):
-        self.chain.parameter_pairwise_plot(*args)
+        path, theta_shape = args
+        theta = np.empty(theta_shape)
+        self.comm.Recv([theta, MPI.DOUBLE], source = 0)
+        self.chain.parameter_pairwise_plot(theta, path)
         return
 
     def complete(self, args):
