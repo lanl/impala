@@ -99,9 +99,7 @@ class TransportFP(object):
         return
 
 if __name__ == '__main__':
-    conn = sql.connect('./data.db?mode=ro', uri = True)
-    curs = conn.cursor()
-    xp = TransportHB_sql(curs, 'ti64_shpb_00vmySJBdi', 0.7, 100)
+    pass
 
 
 # EOF

@@ -411,7 +411,7 @@ class Chain(Transformer):
 
     def sample_Sigma(self, theta, theta0):
         """ Sample Sigma """
-        tdiff = (theta - theta0)
+        tdiff = (theta - theta0)        
         C = sum([np.outer(tdiff[i],tdiff[i]) for i in range(tdiff.shape[0])])
         # Compute parameters for Sigma
         psi0 = self.prior_Sigma_psi + C
