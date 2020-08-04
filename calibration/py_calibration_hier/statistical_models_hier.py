@@ -396,11 +396,11 @@ class Chain(Transformer):
         SigL = cho_factor(Sigma)
         Siginv = cho_solve(SigL, np.eye(self.d))
         S0 = cho_solve(
-            cho_factor(self.N * Siginv + self.prior_theta0_Sinv),
+            cho_factor((self.N / self.temperature) * Siginv + self.prior_theta0_Sinv),
             np.eye(self.d)
             )
         m0 = (
-            self.N * theta_bar.T.dot(Siginv) +
+            (self.N / self.temperature) * theta_bar.T.dot(Siginv) +
             self.prior_theta0_mu.T.dot(self.prior_theta0_Sinv)
             ).dot(S0)
         S0L = cholesky(S0)
@@ -411,11 +411,11 @@ class Chain(Transformer):
 
     def sample_Sigma(self, theta, theta0):
         """ Sample Sigma """
-        tdiff = (theta - theta0)        
+        tdiff = (theta - theta0)
         C = sum([np.outer(tdiff[i],tdiff[i]) for i in range(tdiff.shape[0])])
         # Compute parameters for Sigma
-        psi0 = self.prior_Sigma_psi + C
-        nu0  = self.prior_Sigma_nu + self.N
+        psi0 = self.prior_Sigma_psi + C / self.temperature
+        nu0  = self.prior_Sigma_nu + self.N / self.temperature
         # Compute Sigma
         Sigma = invwishart.rvs(df = nu0, scale = psi0)
         return Sigma
