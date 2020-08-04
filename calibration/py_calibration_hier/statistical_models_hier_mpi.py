@@ -9,6 +9,8 @@ import numpy as np
 from math import log
 
 MPI_MESSAGE_SIZE = 2**18  # Maximum MPI message size for pickled sends
+                          # Keep increasing this until you don't get truncated
+                          # send states.
 
 class MPI_Error(Exception):
     pass
@@ -278,6 +280,7 @@ class Dispatcher(object):
             'try_swap_state_sup' : self.try_swap_state_sup,
             'write_to_disk'      : self.write_to_disk,
             'complete'           : self.complete,
+            'parameter_pairwise_plot' : self.parameter_pairwise_plot,
             }
         return
 
