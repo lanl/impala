@@ -8,13 +8,16 @@ Created on Fri Apr  3 14:10:54 2020
 
 import numpy as np
 import scipy as sp
+from scipy import stats
 from math import pi, sqrt, log, erf, exp, sin
 import matplotlib.pyplot as plt
 from itertools import combinations, chain
 from scipy.special import comb
 from datetime import datetime
 from collections import namedtuple
-import ipdb
+import ipdb #ipdb.set_trace()
+from pathos.multiprocessing import ProcessingPool as Pool
+import dill
 
 
 def abline(slope, intercept):
@@ -143,11 +146,11 @@ class BassData:
         self.ssy = sum(y*y)
         self.n = len(xx)
         self.p = len(xx[0])
-        self.bounds = np.zeros([p, 2])
-        for i in range(p):
+        self.bounds = np.zeros([self.p, 2])
+        for i in range(self.p):
             self.bounds[i, 0] = np.min(xx[:, i])
             self.bounds[i, 1] = np.max(xx[:, i])
-        self.xx = xx#normalize(self.xx_orig, self.bounds)
+        self.xx = normalize(self.xx_orig, self.bounds)
         return
 
 class BassState:
@@ -445,8 +448,9 @@ class BassModel:
         plt.xlabel("MCMC iteration (post-burn)")
 
         ax = fig.add_subplot(2,2,3)
-        yhat = self.predict(self.data.xx).mean(axis=0) # posterior predictive mean
-        plt.scatter(y, yhat)
+        yhat = self.predict(self.data.xx_orig).mean(axis=0) # posterior predictive mean
+        #ipdb.set_trace()
+        plt.scatter(self.data.y, yhat)
         abline(1,0)
         plt.xlabel("observed")
         plt.ylabel("posterior prediction")
@@ -455,7 +459,7 @@ class BassModel:
         plt.hist(self.data.y-yhat,color = "skyblue", ec="white",density=True)
         axes = plt.gca()
         x=np.linspace(axes.get_xlim()[0],axes.get_xlim()[1],100)
-        plt.plot(x, sp.stats.norm.pdf(x,scale=sqrt(mod.samples.s2.mean())),color='red')
+        plt.plot(x, sp.stats.norm.pdf(x,scale=sqrt(self.samples.s2.mean())),color='red')
         plt.xlabel("residuals")
         plt.ylabel("density")
 
@@ -475,18 +479,19 @@ class BassModel:
             mat[:,m+1] = makeBasis(self.samples.signs[model_ind,m,ind],self.samples.vs[model_ind,m,ind],self.samples.knots[model_ind,m,ind],X).reshape(n)
         return mat
 
-    def predict(self, X, mcmc_use = None):
-        # needs to handle standardization...
-
+    def predict(self, X, mcmc_use = None, nugget=False):
+        Xs = normalize(X, self.data.bounds)
+        #ipdb.set_trace()
         if mcmc_use == None:
             mcmc_use = np.array(range(self.nstore))
-        out = np.zeros([len(mcmc_use),len(X)])
+        out = np.zeros([len(mcmc_use),len(Xs)])
         models = self.model_lookup[mcmc_use]
         umodels = set(models)
         for j in umodels:
-            #ipdb.set_trace()
             mcmc_use_j = mcmc_use[np.ix_(models == j)]
-            out[mcmc_use_j,:] = np.dot(self.samples.beta[mcmc_use_j,0:(self.samples.nbasis_models[j]+1)],self.makeBasisMatrix(j,X).T)
+            out[mcmc_use_j,:] = np.dot(self.samples.beta[mcmc_use_j,0:(self.samples.nbasis_models[j]+1)],self.makeBasisMatrix(j,Xs).T)
+        if nugget:
+            out = out + np.random.normal(size=[len(Xs),len(mcmc_use)],scale=np.sqrt(self.samples.s2[mcmc_use])).T
         return out
 
 
@@ -507,55 +512,147 @@ def bass(xx, y, nmcmc = 10000, nburn = 9000, thin = 1, w1 = 5, w2 = 5, maxInt = 
             bm.writeState()
         if i % 1000==0:
             print(str(datetime.now()) + ', nbasis: ' + str(bm.state.nbasis))
-    #del bm.writeState # the user should have access to this
+    #del bm.writeState # the user should not have access to this
     return bm
 
 
 
 
+class BassBasis:
+    def __init__(self, xx, y, basis, newy, y_mean, y_sd, trunc_error, ncores=1, **kwargs):
+        self.basis = basis
+        self.xx = xx
+        self.y = y
+        self.newy = newy
+        self.y_mean = y_mean
+        self.y_sd = y_sd
+        self.trunc_error = trunc_error
+        self.nbasis = len(basis[0])
+        
+        if ncores == 1:
+            self.bm_list = list(map(lambda ii: bass(self.xx, self.newy[ii,:], **kwargs), list(range(self.nbasis))))
+        else:
+            with Pool(ncores) as pool:
+                self.bm_list = list(pool.map(lambda ii: bass(self.xx, self.newy[ii,:], **kwargs), list(range(self.nbasis))))           
+        return 
+    
+    def predict(self, X, mcmc_use = None, nugget=False, ncores=1):
+        if ncores == 1:
+            pred_coefs = list(map(lambda ii: self.bm_list[ii].predict(X, mcmc_use, nugget), list(range(self.nbasis))))
+        else:
+            with Pool(ncores) as pool:
+                pred_coefs = list(pool.map(lambda ii: self.bm_list[ii].predict(X, mcmc_use, nugget), list(range(self.nbasis))))
+        out = np.dot(np.dstack(pred_coefs),self.basis.T)
+        return out*self.y_sd + self.y_mean
+    
+    def plot(self):
+        fig = plt.figure()
 
+        ax = fig.add_subplot(2,2,1)
+        for i in range(self.nbasis):
+            plt.plot(self.bm_list[i].samples.nbasis)
+        plt.ylabel("number of basis functions")
+        plt.xlabel("MCMC iteration (post-burn)")
 
+        ax = fig.add_subplot(2,2,2)
+        for i in range(self.nbasis):
+            plt.plot(self.bm_list[i].samples.s2)
+        plt.ylabel("error variance")
+        plt.xlabel("MCMC iteration (post-burn)")
+
+        #ipdb.set_trace()
+        ax = fig.add_subplot(2,2,3)
+        yhat = self.predict(self.bm_list[0].data.xx_orig).mean(axis=0) # posterior predictive mean
+        plt.scatter(self.y, yhat)
+        abline(1,0)
+        plt.xlabel("observed")
+        plt.ylabel("posterior prediction")
+
+        ax = fig.add_subplot(2,2,4)
+        plt.hist((self.y-yhat).reshape(np.prod(yhat.shape)),color = "skyblue", ec="white",density=True)
+        plt.xlabel("residuals")
+        plt.ylabel("density")
+
+        fig.tight_layout()
+
+        plt.show()
+
+def bassPCA(xx, y, npc, ncores=1, center=True, scale=False, **kwargs):
+    y_mean = 0
+    y_sd = 1
+    if center:
+        y_mean = np.mean(y, axis=0)
+    if scale:
+        y_sd = np.std(y, axis=0)
+    y_scale = np.apply_along_axis(lambda row: (row-y_mean)/y_sd, 1, y)
+    decomp = np.linalg.svd(y_scale.T)
+    basis = np.dot(decomp[0][:,0:npc],np.diag(decomp[1][0:npc]))
+    newy = decomp[2][0:npc,:]
+    trunc_error = np.dot(basis,newy) - y_scale.T
+    
+    return BassBasis(xx, y, basis, newy, y_mean, y_sd, trunc_error, ncores, **kwargs)
 
 ######################################################
 ## test it out
 
+#if __name__ == '__main__':
 
-def f(x):
-  out = 10. * np.sin(pi * x[:,0] * x[:,1]) + 20. * (x[:,2] - .5)**2 + 10 * x[:,3] + 5. * x[:,4]
-  return out
+if False:
+    def f(x):
+      out = 10. * np.sin(pi * x[:,0] * x[:,1]) + 20. * (x[:,2] - .5)**2 + 10 * x[:,3] + 5. * x[:,4]
+      return out
+    
+    
+    n = 500
+    p = 10
+    x = np.random.rand(n,p)-.5
+    xx = np.random.rand(1000,p)-.5
+    y = f(x) + np.random.normal(size=n)
+    
+    mod = bass(x,y,nmcmc=10000,nburn=9000)
+    
+    #mod.plot()
+    
+    #print(np.var(mod.predict(xx).mean(axis=0)-f(xx)))
 
-n = 500
-p = 10
-x = np.random.rand(n,p)
-xx = np.random.rand(1000,p)
-y = f(x) + np.random.normal(size=n)
+if True:
 
-mod = bass(x,y,nmcmc=10000,nburn=9000)
-
-mod.plot()
-
-print(np.var(mod.predict(xx).mean(axis=0)-f(xx)))
-
-#from pathos.multiprocessing import ProcessingPool as Pool
-#import dill
-
-#dill.settings['recurse'] = True
-
-#pool = Pool()
-#res_list = list(pool.map(calib_use_list, use, itertools.repeat(use_list, len(use)),itertools.repeat(lookup, len(use))))
-#pool.close()
-#pool.join()
-
-
-
-profiler.print_stats()
-profiler.dump_stats("/Users/dfrancom/Desktop/profiler_stats.txt")
-
-#import cProfile
-#cProfile.run('bass(x,y)')
-
-
-# TODO:
-    # PCA space function
-    # explore whether you need discrete knot prior or not
-    # handle standardization
+    def f2(x):
+      out = 10. * np.sin(pi * tt * x[1]) + 20. * (x[2] - .5)**2 + 10 * x[3] + 5. * x[4]
+      return out
+    
+    
+    
+    
+    tt = np.linspace(0,1,50)
+    n = 500
+    p = 9
+    x = np.random.rand(n,p)-.5
+    xx = np.random.rand(1000,p)-.5
+    e = np.random.normal(size=n*len(tt))
+    y = np.apply_along_axis(f2, 1, x) + e.reshape(n,len(tt))
+    
+    modf = bassPCA(x,y,4,ncores=2)
+    modf.plot()
+    
+    pred = modf.predict(xx,nugget=True)
+    
+    ind = 11
+    plt.plot(pred[:,ind,:].T)
+    plt.plot(f2(xx[ind,]),'bo')
+    
+    plt.plot(np.apply_along_axis(f2, 1, xx), np.mean(pred,axis=0))
+    abline(1,0)
+    
+    
+    
+    #profiler.print_stats()
+    #profiler.dump_stats("/Users/dfrancom/Desktop/profiler_stats.txt")
+    
+    #import cProfile
+    #cProfile.run('bass(x,y)')
+    
+        
+        # TODO:
+            # explore whether you need discrete knot prior or not
+            # handle standardization
