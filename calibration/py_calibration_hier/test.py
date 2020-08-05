@@ -77,7 +77,7 @@ elif rank == 0:
         flow_stress_model = PTWYieldStress,
         shear_modulus_model = SimpleShearModulus,
         )
-    model.sample(10000,10000)
+    model.sample(100000)
     model.write_to_disk('Ti64_results.db')
     theta0 = model.invprobit(model.get_history(10000,1))
     model.parameter_pairwise_plot(theta0, 'Ti64_pairwise.png')
