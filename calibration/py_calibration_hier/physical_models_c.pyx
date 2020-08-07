@@ -239,10 +239,11 @@ cdef class PTWYieldStress(BaseModel):
         return {'theta' : self.theta, 'p'     : self.p,     's0'    : self.s0,
                 'sInf'  : self.sInf,  'kappa' : self.kappa, 'gamma' : self.gamma,
                 'y0'    : self.y0,    'yInf'  : self.yInf,
-                'y1'    : self.y1,    'y2'    : self.y2}
+                }
 
     cpdef dict report_constants(self):
-        return {'beta' : self.beta, 'matomic' : self.matomic}
+        return {'beta' : self.beta, 'matomic' : self.matomic,
+                'y1'   : self.y1,   'y2'      : self.y2      }
 
     cpdef void update_parameters(self, np.ndarray[np.float64_t, ndim = 1] input):
         self.theta = input[0]

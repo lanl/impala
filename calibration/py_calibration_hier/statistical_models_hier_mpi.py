@@ -59,8 +59,8 @@ class ParallelTemperMaster(smh.ParallelTemperMaster):
         assert all(parcels)
         return
 
-    def write_to_disk(self, path):
-        self.comm.send(('write_to_disk', path), dest = 1)
+    def write_to_disk(self, path, nburn, thin):
+        self.comm.send(('write_to_disk', (path, nburn, thin)), dest = 1)
         return
 
     def get_state(self, rank):
@@ -248,8 +248,7 @@ class Dispatcher(object):
         return
 
     def write_to_disk(self, args):
-        path = args
-        self.chain.write_to_disk(path)
+        self.chain.write_to_disk(*args)
         return
 
     def parameter_pairwise_plot(self, args):
@@ -260,7 +259,8 @@ class Dispatcher(object):
         return
 
     def complete(self, args):
-        return BreakException('Done')
+        BreakException('Done')
+        return
 
     def __init__(self, comm, rank):
         """ Initialization Routine """

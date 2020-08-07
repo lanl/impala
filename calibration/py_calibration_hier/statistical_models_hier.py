@@ -329,6 +329,8 @@ class SubChainSHPB(Transformer):
         """
         self.parent = parent
 
+        self.table_name = table_name
+
         self.nu = nu
         self.psi0 = psi0
         self.r0 = r0
@@ -338,7 +340,8 @@ class SubChainSHPB(Transformer):
         data = np.array(list(cursor.execute(self.data_query.format(table_name))))
 
         self.submodel = SubModelHB(
-            TransportHB(data = data, temp = temperature, emax = emax, edot = edot * 1e-6),
+            TransportHB(data = data, temp = temperature,
+                        emax = emax, edot = edot * 1e-6),
             **kwargs,
             )
         self.N = self.submodel.N
@@ -405,6 +408,9 @@ class Chain(Transformer):
 
     @staticmethod
     def pd_matrix_inversion(mat):
+        """ calls the (cached) global function cholesky_inversion.  input must
+        be cast to tuples in order to use.  Some overhead for this, but nowhere
+        near as much as going through the inversion. """
         return cholesky_inversion(tuple(map(tuple, mat)))
 
     def set_temperature(self, temperature):
@@ -414,22 +420,19 @@ class Chain(Transformer):
         return
 
     def sample_theta0(self, theta, Sigma):
+        """ All this matrix inversion is really wasteful, but luckily it's
+        not that large. """
         theta_bar = theta.mean(axis = 0)
         SigInv = self.pd_matrix_inversion(Sigma)
-        #SigL = cho_factor(Sigma)
-        #Siginv = cho_solve(SigL, np.eye(self.d))
+        # Posterior Covariance Matrix
         S0 = self.pd_matrix_inversion(
             (self.N / self.temperature) * SigInv + self.prior_theta0_Sinv
             )
-        #S0 = cho_solve(
-        #    cho_factor((self.N / self.temperature) * Siginv + self.prior_theta0_Sinv),
-        #    np.eye(self.d)
-        #    )
-        m0 = (
-            (self.N / self.temperature) * theta_bar.T.dot(SigInv) +
-            self.prior_theta0_mu.T.dot(self.prior_theta0_Sinv)
-            ).dot(S0)
+        # Posterior Mean
+        m0 = ((self.N / self.temperature) * theta_bar.T.dot(SigInv) +
+                self.prior_theta0_mu.T.dot(self.prior_theta0_Sinv)).dot(S0)
         S0L = cholesky(S0)
+        # Sample from Truncated Normal to meet constraints
         theta0_try = m0 + S0L.dot(norm.rvs(size = self.d))
         while not self.check_constraints(theta0_try):
             theta0_try = m0 + S0L.dot(norm.rvs(size = self.d))
@@ -539,7 +542,7 @@ class Chain(Transformer):
         self.curr_ldj    = self.invprobitlogjac(self.curr_theta)
         return
 
-    def write_to_disk(self, path):
+    def write_to_disk(self, path, nburn = 0, thin = 1):
 
         # If output previously exists, delete
         if os.path.exists(path):
@@ -550,6 +553,15 @@ class Chain(Transformer):
         curs = conn.cursor()
 
         # Table Creation and insertion statements
+        meta_create_statement = self.create_statement.format(
+            'meta',
+            'source_name TEXT, calib_name TEXT',
+            )
+        meta_insert_statement = self.insert_statement.format(
+            'meta',
+            'source_name, calib_name',
+            '?,?',
+            )
         theta0_create_statement = self.create_statement.format(
             'theta0',
             ','.join([x + ' REAL' for x in self.parameter_order]),
@@ -577,26 +589,47 @@ class Chain(Transformer):
             'sigma2',
             '?',
             )
+        constant_create_statement = self.create_statement.format(
+            'constants',
+            'constant TEXT, value REAL',
+            )
+        constant_insert_statement = self.insert_statement.format(
+            'constants',
+            'constant, value',
+            '?,?',
+            )
+
+        # Create Meta Table
+        curs.execute(meta_create_statement)
+
+        # Insert Constants
+        curs.execute(constant_create_statement)
+        curs.executemany(
+            constant_insert_statement,
+            list(self.materialmodel.report_constants().items())
+            )
 
         # Insert hierarchical theta
         curs.execute(theta0_create_statement)
         curs.executemany(
             theta0_insert_statement,
-            self.unnormalize(self.invprobit(self.s_theta0)).tolist(),
+            (self.unnormalize(self.invprobit(self.s_theta0)).tolist())[nburn::thin],
             )
         for i, subchain in zip(range(1, len(self.subchains) + 1), self.subchains):
             # Insert componenent thetas
             curs.execute(thetai_create_statement.format(i))
             curs.executemany(
                 thetai_insert_statement.format(i),
-                self.unnormalize(self.invprobit(subchain.s_theta)).tolist(),
+                (self.unnormalize(self.invprobit(subchain.s_theta)).tolist())[nburn::thin],
                 )
             # insert component sigma2's
             curs.execute(sigma2i_create_statement.format(i))
             curs.executemany(
                 sigma2i_insert_statement.format(i),
-                [(x,) for x in subchain.s_sigma2.tolist()]
+                [(x,) for x in subchain.s_sigma2.tolist()][nburn::thin]
                 )
+            # Insert Meta Information
+            curs.execute(meta_insert_statement,(subchain.table_name, 'theta_{}'.format(i)))
 
         # Write changes to disk, close connection.
         conn.commit()
@@ -618,6 +651,16 @@ class Chain(Transformer):
         kwargs - Additional arguments to go to MaterialModel
         """
         self.materialmodel = MaterialModel(**kwargs)
+        self.parameter_order = self.materialmodel.get_parameter_list()
+        self.bounds = np.array([bounds[key] for key in self.parameter_order])
+        init_param = {
+            x : y
+            for x, y in zip(
+                self.parameter_order,
+                list(self.unnormalize(np.array([0.5] * len(self.parameter_order))))
+                )
+            }
+        self.materialmodel.initialize(init_param, constants)
 
         conn = sql.connect(path)
         cursor = conn.cursor()
@@ -639,7 +682,7 @@ class Chain(Transformer):
         self.N = len(self.subchains)
         self.n = np.array([subchain.N for subchain in self.subchains])
 
-        self.parameter_order = self.materialmodel.get_parameter_list()
+
         self.d = len(self.parameter_order)
 
         self.prior_Sigma_nu    = self.d
@@ -647,7 +690,7 @@ class Chain(Transformer):
         self.prior_theta0_mu   = np.zeros(self.d)
         self.prior_theta0_Sinv = 0.5 * np.eye(self.d)
 
-        self.bounds = np.array([bounds[key] for key in self.parameter_order])
+
         conn.close()
         return
 
@@ -728,8 +771,8 @@ class ParallelTemperMaster(Transformer):
         print('Sampling Complete for {} Samples'.format(nsamp))
         return
 
-    def write_to_disk(self, path):
-        self.chains[0].write_to_disk(path)
+    def write_to_disk(self, path, nburn = 0, thin = 1):
+        self.chains[0].write_to_disk(path, nburn, thin)
         return
 
     def get_history(self, *args):
