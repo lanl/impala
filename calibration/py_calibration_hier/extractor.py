@@ -7,15 +7,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 
-def compute_curve_summary(theta, theta0, field_names, const, temp, emax, edot, nhist):
-    model = MaterialModel(
-        flow_stress_model = PTWYieldStress,
-        shear_modulus_model = SimpleShearModulus,
-        )
-    const['y1'] = 0.0245
-    const['y2'] = 0.33
-    model.set_history_variables(emax, edot, nhist)
-    model.initialize({x : y for x , y in zip(field_names, theta[0])}, const)
+def compute_curve_summary(theta, theta0, field_names, const, temp, emax, edot, nhist, models):
+    model = MaterialModel(**models)
+    model.set_history_variables(emax, edot * 1e-6, nhist)
+    param = {x:y for x,y in zip(field_names, list(theta0))}
+    model.initialize(param, const, T = temp)
     stress = np.empty((theta.shape[0], nhist))
     for i in range(theta.shape[0]):
         model.initialize_state(T = temp)
@@ -47,6 +43,12 @@ class HierarchicalExtractor(object):
     param_query = "PRAGMA TABLE_INFO({});"
     data_query = "SELECT {} FROM {};"
     meta_query = "SELECT table_name, temperature, edot, emax FROM meta;"
+    model_query = "SELECT model_type, model_name FROM models_used;"
+
+    def set_models(self):
+        cursor = self.conn_o.cursor()
+        self.models_used = {x : y for x, y in cursor.execute(self.model_query)}
+        return
 
     def compute_curves(self, nburn, thin):
         self.theta0 = self.get_theta_table('theta0', nburn, thin)
@@ -60,11 +62,14 @@ class HierarchicalExtractor(object):
             in self.theta_tables
             ]
         temps = [row[0] for row in self.metas]
-        edots = [row[1]*1e-6 for row in self.metas]
+        edots = [row[1] for row in self.metas]
         emaxs = [row[2] for row in self.metas]
         # Building the iterator
-        iterator = zip(self.thetas, repeat(self.theta0), repeat(self.theta_fields),
-                        repeat(self.constants), temps, emaxs, edots, repeat(100))
+        iterator = zip(
+                self.thetas, repeat(self.theta0), repeat(self.theta_fields),
+                repeat(self.constants), temps, emaxs, edots, repeat(100),
+                repeat(self.models_used)
+                )
         pool = Pool(8)
         results = pool.map(compute_curve_summary_wrapper, iterator)
         pool.close()
@@ -93,7 +98,9 @@ class HierarchicalExtractor(object):
 
     def get_theta_table(self, table, nburn, thin):
         cursor = self.conn_o.cursor()
-        result = cursor.execute(self.data_query.format(','.join(self.theta_fields), table))
+        result = cursor.execute(
+            self.data_query.format(','.join(self.theta_fields), table)
+            )
         return np.array(list(result))[nburn::thin]
 
     def get_thetas(self, nburn, thin):
@@ -130,9 +137,12 @@ class HierarchicalExtractor(object):
         return table_dict
 
     def set_constants(self):
-        query = self.conn_o.execute("SELECT constant, value FROM constants;")
-        results = {x : y for x, y in query}
-        self.constants = results
+        cursor = self.conn_o.cursor()
+        self.constants = {
+            x : y
+            for x, y
+            in cursor.execute("SELECT constant, value FROM constants;")
+            }
         return
 
     def __init__(self, path_inputs, path_results):
@@ -140,6 +150,7 @@ class HierarchicalExtractor(object):
         self.conn_o = sql.connect(path_results)
         self.set_table_list()
         self.set_constants()
+        self.set_models()
         self.theta_fields = self.parameter_list('theta0')
         return
 

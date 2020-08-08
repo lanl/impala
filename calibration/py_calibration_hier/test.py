@@ -1,4 +1,3 @@
-from physical_models_c import PTWYieldStress, SimpleShearModulus
 from statistical_models_hier_mpi import ParallelTemperMaster, Dispatcher
 #from statistical_models_hier import ParallelTemperMaster
 from numpy import array, float64
@@ -75,8 +74,8 @@ elif rank == 0:
         path = './data_Ti64.db',
         bounds = parameter_bounds,
         constants = starting_consts,
-        flow_stress_model = PTWYieldStress,
-        shear_modulus_model = SimpleShearModulus,
+        flow_stress_model = 'PTW',
+        shear_modulus_model = 'Simple',
         )
     model.sample(100000)
     model.write_to_disk('Ti64_results.db', 50000, 20)

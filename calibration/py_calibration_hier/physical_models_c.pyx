@@ -66,6 +66,9 @@ cdef class ConstantSpecificHeat(BaseModel):
     cpdef double value(self, double edot = 0.):
         return self.Cv0
 
+SpecificHeat = {
+    'Constant' : ConstantSpecificHeat,
+    }
 # Density Models
 
 cdef class ConstantDensity(BaseModel):
@@ -84,6 +87,10 @@ cdef class ConstantDensity(BaseModel):
     cpdef double value(self, double edot = 0.):
         return self.rho0
 
+Density = {
+    'Constant' : ConstantDensity,
+    }
+
 # Melt Temperature Models
 
 cdef class ConstantMeltTemperature(BaseModel):
@@ -101,6 +108,10 @@ cdef class ConstantMeltTemperature(BaseModel):
 
     cpdef double value(self, double edot = 0.):
         return self.Tmelt0
+
+MeltTemperature = {
+    'Constant' : ConstantMeltTemperature
+    }
 
 # Shear Modulus Models
 
@@ -167,6 +178,12 @@ cdef class SteinShearModulus(BaseModel):
             gnow = 0.
 
         return gnow
+
+ShearModulus = {
+    'Constant' : ConstantShearModulus,
+    'Simple'   : SimpleShearModulus,
+    'Stein'    : SteinShearModulus,
+    }
 
 # Yield Stress Models
 
@@ -370,6 +387,13 @@ cdef class SteinFlowStress(BaseModel):
             fnow = 0.
         return self.y0 * fnow * G / self.G0
 
+YieldStress = {
+    'Constant' : ConstantYieldStress,
+    'JC'       : JCYieldStress,
+    'PTW'      : PTWYieldStress,
+    'Stein'    : SteinFlowStress,
+    }
+
 # Material State Model
 
 cdef class MaterialState:
@@ -417,6 +441,7 @@ cdef class MaterialModel:
     cdef double chi
     cdef double emax, edot
     cdef int Nhist
+    cdef dict models_used
 
     cpdef dict report_parameters(self):
         return {
@@ -445,6 +470,9 @@ cdef class MaterialModel:
             'melt_model'    : self.melt_model_idx,
             'density_model' : self.density_model_idx,
             }
+
+    cpdef dict report_models_used(self):
+        return self.models_used
 
     cpdef (double,double,int) report_history_variables(self):
         return (self.emax, self.edot, self.Nhist)
@@ -563,73 +591,97 @@ cdef class MaterialModel:
         return self.chi
 
     cpdef bint check_constraints(self):
-        checked = [
-            self.flow_stress.check_constraints(),
-            self.specific_heat.check_constraints(),
-            self.shear_modulus.check_constraints(),
-            self.melt_model.check_constraints(),
-            self.density_model.check_constraints(),
-            ]
-        return all(checked)
+        if  self.flow_stress.check_constraints()   and \
+            self.specific_heat.check_constraints() and \
+            self.shear_modulus.check_constraints() and \
+            self.melt_model.check_constraints()    and \
+            self.density_model.check_constraints():
+            return True
+
+        else:
+            return False
+        # checked = [
+        #     self.flow_stress.check_constraints(),
+        #     self.specific_heat.check_constraints(),
+        #     self.shear_modulus.check_constraints(),
+        #     self.melt_model.check_constraints(),
+        #     self.density_model.check_constraints(),
+        #     ]
+        # return all(checked)
 
     def __init__(
             self,
             object state               = MaterialState,
-            object flow_stress_model   = ConstantYieldStress,
-            object specific_heat_model = ConstantSpecificHeat,
-            object shear_modulus_model = ConstantShearModulus,
-            object melt_model          = ConstantMeltTemperature,
-            object density_model       = ConstantDensity,
+            object flow_stress_model   = 'Constant',
+            object specific_heat_model = 'Constant',
+            object shear_modulus_model = 'Constant',
+            object melt_model          = 'Constant',
+            object density_model       = 'Constant',
             ):
         """ Builds a complete model to describe material reactions """
+
+        self.models_used = {
+            'flow_stress_model'   : flow_stress_model,
+            'specific_heat_model' : specific_heat_model,
+            'shear_modulus_model' : shear_modulus_model,
+            'melt_model'          : melt_model,
+            'density_model'       : density_model,
+            }
+
+        flow_stress   = YieldStress[flow_stress_model]
+        specific_heat = SpecificHeat[specific_heat_model]
+        shear_modulus = ShearModulus[shear_modulus_model]
+        melt_temp     = MeltTemperature[melt_model]
+        density       = Density[density_model]
+
         # Set model indices
-        self.flow_stress_idx = (0,0) # start with flow stress at 0
+        self.flow_stress_idx   = (0,0) # start with flow stress at 0
         self.specific_heat_idx = (
-            len(flow_stress_model.parameter_list) + self.flow_stress_idx[0],
-            len(flow_stress_model.constant_list)  + self.flow_stress_idx[1],
+            len(flow_stress.parameter_list) + self.flow_stress_idx[0],
+            len(flow_stress.constant_list)  + self.flow_stress_idx[1],
             )
         self.shear_modulus_idx = (
-            len(specific_heat_model.parameter_list) + self.specific_heat_idx[0],
-            len(specific_heat_model.constant_list)  + self.specific_heat_idx[1],
+            len(specific_heat.parameter_list) + self.specific_heat_idx[0],
+            len(specific_heat.constant_list)  + self.specific_heat_idx[1],
             )
-        self.melt_model_idx = (
-            len(shear_modulus_model.parameter_list) + self.shear_modulus_idx[0],
-            len(shear_modulus_model.constant_list)  + self.shear_modulus_idx[1],
+        self.melt_model_idx    = (
+            len(shear_modulus.parameter_list) + self.shear_modulus_idx[0],
+            len(shear_modulus.constant_list)  + self.shear_modulus_idx[1],
             )
         self.density_model_idx = (
-            len(melt_model.parameter_list) + self.melt_model_idx[0],
-            len(melt_model.constant_list)  + self.melt_model_idx[1],
+            len(melt_temp.parameter_list) + self.melt_model_idx[0],
+            len(melt_temp.constant_list)  + self.melt_model_idx[1],
             )
 
         # Declare complete parameter list
         self.parameter_list = (
-            flow_stress_model.parameter_list   +
-            specific_heat_model.parameter_list +
-            shear_modulus_model.parameter_list +
-            melt_model.parameter_list          +
-            density_model.parameter_list
+            flow_stress.parameter_list   +
+            specific_heat.parameter_list +
+            shear_modulus.parameter_list +
+            melt_temp.parameter_list     +
+            density.parameter_list
             )
         # Declare complete constant list
         self.constant_list = (
-            flow_stress_model.constant_list    +
-            specific_heat_model.constant_list  +
-            shear_modulus_model.constant_list  +
-            melt_model.constant_list           +
-            density_model.constant_list
+            flow_stress.constant_list    +
+            specific_heat.constant_list  +
+            shear_modulus.constant_list  +
+            melt_temp.constant_list      +
+            density.constant_list
             )
 
         # Model Initialization
         self.state         = state(self)
-        self.flow_stress   = flow_stress_model(self, self.flow_stress_idx[0],
-                                                self.flow_stress_idx[1])
-        self.specific_heat = specific_heat_model(self, self.specific_heat_idx[0],
-                                                self.specific_heat_idx[1])
-        self.shear_modulus = shear_modulus_model(self, self.shear_modulus_idx[0],
-                                                self.specific_heat_idx[1])
-        self.melt_model    = melt_model(self, self.melt_model_idx[0],
-                                                self.melt_model_idx[1])
-        self.density_model = density_model(self, self.density_model_idx[0],
-                                                self.density_model_idx[1])
+        self.flow_stress   = flow_stress(self, self.flow_stress_idx[0],
+                                            self.flow_stress_idx[1])
+        self.specific_heat = specific_heat(self, self.specific_heat_idx[0],
+                                            self.specific_heat_idx[1])
+        self.shear_modulus = shear_modulus(self, self.shear_modulus_idx[0],
+                                            self.specific_heat_idx[1])
+        self.melt_model    = melt_temp(self, self.melt_model_idx[0],
+                                            self.melt_model_idx[1])
+        self.density_model = density(self, self.density_model_idx[0],
+                                            self.density_model_idx[1])
         return
 
 # EOF

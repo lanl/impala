@@ -173,7 +173,7 @@ class SubChainSHPB(Transformer):
             maintain that. """
         ssse = self.probit_sse(theta) / sigma2 # scaled sum squared error
         tdiff = theta - theta0                 # diff (hier)
-        sssd = tdiff.dot(SigmaInv).dot(tdiff) # scaled sum squared diff (hier)
+        sssd = tdiff.dot(SigmaInv).dot(tdiff)  # scaled sum squared diff (hier)
         ldj = self.invprobitlogjac(theta)      # Log determinant of jacobian
         tll = - 0.5 * (ssse + sssd) / self.temperature # tempered log Likelihood
         return ldj + tll
@@ -426,16 +426,20 @@ class Chain(Transformer):
         SigInv = self.pd_matrix_inversion(Sigma)
         # Posterior Covariance Matrix
         S0 = self.pd_matrix_inversion(
-            (self.N / self.temperature) * SigInv + self.prior_theta0_Sinv
-            )
+                (self.N / self.temperature) * SigInv +
+                self.prior_theta0_Sinv
+                )
         # Posterior Mean
-        m0 = ((self.N / self.temperature) * theta_bar.T.dot(SigInv) +
-                self.prior_theta0_mu.T.dot(self.prior_theta0_Sinv)).dot(S0)
-        S0L = cholesky(S0)
+        m0 = S0.dot((self.N / self.temperature) * SigInv.dot(theta_bar) +
+                self.prior_theta0_Sinv.dot(self.prior_theta0_mu))
+        # S0L = cholesky(S0)
         # Sample from Truncated Normal to meet constraints
-        theta0_try = m0 + S0L.dot(norm.rvs(size = self.d))
+        gen = mvnorm(mean = m0, cov = S0)
+        theta0_try = gen.rvs()
+        #theta0_try = m0 + S0L.dot(norm.rvs(size = self.d))
         while not self.check_constraints(theta0_try):
-            theta0_try = m0 + S0L.dot(norm.rvs(size = self.d))
+            theta0_try = gen.rvs()
+            #theta0_try = m0 + S0L.dot(norm.rvs(size = self.d))
         return theta0_try
 
     def sample_Sigma(self, theta, theta0):
@@ -553,6 +557,15 @@ class Chain(Transformer):
         curs = conn.cursor()
 
         # Table Creation and insertion statements
+        model_create_statement = self.create_statement.format(
+            'models',
+            'model_type TEXT, model_name TEXT'
+            )
+        model_insert_statement = self.insert_statement.format(
+            'models',
+            'model_type, model_name',
+            '?,?',
+            )
         meta_create_statement = self.create_statement.format(
             'meta',
             'source_name TEXT, calib_name TEXT',
@@ -597,6 +610,13 @@ class Chain(Transformer):
             'constants',
             'constant, value',
             '?,?',
+            )
+
+        # Create Model Table
+        curs.execute(model_create_statement)
+        curs.executemany(
+            model_insert_statement,
+            list(self.materialmodel.report_models_used().items())
             )
 
         # Create Meta Table
@@ -678,19 +698,13 @@ class Chain(Transformer):
         self.psi0 = psi0
         self.r0 = r0
         self.temperature = temperature
-
         self.N = len(self.subchains)
         self.n = np.array([subchain.N for subchain in self.subchains])
-
-
         self.d = len(self.parameter_order)
-
         self.prior_Sigma_nu    = self.d
         self.prior_Sigma_psi   = 0.5 * np.eye(self.d) / self.d
         self.prior_theta0_mu   = np.zeros(self.d)
         self.prior_theta0_Sinv = 0.5 * np.eye(self.d)
-
-
         conn.close()
         return
 
