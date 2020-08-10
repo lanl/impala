@@ -43,7 +43,7 @@ class HierarchicalExtractor(object):
     param_query = "PRAGMA TABLE_INFO({});"
     data_query = "SELECT {} FROM {};"
     meta_query = "SELECT table_name, temperature, edot, emax FROM meta;"
-    model_query = "SELECT model_type, model_name FROM models_used;"
+    model_query = "SELECT model_type, model_name FROM models;"
 
     def set_models(self):
         cursor = self.conn_o.cursor()
