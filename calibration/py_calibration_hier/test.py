@@ -1,5 +1,5 @@
-from statistical_models_hier_mpi import ParallelTemperMaster, Dispatcher
-#from statistical_models_hier import ParallelTemperMaster
+#from statistical_models_hier_mpi import ParallelTemperMaster, Dispatcher
+from statistical_models_hier import ParallelTemperMaster
 from numpy import array, float64
 from mpi4py import MPI
 
@@ -7,10 +7,10 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
-#rank = 0
-#size = 6
+rank = 0
+size = 2
 
-material = 'Ti64'
+material = 'copper'
 
 # Defining Paths, Constants, Parameter Ranges
 if True:
@@ -61,15 +61,15 @@ if True:
             }
 
 if rank > 0:
-    # pass
-    dispatcher = Dispatcher(comm, rank)
-    dispatcher.watch()
+    pass
+    #dispatcher = Dispatcher(comm, rank)
+    #dispatcher.watch()
 
 elif rank == 0:
     # Define the Model
     model = ParallelTemperMaster(
-        comm = comm,
-        size = size,
+        #comm = comm,
+        #size = size,
         temperature_ladder = 1.3 ** array(range(size - 1)),
         path = './data_Ti64.db',
         bounds = parameter_bounds,
@@ -77,12 +77,12 @@ elif rank == 0:
         flow_stress_model = 'PTW',
         shear_modulus_model = 'Simple',
         )
-    model.sample(100000)
-    model.write_to_disk('Ti64_results.db', 50000, 20)
-    theta0 = model.invprobit(model.get_history(50000,20))
-    model.parameter_pairwise_plot(theta0, 'Ti64_pairwise.png')
-    model.parameter_trace_plot(theta0, 'Ti64_trace.png')
-    model.complete()
+    model.sample(2000)
+    #model.write_to_disk('Ti64_results.db', 50000, 20)
+    #theta0 = model.invprobit(model.get_history(50000,20))
+    #model.parameter_pairwise_plot(theta0, 'Ti64_pairwise.png')
+    #model.parameter_trace_plot(theta0, 'Ti64_trace.png')
+    #model.complete()
 
 if __name__ == '__main__':
     pass
