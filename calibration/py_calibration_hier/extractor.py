@@ -1,4 +1,4 @@
-from physical_models_c import MaterialModel, PTWYieldStress, SimpleShearModulus
+from physical_models_c import MaterialModel
 from multiprocessing import Pool
 from itertools import repeat
 import sqlite3 as sql
@@ -10,7 +10,7 @@ import os
 def compute_curve_summary(theta, theta0, field_names, const, temp, emax, edot, nhist, models):
     model = MaterialModel(**models)
     model.set_history_variables(emax, edot * 1e-6, nhist)
-    param = {x:y for x,y in zip(field_names, list(theta0))}
+    param = {x:y for x,y in zip(field_names, list(theta0[0]))}
     model.initialize(param, const, T = temp)
     stress = np.empty((theta.shape[0], nhist))
     for i in range(theta.shape[0]):
