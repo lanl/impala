@@ -10,7 +10,7 @@ size = comm.Get_size()
 #rank = 0
 #size = 6
 
-material = 'Ti64'
+material = 'copper'
 
 # Defining Paths, Constants, Parameter Ranges
 if True:
@@ -71,17 +71,17 @@ elif rank == 0:
         comm = comm,
         size = size,
         temperature_ladder = 1.3 ** array(range(size - 1)),
-        path = './data_Ti64.db',
+        path = paths_hb,
         bounds = parameter_bounds,
         constants = starting_consts,
         flow_stress_model = 'PTW',
         shear_modulus_model = 'Simple',
         )
-    model.sample(100000)
-    model.write_to_disk('Ti64_results.db', 50000, 20)
-    theta0 = model.invprobit(model.get_history(50000,20))
-    model.parameter_pairwise_plot(theta0, 'Ti64_pairwise.png')
-    model.parameter_trace_plot(theta0, 'Ti64_trace.png')
+    model.sample(80000)
+    model.write_to_disk('Ti64_results.db', 40000, 20)
+    #theta0 = model.invprobit(model.get_history(40000,20))
+    #model.parameter_pairwise_plot(theta0, 'Ti64_pairwise.png')
+    #model.parameter_trace_plot(theta0, 'Ti64_trace.png')
     model.complete()
 
 if __name__ == '__main__':
