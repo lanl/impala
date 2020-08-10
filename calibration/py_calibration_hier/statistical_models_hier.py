@@ -702,7 +702,7 @@ class Chain(Transformer):
         self.n = np.array([subchain.N for subchain in self.subchains])
         self.d = len(self.parameter_order)
         self.prior_Sigma_nu    = self.d
-        self.prior_Sigma_psi   = 0.5 * np.eye(self.d) / self.d
+        self.prior_Sigma_psi   = 0.5 * np.eye(self.d)
         self.prior_theta0_mu   = np.zeros(self.d)
         self.prior_theta0_Sinv = 0.5 * np.eye(self.d)
         conn.close()
@@ -758,9 +758,11 @@ class ParallelTemperMaster(Transformer):
         chain_idx = list(range(self.size))
         shuffle(chain_idx)
 
-        for cidx1, cidx2 in zip(chain_idx[::2], chain_idx[1::2]):
-            self.try_swap_states(self.chains[cidx1], self.chains[cidx2])
-
+        if len(chain_idx) == 1:
+            pass
+        else:
+            for cidx1, cidx2 in zip(chain_idx[::2], chain_idx[1::2]):
+                self.try_swap_states(self.chains[cidx1], self.chains[cidx2])
         return
 
     def sample_chains(self, ns = 1):
