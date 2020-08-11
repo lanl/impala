@@ -184,7 +184,7 @@ def load_copper():
     return
 
 if __name__ == '__main__':
-    # load_Ti64()
+    load_Ti64()
     load_copper()
 
 # EOF
