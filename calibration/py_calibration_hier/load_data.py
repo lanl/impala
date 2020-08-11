@@ -165,7 +165,6 @@ def load_copper_fp(curs):
 def load_copper():
     global copper_curr_id
     copper_curr_id = 0
-    shpb_emax = 0
 
     if os.path.exists('./data_copper.db'):
         os.remove('./data_copper.db')
@@ -183,8 +182,78 @@ def load_copper():
     connection.close()
     return
 
+def load_Al5083_shpb(curs):
+    global al5083_curr_id
+    shpb_emax = 0
+    base_path = '../../data/Al-5083/Stress-Strain_Data'
+    files = [
+        'Gray94_Al5083_S0_001T-196C.csv',
+        'Gray94_Al5083_S0_001T125C.csv',
+        'Gray94_Al5083_S0_1T125C.csv',
+        'Gray94_Al5083_S2000T-196C.csv',
+        'Gray94_Al5083_S2500T25C.csv',
+        'Gray94_Al5083_S3000T100C.csv',
+        'Gray94_Al5083_S3500T200C.csv',
+        'Gray94_Al5083_S7000T25C.csv',
+        ]
+    paths = [os.path.join(base_path, file) for file in files]
+    temps = np.array([ -196.,  125.,  125., -196., 25., 100., 200., 25.]) + 273.15
+    edots = np.array([0.001, 0.001, 0.1, 2000, 2500, 3000, 3500, 7000,]) * 1.e-6
+
+    xps = []
+    for i in range(len(paths)):
+        data = pd.read_csv(paths[i], skiprows = 2).values
+        data[:,1] = data[:,1] * 1e-5
+        temp = temps[i]
+        edot = edots[i]
+        fname = files[i]
+        pname = ''
+        shpb_emax = max(shpb_emax, data[:,0].max())
+        xps.append({'data' : data, 'temp' : temp, 'edot' : edot,
+                    'pname' : pname, 'fname' : fname})
+
+    for xp in xps:
+        al5083_curr_id += 1
+        table_name = 'data_{}'.format(al5083_curr_id)
+        curs.execute(shpb_data_create.format(table_name))
+        curs.execute(
+            shpb_meta_insert,
+            ('shpb', xp['temp'], xp['edot'], shpb_emax,
+                xp['pname'], xp['fname'], table_name)
+            )
+        curs.executemany(
+            shpb_data_insert.format(table_name),
+            xp['data'].tolist()
+            )
+    return
+
+def load_Al5083_tc(curs):
+    pass
+
+def load_Al5083_fp(curs):
+    pass
+
+def load_Al5083():
+    global al5083_curr_id
+    al5083_curr_id = 0
+
+    if os.path.exists('./data_Al5083.db'):
+        os.remove('./data_Al5083.db')
+    connection = sql.connect('./data_Al5083.db')
+    cursor = connection.cursor()
+    cursor.execute(meta_create)
+
+    load_Al5083_shpb(cursor)
+    load_Al5083_tc(cursor)
+    load_Al5083_fp(cursor)
+
+    connection.commit()
+    connection.close()
+    return
+
 if __name__ == '__main__':
     load_Ti64()
     load_copper()
+    load_Al5083()
 
 # EOF
