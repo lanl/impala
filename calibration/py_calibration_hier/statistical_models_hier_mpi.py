@@ -259,8 +259,8 @@ class Dispatcher(object):
         return
 
     def complete(self, args):
-        BreakException('Done')
-        return
+        raise BreakException('Done')
+
 
     def __init__(self, comm, rank):
         """ Initialization Routine """
