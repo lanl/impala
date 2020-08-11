@@ -80,8 +80,8 @@ elif rank == 0:
     model.sample(80000)
     model.write_to_disk('Ti64_results.db', 40000, 20)
     theta0 = model.invprobit(model.get_history(40000,20))
-    #model.parameter_pairwise_plot(theta0, 'Ti64_pairwise.png')
-    #model.parameter_trace_plot(theta0, 'Ti64_trace.png')
+    model.parameter_pairwise_plot(theta0, 'Ti64_pairwise.png')
+    model.parameter_trace_plot(theta0, 'Ti64_trace.png')
     model.complete()
 
 if __name__ == '__main__':
