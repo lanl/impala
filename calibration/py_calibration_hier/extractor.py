@@ -9,7 +9,7 @@ import os
 
 def compute_curve_summary(theta, theta0, field_names, const, temp, emax, edot, nhist, models):
     model = MaterialModel(**models)
-    model.set_history_variables(emax, edot * 1e-6, nhist)
+    model.set_history_variables(emax, edot, nhist)
     param = {x:y for x,y in zip(field_names, list(theta0[0]))}
     model.initialize(param, const, T = temp)
     stress = np.empty((theta.shape[0], nhist))

@@ -49,7 +49,7 @@ def load_Ti64_shpb(curs):
             f = open(file)
             lines = f.readlines()
             temp  = float(lines[1].split(" ")[2]) # Kelvin
-            edot  = float(lines[2].split(" ")[3]) # 1/s
+            edot  = float(lines[2].split(" ")[3]) * 1e-6 # 1/s
             pname = os.path.split(os.path.dirname(file))[1]
             fname = os.path.splitext(os.path.basename(file))[0]
             data  = pd.read_csv(file, skiprows = range(0,17)).values
@@ -123,7 +123,7 @@ def load_copper_shpb(curs):
         './copper/CuRT10-3.SRC.txt',
         ]
     temps_hb = np.array([298., 473., 673., 873., 298., 298.])
-    edots_hb = np.array([2000., 2000., 2000., 2000., 0.1, 0.001])
+    edots_hb = np.array([2000., 2000., 2000., 2000., 0.1, 0.001]) * 1e-6
     fnames_hb = [os.path.basename(path) for path in paths_hb]
 
     xps = []

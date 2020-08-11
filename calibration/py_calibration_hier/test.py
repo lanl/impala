@@ -1,11 +1,11 @@
 #from statistical_models_hier_mpi import ParallelTemperMaster, Dispatcher
 from statistical_models_hier import ParallelTemperMaster
 from numpy import array, float64
-from mpi4py import MPI
+#from mpi4py import MPI
 
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
-size = comm.Get_size()
+#comm = MPI.COMM_WORLD
+#rank = comm.Get_rank()
+#size = comm.Get_size()
 
 rank = 0
 size = 2
@@ -71,13 +71,13 @@ elif rank == 0:
         #comm = comm,
         #size = size,
         temperature_ladder = 1.3 ** array(range(size - 1)),
-        path = './data_Ti64.db',
+        path = path,
         bounds = parameter_bounds,
         constants = starting_consts,
         flow_stress_model = 'PTW',
         shear_modulus_model = 'Simple',
         )
-    model.sample(2000)
+    model.sample(5000)
     #model.write_to_disk('Ti64_results.db', 50000, 20)
     #theta0 = model.invprobit(model.get_history(50000,20))
     #model.parameter_pairwise_plot(theta0, 'Ti64_pairwise.png')

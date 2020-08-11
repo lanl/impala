@@ -341,7 +341,7 @@ class SubChainSHPB(Transformer):
 
         self.submodel = SubModelHB(
             TransportHB(data = data, temp = temperature,
-                        emax = emax, edot = edot * 1e-6),
+                        emax = emax, edot = edot),
             **kwargs,
             )
         self.N = self.submodel.N
