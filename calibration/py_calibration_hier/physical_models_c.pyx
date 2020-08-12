@@ -294,49 +294,52 @@ cdef class PTWYieldStress(BaseModel):
         cdef double ledot = edot * 1.e6
 
         if not self.check_constraints():
-            return -999
+            return -999.
 
-        t_hom = temp / tmelt
-        ainv = cbrt((4./3.) * pi * rho / self.matomic)
+        try:
+            t_hom = temp / tmelt
+            ainv = cbrt((4./3.) * pi * rho / self.matomic)
 
-        xfact = sqrt(shear / (rho + 1e-20))
-        xiDot = 0.5 * ainv * xfact * cbrt(6.022e29) * 1.e4
-        erf_argerf = erf(self.kappa * t_hom * log(self.gamma * xiDot / (ledot)))
+            xfact = sqrt(shear / rho)
+            xiDot = 0.5 * ainv * xfact * cbrt(6.022e29) * 1.e4
+            erf_argerf = erf(self.kappa * t_hom * log(self.gamma * xiDot / ledot))
 
-        saturation1 = self.s0 - (self.s0 - self.sInf) * erf_argerf
-        saturation2 = self.s0 * pow(ledot / (self.gamma + 1e-20) / (xiDot + 1e-20), self.beta)
+            saturation1 = self.s0 - (self.s0 - self.sInf) * erf_argerf
+            saturation2 = self.s0 * pow(ledot / self.gamma / xiDot, self.beta)
 
-        tau_s = max(saturation1, saturation2)
+            tau_s = max(saturation1, saturation2)
 
-        ayield = self.y0 - (self.y0 - self.yInf) * erf_argerf
-        byield = self.y1 * pow(self.gamma * xiDot / ledot, -self.y2)
-        cyield = self.s0 * pow(self.gamma * xiDot / ledot, -self.beta)
+            ayield = self.y0 - (self.y0 - self.yInf) * erf_argerf
+            byield = self.y1 * pow(self.gamma * xiDot / ledot, -self.y2)
+            cyield = self.s0 * pow(self.gamma * xiDot / ledot, -self.beta)
 
-        dyield = min(byield, cyield)
-        tau_y = max(ayield, dyield)
+            dyield = min(byield, cyield)
+            tau_y = max(ayield, dyield)
 
-        if ayield > dyield:
-            tau_y = ayield
-        else:
-            tau_y = dyield
-
-        if self.p > 0.:
-            if tau_s == tau_y:
-                scaled_stress = tau_s
+            if ayield > dyield:
+                tau_y = ayield
             else:
-                eArg1 = self.p * (tau_s - tau_y) / (self.s0 - tau_y + 1e-20)
-                eArg2 = eps * self.p * self.theta / (self.s0 - tau_y + 1e-20) / (exp(eArg1) - 1.)
-                theLog = log(1. - (1. - exp(-eArg1)) * exp(-eArg2))
+                tau_y = dyield
 
-                scaled_stress = tau_s + (self.s0 - tau_y) * theLog / (self.p + 1e-20)
-        else:
-            if tau_s > tau_y:
-                scaled_stress = (tau_s - (tau_s - tau_y) *
-                        exp(-eps * self.theta / (tau_s - tau_y + 1e-20)))
+            if self.p > 0.:
+                if tau_s == tau_y:
+                    scaled_stress = tau_s
+                else:
+                    eArg1 = self.p * (tau_s - tau_y) / (self.s0 - tau_y)
+                    eArg2 = eps * self.p * self.theta / (self.s0 - tau_y) / (exp(eArg1) - 1.)
+                    theLog = log(1. - (1. - exp(-eArg1)) * exp(-eArg2))
+
+                    scaled_stress = tau_s + (self.s0 - tau_y) * theLog / self.p
             else:
-                scaled_stress = tau_s
+                if tau_s > tau_y:
+                    scaled_stress = (tau_s - (tau_s - tau_y) *
+                                      exp(-eps * self.theta / (tau_s - tau_y)))
+                else:
+                    scaled_stress = tau_s
 
-        return scaled_stress * shear * 2.
+            return scaled_stress * shear * 2.
+        except:
+            return -999.
 
 cdef class SteinFlowStress(BaseModel):
     parameter_list = ['y0', 'a','b','beta','n','ymax']
