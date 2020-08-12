@@ -34,6 +34,7 @@ from physical_models_c import MaterialModel
 import matplotlib.pyplot as plt
 import seaborn as sea
 import time
+from timeout import timeout
 
 sea.set(style = 'ticks')
 
@@ -153,7 +154,7 @@ class SubChainSHPB(Transformer):
     """
     N = 0
     prior_sigma2_a = 100
-    prior_sigma2_b = 5e-6
+    prior_sigma2_b = 1e-6
     temperature = 1.
 
     meta_query = " SELECT temperature, edot, emax FROM meta WHERE table_name = '{}'; "
@@ -171,6 +172,11 @@ class SubChainSHPB(Transformer):
         """ Computes the log-posterior / full conditional for theta.  Note that
             we are tempering the likelihood, and not the prior. Care is taken to
             maintain that. """
+        # try:
+        #     with timeout(1):
+        #         ssse = self.probit_sse(theta) / sigma2 # scaled sum squared error
+        # except TimeoutError:
+        #     ssse = 1e9
         ssse = self.probit_sse(theta) / sigma2 # scaled sum squared error
         tdiff = theta - theta0                 # diff (hier)
         sssd = tdiff.dot(SigmaInv).dot(tdiff)  # scaled sum squared diff (hier)

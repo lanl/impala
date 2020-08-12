@@ -8,12 +8,30 @@ from numpy import array, float64
 #size = comm.Get_size()
 
 rank = 0
-size = 2
+size = 8
 
-material = 'copper'
+material = 'Al5083'
 
 # Defining Paths, Constants, Parameter Ranges
 if True:
+    if material == 'Al5083':
+        path = './data_Al5083.db'
+        starting_consts = {
+            'y1'     : 0.094, 'y2'      : 0.575, 'beta' : 0.25,
+            'alpha'  : 0.2,   'matomic' : 27.,   'Tref' : 298.,
+            'Tmelt0' : 933.,  'rho0'    : 2.683, 'Cv0'  : 0.9e-5,
+            'G0'     : 0.70,  'chi'     : 0.90,
+            }
+        parameter_bounds = {
+            'theta' : (0.0001,   0.05),
+            'p'     : (0.0001,   5.),
+            's0'    : (0.0001,   0.05),
+            'sInf'  : (0.0001,   0.005),
+            'kappa' : (0.0001,   0.5),
+            'gamma' : (0.000001, 0.0001),
+            'y0'    : (0.0001,   0.005),
+            'yInf'  : (0.0001,   0.005),
+            }
     if material == 'copper':
         path = './data_copper.db'
         parameter_bounds = {
@@ -77,7 +95,7 @@ elif rank == 0:
         flow_stress_model = 'PTW',
         shear_modulus_model = 'Simple',
         )
-    model.sample(5000)
+    model.sample(20000)
     #model.write_to_disk('Ti64_results.db', 50000, 20)
     #theta0 = model.invprobit(model.get_history(50000,20))
     #model.parameter_pairwise_plot(theta0, 'Ti64_pairwise.png')
