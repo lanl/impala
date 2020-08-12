@@ -88,7 +88,7 @@ elif rank == 0:
     model = ParallelTemperMaster(
         comm = comm,
         size = size,
-        temperature_ladder = 1.3 ** array(range(size - 1)),
+        temperature_ladder = 1.25 ** array(range(size - 1)),
         path = path,
         bounds = parameter_bounds,
         constants = starting_consts,
