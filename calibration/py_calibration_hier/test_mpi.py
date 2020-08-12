@@ -10,7 +10,7 @@ size = comm.Get_size()
 #rank = 0
 #size = 6
 
-material = 'Al5083'
+material = 'Ti64'
 
 # Defining Paths, Constants, Parameter Ranges
 if True:
@@ -93,11 +93,11 @@ elif rank == 0:
         bounds = parameter_bounds,
         constants = starting_consts,
         flow_stress_model = 'PTW',
-        shear_modulus_model = 'Simple',
+        shear_modulus_model = 'Stein',
         )
-    model.sample(80000)
-    model.write_to_disk('{}_results.db'.format(material), 40000, 20)
-    theta0 = model.invprobit(model.get_history(40000,20))
+    model.sample(40000)
+    model.write_to_disk('{}_results.db'.format(material), 20000, 10)
+    theta0 = model.invprobit(model.get_history(20000,10))
     model.parameter_pairwise_plot(theta0, '{}_pairwise.png'.format(material))
     model.parameter_trace_plot(theta0, '{}_trace.png'.format(material))
     model.complete()
