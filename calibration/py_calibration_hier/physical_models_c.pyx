@@ -299,12 +299,12 @@ cdef class PTWYieldStress(BaseModel):
         t_hom = temp / tmelt
         ainv = cbrt((4./3.) * pi * rho / self.matomic)
 
-        xfact = sqrt(shear / rho)
+        xfact = sqrt(shear / (rho + 1e-20))
         xiDot = 0.5 * ainv * xfact * cbrt(6.022e29) * 1.e4
-        erf_argerf = erf(self.kappa * t_hom * log(self.gamma * xiDot / ledot))
+        erf_argerf = erf(self.kappa * t_hom * log(self.gamma * xiDot / (ledot)))
 
         saturation1 = self.s0 - (self.s0 - self.sInf) * erf_argerf
-        saturation2 = self.s0 * pow(ledot / self.gamma / xiDot, self.beta)
+        saturation2 = self.s0 * pow(ledot / (self.gamma + 1e-20) / (xiDot + 1e-20), self.beta)
 
         tau_s = max(saturation1, saturation2)
 
@@ -324,15 +324,15 @@ cdef class PTWYieldStress(BaseModel):
             if tau_s == tau_y:
                 scaled_stress = tau_s
             else:
-                eArg1 = self.p * (tau_s - tau_y) / (self.s0 - tau_y)
-                eArg2 = eps * self.p * self.theta / (self.s0 - tau_y) / (exp(eArg1) - 1.)
+                eArg1 = self.p * (tau_s - tau_y) / (self.s0 - tau_y + 1e-20)
+                eArg2 = eps * self.p * self.theta / (self.s0 - tau_y + 1e-20) / (exp(eArg1) - 1.)
                 theLog = log(1. - (1. - exp(-eArg1)) * exp(-eArg2))
 
-                scaled_stress = tau_s + (self.s0 - tau_y) * theLog / self.p
+                scaled_stress = tau_s + (self.s0 - tau_y) * theLog / (self.p + 1e-20)
         else:
             if tau_s > tau_y:
                 scaled_stress = (tau_s - (tau_s - tau_y) *
-                        exp(-eps * self.theta / (tau_s - tau_y)))
+                        exp(-eps * self.theta / (tau_s - tau_y + 1e-20)))
             else:
                 scaled_stress = tau_s
 
