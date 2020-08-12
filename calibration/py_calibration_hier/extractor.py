@@ -185,56 +185,57 @@ class Visualizer(object):
         return
 
     def make_plots(self):
+        b_alpha = 0.6; m_alpha = 0.8; linewidth = 0.4
         for i in range(len(self.calibrated_curves)):
             # plot predicted curves
             plt.plot(
                 self.calibrated_curves[i].strain,
                 self.calibrated_curves[i].stress_10,
-                alpha = 0.3,
+                alpha = b_alpha,
                 color = 'blue',
                 linestyle = '-',
-                linewidth = 0.25
+                linewidth = linewidth
                 )
             plt.plot(
                 self.calibrated_curves[i].strain,
                 self.calibrated_curves[i].stress_50,
-                alpha = 0.3,
+                alpha = m_alpha,
                 color = 'blue',
                 linestyle = '-',
-                linewidth = 0.25
+                linewidth = linewidth
                 )
             plt.plot(
                 self.calibrated_curves[i].strain,
                 self.calibrated_curves[i].stress_90,
-                alpha = 0.3,
+                alpha = b_alpha,
                 color = 'blue',
                 linestyle = '-',
-                linewidth = 0.25
+                linewidth = linewidth
                 )
             # plot hierarchical predicted curves
             plt.plot(
                 self.calibrated_curves[i].strain,
                 self.calibrated_curves[i].stress0_10,
-                alpha = 0.3,
+                alpha = b_alpha,
                 color = 'green',
                 linestyle = '-',
-                linewidth = 0.25
+                linewidth = linewidth
                 )
             plt.plot(
                 self.calibrated_curves[i].strain,
                 self.calibrated_curves[i].stress0_50,
-                alpha = 0.3,
+                alpha = m_alpha,
                 color = 'green',
                 linestyle = '-',
-                linewidth = 0.25
+                linewidth = linewidth
                 )
             plt.plot(
                 self.calibrated_curves[i].strain,
                 self.calibrated_curves[i].stress0_90,
-                alpha = 0.3,
+                alpha = b_alpha,
                 color = 'green',
                 linestyle = '-',
-                linewidth = 0.25
+                linewidth = linewidth
                 )
             # plot empirical data
             plt.plot(

@@ -2,12 +2,6 @@ cimport numpy as np
 import numpy as np
 from libc.math cimport log, exp, erf, sqrt, cbrt, pi, pow
 
-class ConstraintError(ValueError):
-    pass
-
-class PTWStressError(FloatingPointError):
-    pass
-
 ## Declaring Models
 
 cdef class BaseModel(object):
@@ -151,16 +145,15 @@ cdef class SimpleShearModulus(BaseModel):
         return self.G0 * (1. - self.alpha * (temp / tmelt))
 
 cdef class SteinShearModulus(BaseModel):
-    constant_list = ['G0', 'sgB', 'eta']
-    cdef double G0, sgB, eta
+    constant_list = ['G0', 'sgB']
+    cdef double G0, sgB
 
     cpdef dict report_constants(self):
-        return {'G0' : self.G0, 'sgB' : self.sgB, 'eta' : self.eta}
+        return {'G0' : self.G0, 'sgB' : self.sgB}
 
     cpdef void initialize_constants(self, np.ndarray[np.float64_t, ndim = 1] input):
         self.G0  = input[0]
         self.sgB = input[1]
-        self.eta = input[2]
         return
 
     cpdef double value(self, double edot = 0.):
@@ -170,7 +163,7 @@ cdef class SteinShearModulus(BaseModel):
         tmelt = self.parent.state.Tmelt
         # Just putting this here for completeness
         # aterm = a / (eta**(1/3)) * pressure
-        aterm = 0.0
+        aterm = 0.
         bterm = self.sgB * (temp - 300.)
         gnow  = self.G0 * (1. + aterm - bterm)
 
@@ -683,5 +676,16 @@ cdef class MaterialModel:
         self.density_model = density(self, self.density_model_idx[0],
                                             self.density_model_idx[1])
         return
+
+
+cpdef dict models_available():
+    d = {
+        'yield_stress'  : list(YieldStress.keys()),
+        'specific_heat' : list(SpecificHeat.keys()),
+        'shear_modulus' : list(ShearModulus.keys()),
+        'melt_temp'     : list(MeltTemperature.keys()),
+        'density'       : list(Density.keys()),
+        }
+    return d
 
 # EOF

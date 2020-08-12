@@ -542,7 +542,7 @@ class Chain(Transformer):
             try_theta = normal(size = self.d)
 
         self.s_theta0[0] = try_theta
-        self.s_Sigma[0]  = np.eye(self.d) * 1
+        self.s_Sigma[0]  = self.prior_Sigma_psi / (self.prior_Sigma_nu - self.d - 1)
         self.curr_ldj    = self.invprobitlogjac(self.curr_theta)
         return
 
@@ -701,10 +701,10 @@ class Chain(Transformer):
         self.N = len(self.subchains)
         self.n = np.array([subchain.N for subchain in self.subchains])
         self.d = len(self.parameter_order)
-        self.prior_Sigma_nu    = self.d
-        self.prior_Sigma_psi   = 0.5 * np.eye(self.d)
+        self.prior_Sigma_nu    = self.d + 2
+        self.prior_Sigma_psi   = np.eye(self.d) * 0.5
         self.prior_theta0_mu   = np.zeros(self.d)
-        self.prior_theta0_Sinv = 0.5 * np.eye(self.d)
+        self.prior_theta0_Sinv = np.eye(self.d) * 1e-9
         conn.close()
         return
 
