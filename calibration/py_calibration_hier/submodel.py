@@ -29,7 +29,7 @@ from GPy.kern import Matern32, Matern52, RBF, Bias, Linear, Coregionalize
 from GPy.inference.mcmc import HMC
 from numpy.random import normal
 
-from methodtools import lru_cache
+# from methodtools import lru_cache
 
 import matplotlib.pyplot as plt
 import os, sys
@@ -158,7 +158,10 @@ class SubModelHB(SubModelBase):
         plt.text(0.65,0.12, plot_text, transform = ax.transAxes)
         return
 
-    @lru_cache(maxsize = 12)
+    def prediction_plot2(self, parameters, sigma2, ylim):
+        pass
+
+    # @lru_cache(maxsize = 12)
     def sse(self, parameters):
         """
         Computes predictions for stress at supplied strain values, then sums
