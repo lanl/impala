@@ -271,7 +271,7 @@ class SubChainSHPB(Transformer):
         prop_lp = self.log_posterior_theta(
             self.parent.curr_theta0,
             self.parent.curr_Sigma,
-            curr_theta,
+            prop_theta,
             self.curr_sigma2
             )
 
