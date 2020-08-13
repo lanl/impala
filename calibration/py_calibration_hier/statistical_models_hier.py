@@ -178,6 +178,8 @@ class SubChainSHPB(Transformer):
         # except TimeoutError:
         #     ssse = 1e9
         ssse = self.probit_sse(theta) / sigma2 # scaled sum squared error
+        if np.isnan(ssse): # something went wrong with the calculation of sse
+            ssse = 1e20    #  (probably divide by zero error)
         tdiff = theta - theta0                 # diff (hier)
         sssd = tdiff.dot(SigmaInv).dot(tdiff)  # scaled sum squared diff (hier)
         ldj = self.invprobitlogjac(theta)      # Log determinant of jacobian
