@@ -93,7 +93,7 @@ elif rank == 0:
         bounds = parameter_bounds,
         constants = starting_consts,
         flow_stress_model = 'PTW',
-        shear_modulus_model = 'Stein',
+        shear_modulus_model = 'Simple',
         )
     model.sample(40000)
     model.write_to_disk('{}_results.db'.format(material), 20000, 10)
