@@ -203,10 +203,14 @@ class SubChainSHPB(Transformer):
         return
 
     def sample_sigma2(self, theta):
-        sse = self.probit_sse(theta)
-        aa = 0.5 * self.N / self.temperature + self.prior_sigma2_a
-        bb = 0.5 * sse / self.temperature + self.prior_sigma2_b
-        return invgamma.rvs(aa, scale = bb)
+        try:
+            sse = self.probit_sse(theta)
+            aa = 0.5 * self.N / self.temperature + self.prior_sigma2_a
+            bb = 0.5 * sse / self.temperature + self.prior_sigma2_b
+            return invgamma.rvs(aa, scale = bb)
+        except ValueError:
+            print (aa, bb)
+            raise
 
     def sse(self, parameters):
         """ Calls submodel.sse for a given set of parameters. """
