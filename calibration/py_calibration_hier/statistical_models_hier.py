@@ -154,7 +154,7 @@ class SubChainSHPB(Transformer):
     """
     N = 0
     prior_sigma2_a = 100
-    prior_sigma2_b = 1e-6
+    prior_sigma2_b = 5e-6
     temperature = 1.
 
     meta_query = " SELECT temperature, edot, emax FROM meta WHERE table_name = '{}'; "
@@ -714,7 +714,7 @@ class Chain(Transformer):
         self.prior_Sigma_nu    = self.d + 2
         self.prior_Sigma_psi   = np.eye(self.d) * 0.5
         self.prior_theta0_mu   = np.zeros(self.d)
-        self.prior_theta0_Sinv = np.eye(self.d) * 1e-9
+        self.prior_theta0_Sinv = np.eye(self.d) * 1e-1
         conn.close()
         return
 
