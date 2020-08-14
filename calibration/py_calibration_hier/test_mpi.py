@@ -54,6 +54,16 @@ if True:
             }
     if material == 'Ti64':
         path = './data_Ti64.db'
+        parameter_bounds = {
+            'theta' : (0.0001,   0.2),
+            'p'     : (0.0001,   5.),
+            's0'    : (0.0001,   0.05),
+            'sInf'  : (0.0001,   0.05),
+            'kappa' : (0.0001,   0.5),
+            'gamma' : (0.000001, 0.0001),
+            'y0'    : (0.0001,   0.05),
+            'yInf'  : (0.0001,   0.01),
+            }
         starting_consts = {
             'alpha'  : 0.2,
             'y1'     : 0.0245,
@@ -67,19 +77,8 @@ if True:
             'chi'    : 1.0,
             'sgB'    : 6.44e-4
             }
-        parameter_bounds = {
-            'theta' : (0.0001,   0.2),
-            'p'     : (0.0001,   5.),
-            's0'    : (0.0001,   0.05),
-            'sInf'  : (0.0001,   0.05),
-            'kappa' : (0.0001,   0.5),
-            'gamma' : (0.000001, 0.0001),
-            'y0'    : (0.0001,   0.05),
-            'yInf'  : (0.0001,   0.01),
-            }
 
 if rank > 0:
-    # pass
     dispatcher = Dispatcher(comm, rank)
     dispatcher.watch()
 
@@ -93,7 +92,7 @@ elif rank == 0:
         bounds = parameter_bounds,
         constants = starting_consts,
         flow_stress_model = 'PTW',
-        shear_modulus_model = 'Simple',
+        shear_modulus_model = 'Stein',
         )
     model.sample(40000)
     model.write_to_disk('{}_results.db'.format(material), 20000, 10)
