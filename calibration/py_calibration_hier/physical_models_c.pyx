@@ -296,6 +296,10 @@ cdef class PTWYieldStress(BaseModel):
         if not self.check_constraints():
             return -999.
 
+        # If shear modulus returns 0, then return 0 (and avoid divide_by_zero)
+        if shear < 1.e-12:
+            return 0.
+
         t_hom = temp / tmelt
         ainv = cbrt((4./3.) * pi * rho / self.matomic)
         xfact = sqrt(shear / rho)
