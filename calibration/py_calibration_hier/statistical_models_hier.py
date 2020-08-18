@@ -496,15 +496,15 @@ class Chain(Transformer):
     def iter_sample(self):
         """ Pushes the sampler one iteration """
         # Push each subchain one iteration
-        futures = [
-            self.executor.submit(lambda sc: sc.iter_sample(), subchain)
-            for subchain in self.subchains
-            ]
-        results = [
-            future.result() for future in futures
-            ]
-        #for subchain in self.subchains:
-        #    subchain.iter_sample()
+        # futures = [
+        #     self.executor.submit(lambda sc: sc.iter_sample(), subchain)
+        #     for subchain in self.subchains
+        #     ]
+        # results = [
+        #     future.result() for future in futures
+        #     ]
+        for subchain in self.subchains:
+            subchain.iter_sample()
 
         # Start iteration for main chain
         self.iter += 1
@@ -726,7 +726,7 @@ class Chain(Transformer):
         self.prior_theta0_mu   = np.zeros(self.d)
         self.prior_theta0_Sinv = np.eye(self.d) * 1e-1
         conn.close()
-        self.executor = ThreadPoolExecutor(max_workers = 8)
+        # self.executor = ThreadPoolExecutor(max_workers = 8)
         return
 
 class ParallelTemperMaster(Transformer):
