@@ -722,7 +722,7 @@ class Chain(Transformer):
         self.n = np.array([subchain.N for subchain in self.subchains])
         self.d = len(self.parameter_order)
         self.prior_Sigma_nu    = self.d + 2
-        self.prior_Sigma_psi   = np.eye(self.d) * 0.5
+        self.prior_Sigma_psi   = np.eye(self.d) * 4.
         self.prior_theta0_mu   = np.zeros(self.d)
         self.prior_theta0_Sinv = np.eye(self.d) * 1e-1
         conn.close()
