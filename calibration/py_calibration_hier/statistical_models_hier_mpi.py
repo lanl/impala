@@ -61,6 +61,8 @@ class ParallelTemperMaster(smh.ParallelTemperMaster):
 
     def write_to_disk(self, path, nburn, thin):
         self.comm.send(('write_to_disk', (path, nburn, thin)), dest = 1)
+        recv = self.comm.irecv(source = 1)
+        recv.wait()
         return
 
     def get_state(self, rank):
@@ -249,6 +251,7 @@ class Dispatcher(object):
 
     def write_to_disk(self, args):
         self.chain.write_to_disk(*args)
+        self.return_value(True)
         return
 
     def parameter_pairwise_plot(self, args):
