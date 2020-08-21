@@ -1,6 +1,6 @@
 # Nemat-Nasser2001 Figure 1d RS-MIL-HIP Ti64
 # Temperature: 296 K
-# Strain rate: 1e-2 s^-1
+# Strain rate: 2000 s^-1
 # -----------
 # Chemistry (weight %)
 # Ti, Bal.
@@ -37,6 +37,3 @@ Plastic strain, stress (MPa)
 0.079133, 1626.2
 0.083977, 1621.72
 0.088336, 1621.67
-0.091973, 1608.35
-0.097068, 1583.94
-0.099502, 1550.7

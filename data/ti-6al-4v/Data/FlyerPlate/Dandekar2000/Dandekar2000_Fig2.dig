@@ -11,7 +11,7 @@
         </Export>
         <AxesChecker Mode="1" Seconds="3" LineColor="6"/>
         <GridDisplay Stable="True" DisableX="0" CountX="4" StartX="1" StepX="0.5" StopX="2.5" DisableY="0" CountY="5" StartY="0" StepY="250" StopY="1000" Color="0" ColorString="Black"/>
-        <GridRemoval Stable="False" DefinedGridLines="False" CloseDistance="10" CoordDisableX="0" CoordDisableXString="Count" CountX="15" StartX="0.994813" StepX="0.0894232" StopX="2.24674" CoordDisableY="0" CoordDisableYString="Count" CountY="6" StartY="2.0398" StepY="209.449" StopY="1049.29"/>
+        <GridRemoval Stable="False" DefinedGridLines="False" CloseDistance="10" CoordDisableX="0" CoordDisableXString="Count" CountX="15" StartX="0.994814" StepX="0.0894232" StopX="2.24674" CoordDisableY="0" CoordDisableYString="Count" CountY="6" StartY="2.04262" StepY="209.449" StopY="1049.29"/>
         <PointMatch PointSize="48" ColorAccepted="4" ColorAcceptedString="Green" ColorCandidate="7" ColorCandidateString="Yellow" ColorRejected="6" ColorRejectedString="Red"/>
         <Segments PointSeparation="25" MinLength="2" FillCorners="False" LineWidth="4" LineColor="4" LineColorString="Green"/>
         <Curve CurveName="Axes">
@@ -22,15 +22,15 @@
             </CurveStyle>
             <CurvePoints>
                 <Point Identifier="Axes&#9;point&#9;1" Ordinal="1" IsAxisPoint="True" IsXOnly="False" Index="212">
-                    <PositionScreen X="112.705" Y="1155.63"/>
+                    <PositionScreen X="112.075" Y="1144.29"/>
                     <PositionGraph X="1" Y="0"/>
                 </Point>
                 <Point Identifier="Axes&#9;point&#9;3" Ordinal="2" IsAxisPoint="True" IsXOnly="False" Index="212">
-                    <PositionScreen X="587.338" Y="1153.25"/>
+                    <PositionScreen X="586.078" Y="1144.43"/>
                     <PositionGraph X="2.2" Y="0"/>
                 </Point>
                 <Point Identifier="Axes&#9;point&#9;5" Ordinal="3" IsAxisPoint="True" IsXOnly="False" Index="212">
-                    <PositionScreen X="107.943" Y="67.4645"/>
+                    <PositionScreen X="107.628" Y="68.4094"/>
                     <PositionGraph X="1" Y="1000"/>
                 </Point>
             </CurvePoints>
