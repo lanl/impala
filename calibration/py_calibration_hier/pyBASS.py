@@ -577,7 +577,7 @@ class BassBasis:
 
         plt.show()
 
-def bassPCA(xx, y, npc, ncores=1, center=True, scale=False, **kwargs):
+def bassPCA(xx, y, npc=None, percVar=99.9, ncores=1, center=True, scale=False, **kwargs):
     y_mean = 0
     y_sd = 1
     if center:
@@ -586,6 +586,16 @@ def bassPCA(xx, y, npc, ncores=1, center=True, scale=False, **kwargs):
         y_sd = np.std(y, axis=0)
     y_scale = np.apply_along_axis(lambda row: (row-y_mean)/y_sd, 1, y)
     decomp = np.linalg.svd(y_scale.T)
+    
+    #ipdb.set_trace()
+    
+    if npc==None:
+        cs = np.cumsum(decomp[1]**2)/np.sum(decomp[1]**2)*100.
+        npc = np.where(cs>percVar)[0][0] + 1
+    
+    if ncores > npc:
+        ncores = npc
+    
     basis = np.dot(decomp[0][:,0:npc],np.diag(decomp[1][0:npc]))
     newy = decomp[2][0:npc,:]
     trunc_error = np.dot(basis,newy) - y_scale.T
@@ -595,64 +605,62 @@ def bassPCA(xx, y, npc, ncores=1, center=True, scale=False, **kwargs):
 ######################################################
 ## test it out
 
-#if __name__ == '__main__':
+if __name__ == '__main__':
 
-if False:
-    def f(x):
-      out = 10. * np.sin(pi * x[:,0] * x[:,1]) + 20. * (x[:,2] - .5)**2 + 10 * x[:,3] + 5. * x[:,4]
-      return out
-    
-    
-    n = 500
-    p = 10
-    x = np.random.rand(n,p)-.5
-    xx = np.random.rand(1000,p)-.5
-    y = f(x) + np.random.normal(size=n)
-    
-    mod = bass(x,y,nmcmc=10000,nburn=9000)
-    
-    #mod.plot()
-    
-    #print(np.var(mod.predict(xx).mean(axis=0)-f(xx)))
-
-if True:
-
-    def f2(x):
-      out = 10. * np.sin(pi * tt * x[1]) + 20. * (x[2] - .5)**2 + 10 * x[3] + 5. * x[4]
-      return out
-    
-    
-    
-    
-    tt = np.linspace(0,1,50)
-    n = 500
-    p = 9
-    x = np.random.rand(n,p)-.5
-    xx = np.random.rand(1000,p)-.5
-    e = np.random.normal(size=n*len(tt))
-    y = np.apply_along_axis(f2, 1, x) + e.reshape(n,len(tt))
-    
-    modf = bassPCA(x,y,4,ncores=2)
-    modf.plot()
-    
-    pred = modf.predict(xx,nugget=True)
-    
-    ind = 11
-    plt.plot(pred[:,ind,:].T)
-    plt.plot(f2(xx[ind,]),'bo')
-    
-    plt.plot(np.apply_along_axis(f2, 1, xx), np.mean(pred,axis=0))
-    abline(1,0)
-    
-    
-    
-    #profiler.print_stats()
-    #profiler.dump_stats("/Users/dfrancom/Desktop/profiler_stats.txt")
-    
-    #import cProfile
-    #cProfile.run('bass(x,y)')
-    
+    if False:
+        def f(x):
+          out = 10. * np.sin(pi * x[:,0] * x[:,1]) + 20. * (x[:,2] - .5)**2 + 10 * x[:,3] + 5. * x[:,4]
+          return out
         
-        # TODO:
-            # explore whether you need discrete knot prior or not
-            # handle standardization
+        
+        n = 500
+        p = 10
+        x = np.random.rand(n,p)-.5
+        xx = np.random.rand(1000,p)-.5
+        y = f(x) + np.random.normal(size=n)
+        
+        mod = bass(x,y,nmcmc=10000,nburn=9000)
+        
+        #mod.plot()
+        
+        #print(np.var(mod.predict(xx).mean(axis=0)-f(xx)))
+
+    if True:
+
+        def f2(x):
+          out = 10. * np.sin(pi * tt * x[1]) + 20. * (x[2] - .5)**2 + 10 * x[3] + 5. * x[4]
+          return out
+        
+        
+        
+        
+        tt = np.linspace(0,1,50)
+        n = 500
+        p = 9
+        x = np.random.rand(n,p)-.5
+        xx = np.random.rand(1000,p)-.5
+        e = np.random.normal(size=n*len(tt))
+        y = np.apply_along_axis(f2, 1, x) #+ e.reshape(n,len(tt))
+        
+        modf = bassPCA(x,y,ncores=2,percVar=99.99)
+        modf.plot()
+        
+        pred = modf.predict(xx,nugget=True)
+        
+        ind = 11
+        plt.plot(pred[:,ind,:].T)
+        plt.plot(f2(xx[ind,]),'bo')
+        
+        plt.plot(np.apply_along_axis(f2, 1, xx), np.mean(pred,axis=0))
+        abline(1,0)
+        
+        
+        
+        #profiler.print_stats()
+        #profiler.dump_stats("/Users/dfrancom/Desktop/profiler_stats.txt")
+        
+        #import cProfile
+        #cProfile.run('bass(x,y)')
+        
+            
+

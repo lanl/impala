@@ -29,6 +29,8 @@ from GPy.kern import Matern32, Matern52, RBF, Bias, Linear, Coregionalize
 from GPy.inference.mcmc import HMC
 from numpy.random import normal
 
+import pyBASS
+
 from methodtools import lru_cache
 
 import matplotlib.pyplot as plt
@@ -313,6 +315,32 @@ class SubModelGP(SubModelBase):
             self.model.likelihood.variance[:].set_prior(Gamma.from_EV(1.,10))
             self.model.optimize()
         return
+
+class SubModelBASS(SubModelBase):
+    """
+    BASS emulator of flyer plate or taylor cylinder simulation results, without warping.
+    """
+
+    def __init__(self, transport, **kwargs):
+        model = MaterialModel(**kwargs)
+        self.parameter_order = model.get_parameter_list() # not sure how to use this to change order of transport.X
+        # Parse the inputs
+        self.X = transport.X
+        self.Y = transport.Y
+        
+        self.model = bassPCA(self.X, self.Y, percVar = 99.9, ncores = os.cpu_count()) # use as many PCs as it takes to explain 99.9 percent of the variance
+        return
+        
+
+    def sse(self, param):
+        """ Compute Sum Squared Error between actual data and predicted """
+        predicted = self.model.predict(param, nugget=True, mcmc_use=np.random.choice(range(self.model.bm_list[0].nstore))) # randomly select a mcmc iteration
+        diff = (self.Y_actual - predicted).reshape(-1)
+        return diff.dot(diff)
+
+
+
+
 
 class SubModelPE(SubModelBase):
     """
