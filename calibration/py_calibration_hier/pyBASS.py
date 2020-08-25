@@ -15,7 +15,7 @@ from itertools import combinations, chain
 from scipy.special import comb
 from datetime import datetime
 from collections import namedtuple
-import ipdb #ipdb.set_trace()
+# import ipdb #ipdb.set_trace()
 from pathos.multiprocessing import ProcessingPool as Pool
 import dill
 
@@ -528,14 +528,14 @@ class BassBasis:
         self.y_sd = y_sd
         self.trunc_error = trunc_error
         self.nbasis = len(basis[0])
-        
+
         if ncores == 1:
             self.bm_list = list(map(lambda ii: bass(self.xx, self.newy[ii,:], **kwargs), list(range(self.nbasis))))
         else:
             with Pool(ncores) as pool:
-                self.bm_list = list(pool.map(lambda ii: bass(self.xx, self.newy[ii,:], **kwargs), list(range(self.nbasis))))           
-        return 
-    
+                self.bm_list = list(pool.map(lambda ii: bass(self.xx, self.newy[ii,:], **kwargs), list(range(self.nbasis))))
+        return
+
     def predict(self, X, mcmc_use = None, nugget=False, ncores=1):
         if ncores == 1:
             pred_coefs = list(map(lambda ii: self.bm_list[ii].predict(X, mcmc_use, nugget), list(range(self.nbasis))))
@@ -544,7 +544,7 @@ class BassBasis:
                 pred_coefs = list(pool.map(lambda ii: self.bm_list[ii].predict(X, mcmc_use, nugget), list(range(self.nbasis))))
         out = np.dot(np.dstack(pred_coefs),self.basis.T)
         return out*self.y_sd + self.y_mean
-    
+
     def plot(self):
         fig = plt.figure()
 
@@ -586,20 +586,20 @@ def bassPCA(xx, y, npc=None, percVar=99.9, ncores=1, center=True, scale=False, *
         y_sd = np.std(y, axis=0)
     y_scale = np.apply_along_axis(lambda row: (row-y_mean)/y_sd, 1, y)
     decomp = np.linalg.svd(y_scale.T)
-    
+
     #ipdb.set_trace()
-    
+
     if npc==None:
         cs = np.cumsum(decomp[1]**2)/np.sum(decomp[1]**2)*100.
         npc = np.where(cs>percVar)[0][0] + 1
-    
+
     if ncores > npc:
         ncores = npc
-    
+
     basis = np.dot(decomp[0][:,0:npc],np.diag(decomp[1][0:npc]))
     newy = decomp[2][0:npc,:]
     trunc_error = np.dot(basis,newy) - y_scale.T
-    
+
     return BassBasis(xx, y, basis, newy, y_mean, y_sd, trunc_error, ncores, **kwargs)
 
 ######################################################
@@ -611,18 +611,18 @@ if __name__ == '__main__':
         def f(x):
           out = 10. * np.sin(pi * x[:,0] * x[:,1]) + 20. * (x[:,2] - .5)**2 + 10 * x[:,3] + 5. * x[:,4]
           return out
-        
-        
+
+
         n = 500
         p = 10
         x = np.random.rand(n,p)-.5
         xx = np.random.rand(1000,p)-.5
         y = f(x) + np.random.normal(size=n)
-        
+
         mod = bass(x,y,nmcmc=10000,nburn=9000)
-        
+
         #mod.plot()
-        
+
         #print(np.var(mod.predict(xx).mean(axis=0)-f(xx)))
 
     if True:
@@ -630,10 +630,10 @@ if __name__ == '__main__':
         def f2(x):
           out = 10. * np.sin(pi * tt * x[1]) + 20. * (x[2] - .5)**2 + 10 * x[3] + 5. * x[4]
           return out
-        
-        
-        
-        
+
+
+
+
         tt = np.linspace(0,1,50)
         n = 500
         p = 9
@@ -641,26 +641,23 @@ if __name__ == '__main__':
         xx = np.random.rand(1000,p)-.5
         e = np.random.normal(size=n*len(tt))
         y = np.apply_along_axis(f2, 1, x) #+ e.reshape(n,len(tt))
-        
+
         modf = bassPCA(x,y,ncores=2,percVar=99.99)
         modf.plot()
-        
+
         pred = modf.predict(xx,nugget=True)
-        
+
         ind = 11
         plt.plot(pred[:,ind,:].T)
         plt.plot(f2(xx[ind,]),'bo')
-        
+
         plt.plot(np.apply_along_axis(f2, 1, xx), np.mean(pred,axis=0))
         abline(1,0)
-        
-        
-        
+
+
+
         #profiler.print_stats()
         #profiler.dump_stats("/Users/dfrancom/Desktop/profiler_stats.txt")
-        
+
         #import cProfile
         #cProfile.run('bass(x,y)')
-        
-            
-

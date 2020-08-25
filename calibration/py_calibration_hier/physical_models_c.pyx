@@ -1,4 +1,5 @@
 cimport numpy as np
+import cython
 import numpy as np
 from libc.math cimport log, exp, erf, sqrt, cbrt, pi, pow
 
@@ -20,14 +21,15 @@ cdef class BaseModel(object):
         """ Reports Constant values as initialized """
         return {}
 
-    cpdef void update_parameters(self, np.ndarray[np.float64_t, ndim = 1] input):
+    cpdef void update_parameters(self, double[:] input):
         """ Update the model parameters """
         return
 
-    cpdef void initialize_constants(self, np.ndarray[np.float64_t, ndim = 1] input):
+    cpdef void initialize_constants(self, double[:] input):
         """ set the model constants """
         return
 
+    @cython.cdivision(True)
     cpdef double value(self, double edot = 0.):
         """ Return Value """
         return 0.
@@ -53,10 +55,11 @@ cdef class ConstantSpecificHeat(BaseModel):
     cpdef dict report_constants(self):
         return {'Cv0' : self.Cv0}
 
-    cpdef void initialize_constants(self, np.ndarray[np.float64_t, ndim = 1] input):
+    cpdef void initialize_constants(self, double[:] input):
         self.Cv0 = input[0]
         return
 
+    @cython.cdivision(True)
     cpdef double value(self, double edot = 0.):
         return self.Cv0
 
@@ -74,10 +77,11 @@ cdef class ConstantDensity(BaseModel):
     cpdef dict report_constants(self):
         return {'rho0' : self.rho0}
 
-    cpdef void initialize_constants(self, np.ndarray[np.float64_t, ndim = 1] input):
+    cpdef void initialize_constants(self, double[:] input):
         self.rho0 = input[0]
         return
 
+    @cython.cdivision(True)
     cpdef double value(self, double edot = 0.):
         return self.rho0
 
@@ -96,10 +100,11 @@ cdef class ConstantMeltTemperature(BaseModel):
     cpdef dict report_constants(self):
         return {'Tmelt0': self.Tmelt0}
 
-    cpdef void initialize_constants(self, np.ndarray[np.float64_t, ndim = 1] input):
+    cpdef void initialize_constants(self, double[:] input):
         self.Tmelt0 = input[0]
         return
 
+    @cython.cdivision(True)
     cpdef double value(self, double edot = 0.):
         return self.Tmelt0
 
@@ -118,10 +123,11 @@ cdef class ConstantShearModulus(BaseModel):
     cpdef dict report_constants(self):
         return {'G0' : self.G0}
 
-    cpdef void initialize_constants(self, np.ndarray[np.float64_t, ndim = 1] input):
+    cpdef void initialize_constants(self, double[:] input):
         self.G0 = input[0]
         return
 
+    @cython.cdivision(True)
     cpdef double value(self, double edot = 0.):
         return self.G0
 
@@ -134,11 +140,12 @@ cdef class SimpleShearModulus(BaseModel):
     cpdef dict report_constants(self):
         return {'G0' : self.G0, 'alpha' : self.alpha}
 
-    cpdef void initialize_constants(self, np.ndarray[np.float64_t, ndim = 1] input):
+    cpdef void initialize_constants(self, double[:] input):
         self.G0    = input[0]
         self.alpha = input[1]
         return
 
+    @cython.cdivision(True)
     cpdef double value(self, double edot = 0.):
         cdef double temp = self.parent.state.T
         cdef double tmelt = self.parent.state.Tmelt
@@ -151,11 +158,12 @@ cdef class SteinShearModulus(BaseModel):
     cpdef dict report_constants(self):
         return {'G0' : self.G0, 'sgB' : self.sgB}
 
-    cpdef void initialize_constants(self, np.ndarray[np.float64_t, ndim = 1] input):
+    cpdef void initialize_constants(self, double[:] input):
         self.G0  = input[0]
         self.sgB = input[1]
         return
 
+    @cython.cdivision(True)
     cpdef double value(self, double edot = 0.):
         cdef double temp, tmelt, aterm, bterm, gnow
 
@@ -188,10 +196,11 @@ cdef class ConstantYieldStress(BaseModel):
     cpdef dict report_constants(self):
         return {'yield_stress' : self.yield_stress}
 
-    cpdef void initialize_constants(self, np.ndarray[np.float64_t, ndim = 1] input):
+    cpdef void initialize_constants(self, double[:] input):
         self.yield_stress = input[0]
         return
 
+    @cython.cdivision(True)
     cpdef double value(self, double edot = 0.):
         return self.yield_stress
 
@@ -210,7 +219,7 @@ cdef class JCYieldStress(BaseModel):
     cpdef dict report_constants(self):
         return {'Tref' : self.Tref, 'edot0' : self.edot0}
 
-    cpdef void update_parameters(self, np.ndarray[np.float64_t, ndim = 1] input):
+    cpdef void update_parameters(self, double[:] input):
         self.A = input[0]
         self.B = input[1]
         self.C = input[2]
@@ -218,11 +227,12 @@ cdef class JCYieldStress(BaseModel):
         self.m = input[4]
         return
 
-    cpdef void initialize_constants(self, np.ndarray[np.float64_t, ndim = 1] input):
+    cpdef void initialize_constants(self, double[:] input):
         self.Tref  = input[0]
         self.edot0 = input[1]
         return
 
+    @cython.cdivision(True)
     cpdef double value(self, double edot = 0.):
         cdef double eps   = self.parent.state.strain
         cdef double t     = self.parent.state.T
@@ -255,7 +265,7 @@ cdef class PTWYieldStress(BaseModel):
         return {'beta' : self.beta, 'matomic' : self.matomic,
                 'y1'   : self.y1,   'y2'      : self.y2      }
 
-    cpdef void update_parameters(self, np.ndarray[np.float64_t, ndim = 1] input):
+    cpdef void update_parameters(self, double[:] input):
         self.theta = input[0]
         self.p     = input[1]
         self.s0    = input[2]
@@ -266,7 +276,7 @@ cdef class PTWYieldStress(BaseModel):
         self.yInf  = input[7]
         return
 
-    cpdef void initialize_constants(self, np.ndarray[np.float64_t, ndim = 1] input):
+    cpdef void initialize_constants(self, double[:] input):
         self.beta    = input[0]
         self.matomic = input[1]
         self.y1      = input[2]
@@ -280,6 +290,7 @@ cdef class PTWYieldStress(BaseModel):
         else:
             return True
 
+    @cython.cdivision(True)
     cpdef double value(self, double edot = 0.):
         cdef:
             double t_hom, afact, ainv, xfact, xiDot, erf_argErf
@@ -354,7 +365,7 @@ cdef class SteinFlowStress(BaseModel):
     cpdef dict report_constants(self):
         return {'G0' : self.G0, 'epsi' : self.epsi, 'chi' : self.chi}
 
-    cpdef void update_parameters(self, np.ndarray[np.float64_t, ndim = 1] input):
+    cpdef void update_parameters(self, double[:] input):
         self.y0   = input[0]
         self.a    = input[1]
         self.b    = input[2]
@@ -363,12 +374,13 @@ cdef class SteinFlowStress(BaseModel):
         self.ymax = input[5]
         return
 
-    cpdef void initialize_constants(self, np.ndarray[np.float64_t, ndim = 1] input):
+    cpdef void initialize_constants(self, double[:] input):
         self.G0   = input[0]
         self.epsi = input[1]
         self.chi  = input[2]
         return
 
+    @cython.cdivision(True)
     cpdef double value(self, double edot = 0.):
         cdef double temp, tmelt, G, eps, fnow
         temp  = self.parent.state.T
@@ -513,7 +525,7 @@ cdef class MaterialModel:
         """ Returns the constant list as defined by the member models """
         return self.constant_list
 
-    cpdef void update_parameters(self, np.ndarray[np.float64_t, ndim = 1] param):
+    cpdef void update_parameters(self, double[:] param):
         """ Updates the Parameters for each of the sub-models """
         self.flow_stress.update_parameters(
                 param[self.flow_stress_idx[0]   : self.specific_heat_idx[0]]
@@ -532,7 +544,7 @@ cdef class MaterialModel:
                 )
         return
 
-    cpdef void initialize_constants(self, np.ndarray const):
+    cpdef void initialize_constants(self, double[:] const):
         """ Sets initial values for the constants for each of the sub-models """
         self.flow_stress.initialize_constants(
                 const[self.flow_stress_idx[1] : self.specific_heat_idx[1]]
