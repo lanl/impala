@@ -92,7 +92,7 @@ elif rank == 0:
         bounds = parameter_bounds,
         constants = starting_consts,
         flow_stress_model = 'PTW',
-        shear_modulus_model = 'Stein',
+        shear_modulus_model = 'Simple',
         extra_Sigma_nu0 = 100000,
         Sigma_psi0 = 1e-3,
         )
