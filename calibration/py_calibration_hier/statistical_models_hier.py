@@ -677,9 +677,10 @@ class Chain(Transformer):
             )
         # insert Hierarchical Sigma:
         curs.execute(Sigma_create_statement)
+        Sigma = self.s_Sigma[nburn::thin]
         curs.executemany(
             Sigma_insert_statement,
-            self.s_Sigma[nburn::thin].tolist(),
+            Sigma.reshape(Sigma.shape[0],-1).tolist(),
             )
         for i, subchain in zip(range(1, len(self.subchains) + 1), self.subchains):
             # Insert componenent thetas

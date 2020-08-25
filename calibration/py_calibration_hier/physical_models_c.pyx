@@ -285,7 +285,8 @@ cdef class PTWYieldStress(BaseModel):
 
     cpdef bint check_constraints(self):
         if ((self.sInf > self.s0) or (self.yInf > self.y0)   or
-            (self.y0   > self.s0) or (self.yInf > self.sInf)):
+            (self.y0   > self.s0) or (self.yInf > self.sInf) or
+            (self.y1   < self.s0) or (self.y2   < self.beta)):
             return False
         else:
             return True

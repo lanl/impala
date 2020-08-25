@@ -93,7 +93,7 @@ class Simple_Shear_Modulus(BaseModel):
         tmelt = self.parent.state.Tmelt
 
         return mp.G0 * (1. - mp.alpha * (temp / tmelt))
-        
+
 class Stein_Shear_Modulus(BaseModel):
     #consts = ['G0', 'sgA', 'sgB']
     #assuming constant density and pressure
@@ -164,8 +164,9 @@ class PTW_Yield_Stress(BaseModel):
         tmelt = self.parent.state.Tmelt
         shear = self.parent.state.G
 
-        if ((mp.sInf > mp.s0) or (mp.yInf > mp.y0) or
-                (mp.y0 > mp.s0) or (mp.yInf > mp.sInf)):
+        if (    (mp.sInf > mp.s0) or (mp.yInf > mp.y0)      or
+                (mp.y0   > mp.s0) or (mp.yInf > mp.sInf)    or
+                (mp.y1   < mp.s0) or (mp.y2   < mp.beta)    ):
             raise ConstraintError
 
         #convert to 1/s strain rate since PTW rate is in that unit
@@ -230,7 +231,7 @@ class PTW_Yield_Stress(BaseModel):
 
         # should be flow stress in units of Mbar
         return scaled_stress * shear * 2.0
-        
+
 class Stein_Flow_Stress(BaseModel):
     params = ['y0', 'a', 'b', 'beta', 'n', 'ymax']
     consts = ['G0', 'epsi', 'chi']
@@ -377,7 +378,7 @@ class MaterialModel(object):
         #if we are working with microseconds, then this is a reasonable value
         #if we work in seconds, it should be changed to ~1.
         edotcrit=1.0e-6
-        if edot > edotcrit: 
+        if edot > edotcrit:
           self.state.T += chi * self.state.stress * edot * dt / (self.state.Cv * self.state.rho)
         self.state.strain += edot * dt
 
@@ -419,7 +420,7 @@ class MaterialModel(object):
         self.edot = edot
         self.Nhist = Nhist
         return
-    
+
     def get_history_variables(self):
         return [self.emax, self.edot, self.Nhist]
 
