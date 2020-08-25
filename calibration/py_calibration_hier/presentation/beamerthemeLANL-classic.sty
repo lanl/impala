@@ -1,0 +1,206 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 
+% This is the LANL-classic Beamer theme.  It is a Beamer approximation
+% of the ``classic'' LANL Powerpoint theme introduced in January 2014.
+% Author:  Charles Ferenbaugh cferenba@lanl.gov
+% Last modified:  December 2015
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% This theme reuses some elements from the following earlier
+% themes:
+%
+% Theme for the Lagrangian Applications Project at Los Alamos
+% Author:  Jimmy Fung fung@lanl.gov
+% Last modified:  October 2010
+%
+% Theme for the DDMA team at Los Alamos
+% Author:  Bryan Rasmussen, LANL Postdoc bryanras@lanl.gov
+% Last modified:  October 2006
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\ProvidesPackage{beamerthemeLANL-classic}
+
+% Load packages we will need.
+\usepackage{helvet}
+\usepackage{graphicx}
+
+% Define a few colors.
+\definecolor{LANLYellow}{RGB}{241,155,32}
+\definecolor{LANLDarkBlue}{RGB}{0,73,130}
+
+\newcommand{\classColor}{\color{black}}
+
+% Add commands to display LA-UR (or similar ID) on title page.
+\newcommand{\markLAUR}{}
+\newcommand{\LAUR}[1]{\renewcommand{\markLAUR}{{#1}}}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%
+%%%% Processing options.
+%%%%
+
+% Classification markings.
+% Use a vphantom for noclass to keep vertical spacing correct.
+\DeclareOptionBeamer{noclass}{%
+    \providecommand{\markClass}{\vphantom{X}}}
+
+\DeclareOptionBeamer{unclass}{%
+    \renewcommand{\markClass}{{\classColor{UNCLASSIFIED}}}}
+
+\DeclareOptionBeamer{myclass}{%
+    \renewcommand{\markClass}{{\classColor{#1}}}}
+
+\DeclareOptionBeamer{classcolor}{%
+    \renewcommand{\classColor}{\color{#1}}}
+
+% Page numbers.
+\DeclareOptionBeamer{slidenum}{%
+    \providecommand{\markPage}{%
+        \usebeamerfont{page number in head/foot}%
+        {Slide\ \insertframenumber}%
+    }
+}
+
+% Use a vphantom for noslidenum to keep vertical spacing correct.
+\DeclareOptionBeamer{noslidenum}{\renewcommand{\markPage}{\vphantom{X}}}
+
+% Set default options.
+\ExecuteOptionsBeamer{noclass,slidenum}
+\ProcessOptionsBeamer
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Use default themes, then modify.
+\useoutertheme{default}
+\useinnertheme{default}
+\usefonttheme{default}
+\usecolortheme{default}
+
+% Get rid of navigation symbols.
+\setbeamertemplate{navigation symbols}{}
+
+% Set up basic fonts and colors.
+\setbeamerfont{title}{size=\LARGE,series=\bfseries}
+\setbeamerfont{subtitle}{size=\large,series=\bfseries}
+\setbeamerfont{frametitle}{size=\Large,series=\bfseries}
+\setbeamerfont{framesubtitle}{size=\large,series=\bfseries}
+\setbeamerfont{page number in head/foot}{size=\tiny}
+\setbeamerfont{headline}{size=\tiny}
+\setbeamerfont{footline}{size=\tiny}
+
+\setbeamercolor{titlelike}{fg=black}
+\setbeamercolor{page number in head/foot}{fg=LANLYellow}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Set up overall page dimensions.
+
+% These are the left and right margins.
+% We'll need them in multiple places.
+\newdimen\lskip
+\newdimen\rskip
+\lskip=0.05\paperwidth
+\rskip=0.05\paperwidth
+\textwidth=\paperwidth
+\addtolength{\textwidth}{-\lskip}
+\addtolength{\textwidth}{-\rskip}
+
+% Kill the sidebar and shift everything to the same left margin.
+\setbeamersize{sidebar width left=0pt}
+\setbeamersize{sidebar width right=0pt}
+\setbeamersize{text margin left=\lskip}
+\setbeamersize{text margin right=\rskip}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Now we set up the basic page layout.
+
+% Set background image for all slides.
+\setbeamertemplate{background canvas}{%
+    \includegraphics[width=\paperwidth,height=\paperheight,
+        keepaspectratio]{LANLBackground}}
+
+% Set up the head of the page.
+\defbeamertemplate*{headline}{}{%
+    \vspace{1.5ex}%
+    \begin{beamercolorbox}[wd=\paperwidth]{}%
+        \usebeamerfont*{headline}%
+        \hspace{\stretch{1}}%
+        \makebox[0pt][c]{\markClass}%
+        \hspace{\stretch{1}}%
+        \makebox[0pt][r]{%
+            \ifnum\c@framenumber=1%
+                \textbf{\markLAUR}\hspace{0.02\paperwidth}%
+            \fi%
+        }
+    \end{beamercolorbox} 
+}
+
+% Set up the foot of the page.
+\defbeamertemplate*{footline}{}{%
+    \begin{beamercolorbox}[wd=\paperwidth]{page number in head/foot}%
+        \hspace{\stretch{1}}%
+        \makebox[0pt][c]{\markClass}%
+        \hspace{\stretch{1}}%
+        \makebox[0pt][r]{%
+            \ifnum\c@framenumber>1%
+                \raisebox{1.2ex}{\markPage\hspace{0.02\paperwidth}}%
+            \fi%
+        }
+    \end{beamercolorbox} 
+    \vspace{4.5ex}
+    \begin{beamercolorbox}[wd=\paperwidth]{}%
+        \hspace{\stretch{1}}%
+        \raisebox{0.5ex}{%
+            \makebox[0pt][c]{\Tiny\color{white}%
+            Managed by Triad National Security, LLC
+            for the U.S. Department of Energy's NNSA}}%
+        \hspace{\stretch{1}}
+    \end{beamercolorbox} 
+    \vspace{1.0ex}
+}
+
+
+% Set up the title page.
+\addtobeamertemplate{title page}
+    % Add vertical space to keep the title somewhat centered, since the
+    % footer is taller than the header.  Put a box around everything
+    % to preserve the space.
+    {\vspace{0.12\paperheight}\begin{beamercolorbox}{}}
+    {\end{beamercolorbox}}
+
+
+% Set up the frame title for each slide.
+\defbeamertemplate*{frametitle}{standard}{%
+    \begin{beamercolorbox}[wd=0.9\paperwidth,ht=0.12\paperheight,
+        dp=0pt,left]{frametitle}%
+        \setlength{\baselineskip}{2.0ex}%
+        \insertframetitle\par%
+        \ifx\insertframesubtitle\empty%
+        \else%
+            \usebeamerfont*{framesubtitle}\insertframesubtitle\par%
+        \fi
+    \end{beamercolorbox}
+}
+
+
+% Set up bulleted lists.
+\setbeamertemplate{itemize item}
+    {\raise0.4ex\hbox{\vrule width 0.6ex height 0.6ex}}
+\setbeamertemplate{itemize subitem}{--}
+\setbeamertemplate{itemize subsubitem}[circle]
+\setbeamercolor{itemize item}{fg=LANLYellow}
+\setbeamercolor{itemize subitem}{fg=LANLYellow}
+\setbeamercolor{itemize subsubitem}{fg=LANLYellow}
+\setlength{\leftmargini}{1.5em}
+\setlength{\leftmarginii}{1.5em}
+\setlength{\leftmarginiii}{1.5em}
+\setlength{\labelsep}{1em}
+
+

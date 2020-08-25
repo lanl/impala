@@ -31,6 +31,7 @@ from submodel import SubModelHB, SubModelTC, SubModelFP
 from transport import TransportHB, TransportTC, TransportFP
 from physical_models_c import MaterialModel
 from concurrent.futures import ThreadPoolExecutor
+from collections import namedtuple
 
 import matplotlib.pyplot as plt
 import seaborn as sea
@@ -40,7 +41,6 @@ from timeout import timeout
 sea.set(style = 'ticks')
 
 # What will send me to the Hell of the Matrix Inverters
-
 @lru_cache(maxsize = 128)
 def cholesky_inversion(Sigma_as_tuple):
     Sigma = np.array(Sigma_as_tuple)
@@ -48,6 +48,12 @@ def cholesky_inversion(Sigma_as_tuple):
 
 class BreakException(Exception):
     pass
+
+def shpb_sse(args):
+    model = MaterialModel(**args.models)
+    model.set_history_variables(**args.history_variables)
+    model.initialize(args.parameters, args.constants, args.initial_temp)
+    history = model.compute_state_history()
 
 # Statistical Models
 
@@ -341,9 +347,7 @@ class SubChainSHPB(Transformer):
         kwargs - Additional arguments to go to MaterialModel
         """
         self.parent = parent
-
         self.table_name = table_name
-
         self.nu = nu
         self.psi0 = psi0
         self.r0 = r0
@@ -604,6 +608,22 @@ class Chain(Transformer):
             ','.join(self.parameter_order),
             ','.join(['?'] * len(self.parameter_order)),
             )
+
+        Sigma_cols = [
+            'Sigma_{}_{}'.format(i,j)
+            for i in range(1, self.d + 1)
+            for j in range(1, self.d + 1)
+            ]
+
+        Sigma_create_statement = self.create_statement.format(
+            'Sigma',
+            ','.join([x + ' REAL' for x in Sigma_cols]),
+            )
+        Sigma_insert_statement = self.insert_statement.format(
+            'Sigma',
+            ','.join(Sigma_cols),
+            ','.join(['?'] * len(Sigma_cols))
+            )
         thetai_create_statement = self.create_statement.format(
             'theta_{}',
             ','.join([x + ' REAL' for x in self.parameter_order]),
@@ -655,6 +675,12 @@ class Chain(Transformer):
             theta0_insert_statement,
             (self.unnormalize(self.invprobit(self.s_theta0)).tolist())[nburn::thin],
             )
+        # insert Hierarchical Sigma:
+        curs.execute(Sigma_create_statement)
+        curs.executemany(
+            Sigma_insert_statement,
+            self.s_Sigma[nburn::thin].tolist(),
+            )
         for i, subchain in zip(range(1, len(self.subchains) + 1), self.subchains):
             # Insert componenent thetas
             curs.execute(thetai_create_statement.format(i))
@@ -676,8 +702,10 @@ class Chain(Transformer):
         conn.close()
         return
 
-    def __init__(self, path, bounds, constants, nu = 40,
-                    psi0 = 1e-4, r0 = 0.5, temperature = 1., **kwargs):
+    def __init__(self, path, bounds, constants,
+                    nu = 40, psi0 = 1e-4, r0 = 0.5,
+                    extra_Sigma_nu0 = 0, Sigma_psi0 = 4.,
+                    temperature = 1., **kwargs):
         """
         Initialization of Hopkinson Bar Model.
 
@@ -721,8 +749,8 @@ class Chain(Transformer):
         self.N = len(self.subchains)
         self.n = np.array([subchain.N for subchain in self.subchains])
         self.d = len(self.parameter_order)
-        self.prior_Sigma_nu    = self.d + 2
-        self.prior_Sigma_psi   = np.eye(self.d) * 4.
+        self.prior_Sigma_nu    = self.d + 2 + extra_Sigma_nu0
+        self.prior_Sigma_psi   = np.eye(self.d) * Sigma_psi0
         self.prior_theta0_mu   = np.zeros(self.d)
         self.prior_theta0_Sinv = np.eye(self.d) * 1e-1
         conn.close()

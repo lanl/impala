@@ -27,7 +27,7 @@ from GPy.models.gp_regression import GPRegression
 from GPy.core.parameterization.priors import Gamma, Gaussian
 from GPy.kern import Matern32, Matern52, RBF, Bias, Linear, Coregionalize
 from GPy.inference.mcmc import HMC
-from numpy.random import normal
+from numpy.random import normal, choice
 
 import pyBASS
 
@@ -320,27 +320,26 @@ class SubModelBASS(SubModelBase):
     """
     BASS emulator of flyer plate or taylor cylinder simulation results, without warping.
     """
-
     def __init__(self, transport, **kwargs):
         model = MaterialModel(**kwargs)
         self.parameter_order = model.get_parameter_list() # not sure how to use this to change order of transport.X
         # Parse the inputs
-        self.X = transport.X
-        self.Y = transport.Y
-        
-        self.model = bassPCA(self.X, self.Y, percVar = 99.9, ncores = os.cpu_count()) # use as many PCs as it takes to explain 99.9 percent of the variance
+        self.X        = transport.X
+        self.Y        = transport.Y
+        self.Y_actual = transport.Y_actual
+        # use as many PCs as it takes to explain 99.9 percent of the variance
+        self.model    = pyBASS.bassPCA(self.X, self.Y, percVar = 99.9,
+                                        ncores = os.cpu_count())
         return
-        
+
 
     def sse(self, param):
         """ Compute Sum Squared Error between actual data and predicted """
-        predicted = self.model.predict(param, nugget=True, mcmc_use=np.random.choice(range(self.model.bm_list[0].nstore))) # randomly select a mcmc iteration
+        predicted = self.model.predict(param, nugget = True,
+                mcmc_use = choice(range(self.model.bm_list[0].nstore)))
+                # randomly select a mcmc iteration
         diff = (self.Y_actual - predicted).reshape(-1)
         return diff.dot(diff)
-
-
-
-
 
 class SubModelPE(SubModelBase):
     """
@@ -422,7 +421,6 @@ class SubModelPE(SubModelBase):
         # Setup, passing transport contents
         self.X = transport.X
         self.Y = transport.Y
-        self.Y_actual = transport.Y_actual
         self.Xmean, self.Xsd = np.mean(self.X, axis = 0), np.std(self.X, axis = 0)
         self.Ymean, self.Ysd = np.mean(self.Y, axis = 0), np.std(self.Y, axis = 0)
         self.A = self.standardize_x(self.X)
