@@ -110,11 +110,31 @@ SubChain = {
     'shpb' : SubChainSHPB
     }
 
-Samples = namedtuple("Samples", "theta delta Sigma theta0")
-PriorsChain = namedtuple('PriorsChain', 'psi nu mu Sinv')
+Samples = namedtuple("Samples", "theta delta Sigma theta0 alpha")
+PriorsChain = namedtuple('PriorsChain', 'psi nu mu Sinv eta_a eta_b')
 class Chain(Transformer, pt.PTSlave):
     samples = None
     N = None
+
+    @property
+    def curr_Sigma(self):
+        return self.samples.Sigma[self.curr_iter]
+
+    @property
+    def curr_theta0(self):
+        return self.samples.theta0[self.curr_iter]
+
+    @property
+    def curr_alpha(self):
+        return self.samples.alpha[self.curr_iter]
+
+    @property
+    def curr_delta(self):
+        return self.samples.delta[self.curr_iter]
+
+    @property
+    def curr_thetas(self):
+        return self.samples.theta[self.curr_iter]
 
     @staticmethod
     def clean_delta_theta(delta, theta):
@@ -138,7 +158,7 @@ class Chain(Transformer, pt.PTSlave):
         _dmax  = _delta.max()
         nj     = np.array([(delta == j).sum() for in in range(_dmax + 1 + self.m)])
         lj     = nj + (nj == 0) * alpha / self.m
-        th_new = self.sample_theta_new(self.theta0, self.Sigma, self.m)
+        th_new = self.sample_theta_new(theta0, Sigma, self.m)
         thetas = np.vstack((_theta, th_new))
         phis   = self.unnormalize(self.invprobit(thetas))
         assert(thetas.shape[0] == lj.shape[0])
@@ -244,6 +264,55 @@ class Chain(Transformer, pt.PTSlave):
         nu0  = self.priors.nu  + N * self.inv_temper_temp
         return invwishart.rvs(df = nu0, scale = psi0)
 
+    def sample_alpha(self, curr_alpha, delta):
+        nclust = delta.max() + 1 # one-off error of array indexing... # of unique is max + 1
+        g = beta.rvs(curr_alpha + 1, self.N)
+        aa = self.priors.eta_a + nclust
+        bb = self.priors.eta_b - log(g)
+        eps = (aa - 1) / (self.N * bb + aa - 1)
+        aaa = choice((aa, aa - 1), 1, p = (eps, 1 - eps))
+        return gamma.rvs(aaa, bb)
+
+    def sample_subchains(self, thetas, deltas):
+        exp_tuples = [self.subchains[i].experiment.tuple for i in range(self.N)]
+        phis = self.unnormalize(self.invprobit(thetas[deltas]))
+        args = zip(exp_tuples, phis.tolist(), repeat(self.constants_vec), repeat(self.model_args))
+        sses = np.array(list(self.pool.map(args, lambda arg: sse[arg[0].type](*arg))))
+        for i in range(self.N):
+            self.subchain[i].iter_sample(sses[i])
+        return
+
+    def iter_sample(self):
+        # Set the current values for all parameters
+        theta0 = self.curr_theta0
+        Sigma  = self.curr_Sigma
+        thetas = self.curr_thetas
+        deltas = self.curr_delta
+        alpha  = self.curr_alpha
+
+        # Advance the sampler 1 step
+        self.curr_iter += 1
+
+        # Sample new cluster assignments given current values of theta
+        # (admittedly this won't mix all that well)
+        for i in range(self.N):
+            deltas, thetas = self.sample_delta_i(self, delta, thetas, theta0, Sigma, alpha, i)
+
+        # Given the new cluster assignments, sample new values for theta
+        # and the rest of the parameters
+        self.samples.delta[self.curr_iter] = deltas
+        self.samples.theta[self.curr_iter] = self.sample_thetas(thetas, self.curr_delta, theta0, Sigma)
+        self.samples.theta0[self.curr_iter] = self.sample_theta0(thetas, Sigma)
+        self.samples.Sigma[self.curr_iter] = self.sample_Sigma(self.curr_thetas, self.curr_theta0)
+        self.samples.alpha[self.curr_iter] = self.sample_alpha(alpha, self.curr_delta)
+        # Sample the error terms (and whatever other experiment-specific parameters there are)
+        self.sample_subchains(thetas, deltas)
+        return
+
+    def sample_k(self, k):
+        for _ in range(k):
+            self.iter_sample()
+    
     def check_constraints(self, theta):
         self.model.update_parameters(self.unnormalize(self.invprobit(theta)))
         return self.model.check_constraints()
