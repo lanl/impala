@@ -411,8 +411,6 @@ class Chain(Transformer, pt.PTSlave):
         return localcov(history, target, self.radius, self.nu, self.psi0)
 
     def initialize_sampler(self, ns):
-        # self.samples = ChainSamples([], np.empty((ns + 1, self.N)), np.empty((ns + 1, self.d, self.d)),
-        #                         np.empty((ns + 1, self.d)), np.empty(ns + 1))
         self.samples = ChainSamples(self.N, self.d, ns)
         self.samples.delta[0] = range(self.N)
         theta_start = np.empty((self.N, self.d))
@@ -472,15 +470,16 @@ class Chain(Transformer, pt.PTSlave):
         # calculate log-posteriors given calculated sse's, substates
         lpss   = np.array([
             subchain.log_posterior_substate(sse, substate)
-            for sse, substate in zip(sses, state.substates)
+            for sse, subchain, substate in zip(sses, self.subchains, state.substates)
             ])
         # Log determinant of the jacobian for each theta
-        ldjs   = sum([self.invprobitlogjac(th) for th in state.thetas.tolist()])
+        ldjs   = sum([self.invprobitlogjac(state.thetas[i]) for i in range(state.thetas.shape[0])])
         # Log-posterior for theta (against theta0, that part that isn't covered by the subchains)
+        thdiff = state.thetas - state.theta0
         lpts   = - 0.5 * self.inv_temper_temp * sum([
-            (th - state.theta0) @ SigInv @ (th - state.theta0)
-            for th in state.thetas.tolist()
-            ])
+                thdiff[i] @ SigInv @ thdiff[i]
+                for i in range(state.thetas.shape[0])
+                ])
         # Log posterior for theta0 (against mu, that part that isn't covered by lpts)
         lpth0  = - 0.5 * (
             (state.theta0 - self.priors.mu) @ self.priors.Sinv @ (state.theta0 - self.priors.mu)
