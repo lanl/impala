@@ -1,9 +1,10 @@
 from physical_models_c import MaterialModel
+from scipy.linalg import cho_factor, cho_solve
+from scipy.special import erf, erfinv
+from collections import namedtuple
+from math import ceil, sqrt, pi, log
 import methodtools as mt
 import functools as ft
-from scipy.linalg import cho_factor, cho_solve
-from collections import namedtuple
-
 import numpy as np
 import pandas as pd
 import sqlite3 as sql
@@ -56,7 +57,6 @@ class Transformer(object):
         return
 
 SHPBTuple = namedtuple('SHPBTuple', 'X Y temp edot emax type')
-
 class Experiment_SHPB(object):
     X     = None
     Y     = None
@@ -66,7 +66,7 @@ class Experiment_SHPB(object):
     emax  = None
 
     data_query = "SELECT strain,stress FROM {};"
-    meta_query = "SELECT temperature, edot, emax FROM meta WHERE table_name = {};"
+    meta_query = "SELECT temperature, edot, emax FROM meta WHERE table_name = '{}';"
 
     @property
     def tuple(self):

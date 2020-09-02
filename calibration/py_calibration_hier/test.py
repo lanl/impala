@@ -1,6 +1,9 @@
 #from statistical_models_hier_mpi import ParallelTemperMaster, Dispatcher
-from statistical_models_hier import ParallelTemperMaster
+#from statistical_models_hier import ParallelTemperMaster
+from sm_dpcluster import Chain
 from numpy import array, float64
+import numpy
+numpy.seterr(under = 'ignore')
 #from mpi4py import MPI
 
 #comm = MPI.COMM_WORLD
@@ -85,22 +88,42 @@ if rank > 0:
 
 elif rank == 0:
     # Define the Model
-    model = ParallelTemperMaster(
-        #comm = comm,
-        #size = size,
-        temperature_ladder = 1.3 ** array(range(size - 1)),
-        path = path,
-        bounds = parameter_bounds,
-        constants = starting_consts,
-        flow_stress_model = 'PTW',
-        shear_modulus_model = 'Simple',
-        )
-    model.sample(20000)
-    #model.write_to_disk('Ti64_results.db', 50000, 20)
-    #theta0 = model.invprobit(model.get_history(50000,20))
-    #model.parameter_pairwise_plot(theta0, 'Ti64_pairwise.png')
-    #model.parameter_trace_plot(theta0, 'Ti64_trace.png')
-    #model.complete()
+    # model = ParallelTemperMaster(
+    #     #comm = comm,
+    #     #size = size,
+    if __name__ == '__main__':
+        model = Chain(
+            temperature = 1.,
+            # temperature_ladder = 1.3 ** array(range(size - 1)),
+            path = path,
+            bounds = parameter_bounds,
+            constants = starting_consts,
+            model_args = {
+                'flow_stress_model' : 'PTW',
+                'shear_modulus_model' : 'Simple',
+                }
+            )
+        model.initialize_sampler(10000)
+        model.sample_k(10000)
+        # self = model
+        # theta0 = self.curr_theta0
+        # Sigma  = self.curr_Sigma
+        # thetas = self.curr_thetas
+        # deltas = self.curr_delta
+        # alpha  = self.curr_alpha
+        # self.curr_iter += 1
+
+
+
+
+
+
+        # model.sample(20000)
+        # model.write_to_disk('Ti64_results.db', 50000, 20)
+        # theta0 = model.invprobit(model.get_history(50000,20))
+        # model.parameter_pairwise_plot(theta0, 'Ti64_pairwise.png')
+        # model.parameter_trace_plot(theta0, 'Ti64_trace.png')
+        # model.complete()
 
 if __name__ == '__main__':
     pass
