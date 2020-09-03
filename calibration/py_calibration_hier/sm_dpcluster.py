@@ -1,17 +1,20 @@
+""" Base code for Chinese Restaurant Process clustering of Strength Model Parameters """
+# Required Modules
 from scipy.stats import invgamma, invwishart, uniform, beta, gamma
 from scipy.stats import multivariate_normal as mvnormal, norm as normal
 from scipy.interpolate import interp1d
-from collections import namedtuple
-from itertools import repeat
 from numpy.linalg import multi_dot, slogdet
 from numpy.random import choice
+import numpy as np
+np.seterr(under = 'ignore')
+# Builtins
+from collections import namedtuple
+from itertools import repeat
 from functools import lru_cache
 from multiprocessing import Pool
 from math import exp, log
 import sqlite3 as sql
-import numpy as np
-np.seterr(under = 'ignore')
-
+# Custom Modules
 from experiment import Experiment, Transformer, cholesky_inversion
 from physical_models_c import MaterialModel
 from pointcloud import localcov
@@ -26,14 +29,11 @@ import parallel_tempering as pt
 
 def sse_shpb(exp_tuple, parameters, constants, model_args):
     """
-    Computes sum-squared-error for a given experiment.
-
-    kappa      : Kappa (namedtuple, with theta and sigma2 as terms)
-               :-> theta  = parameter vector (probit scale)
-               :-> sigma2 = error vector
+    Computes sum-squared-error for a given experiment, for quasi-statics and shpb's.
+    exp_tuple  : relevant experiment data wrapped in a tuple. (x, y, emax, edot, temp)
+    parameters : real-values of parameters used to calculate sse.
     constants  : np.array (d) (constants used)
-    model_args : dict (what models are used)
-
+    model_args : dict (defines what physical models are used)
     """
     # Build model, predict stress at given strain values
     model = MaterialModel(**model_args)
@@ -42,14 +42,24 @@ def sse_shpb(exp_tuple, parameters, constants, model_args):
     model.update_parameters(np.array(parameters))
     model.initialize_state(exp_tuple.temp)
     res = (model.compute_state_history()[:, 1:3]).T
+    if np.isnan(res).any():
+        return 1.e9
     est_curve = interp1d(res[0], res[1], kind = 'cubic')
     preds = est_curve(exp_tuple.X)
     # Compute diffrences, return sum-squared-error
-    diffs = (exp_tuple.Y - preds)
-    return (diffs * diffs).sum()
+    diffs = exp_tuple.Y - preds
+    return diffs @ diffs
+
+def sse_flyer(exp_tuple, parameters, constants, model_args):
+    raise NotImplementedError
+
+def sse_taylor(exp_tuple, parameters, constants, model_args):
+    raise NotImplementedError
 
 sse = {
-    'shpb' : sse_shpb
+    'shpb' : sse_shpb,
+    'taylor' : sse_taylor,
+    'flyer' : sse_flyer,
     }
 
 # sse_wrapper
@@ -57,6 +67,8 @@ sse = {
 #  pool against a row of a given iterator.  I.e., pool.map(sse_wrapper, arg_iterable)
 
 def sse_wrapper(args):
+    """ Provides a wrapper around the sse dictionary so that we can invoke the particular SSE
+    type relevant to the data, all at the same time. """
     return sse[args[0].type](*args)
 
 # Defining SubChains
@@ -107,7 +119,7 @@ class SubChainSHPB(SubChainBase):
 
     @property
     def curr_sigma2(self):
-        return self.samples.sigma2[self.curr_iter]
+        return self.samples.sigma2[self.curr_iter].copy()
 
     def get_substate(self):
         return SubstateSHPB(self.curr_sigma2)
@@ -186,27 +198,23 @@ class Chain(Transformer, pt.PTSlave):
 
     @property
     def curr_Sigma(self):
-        return self.samples.Sigma[self.curr_iter]
+        return self.samples.Sigma[self.curr_iter].copy()
 
     @property
     def curr_theta0(self):
-        return self.samples.theta0[self.curr_iter]
+        return self.samples.theta0[self.curr_iter].copy()
 
     @property
     def curr_alpha(self):
-        return self.samples.alpha[self.curr_iter]
+        return self.samples.alpha[self.curr_iter].copy()
 
     @property
     def curr_delta(self):
-        return self.samples.delta[self.curr_iter]
+        return self.samples.delta[self.curr_iter].copy()
 
     @property
     def curr_thetas(self):
-        return self.samples.theta[self.curr_iter]
-
-    @property
-    def curr_sigma2(self):
-        return np.array([subchain.curr_sigma2 for subchain in self.subchains])
+        return (self.samples.theta[self.curr_iter]).copy()
 
     @property
     def curr_substates(self):
@@ -214,18 +222,19 @@ class Chain(Transformer, pt.PTSlave):
 
     @staticmethod
     def clean_delta_theta(deltas, thetas, i):
-        delta = np.delete(deltas, i)
-        theta = thetas[np.array([j for j in range(delta.max() + 1) if j in set(delta)])]
-        # theta = thetas[np.array(list(set(delta)))]
-        nj    = np.array([(delta == j).sum() for j in range(delta.max() + 2)])
-        fz    = np.where(nj == 0)[0][0]
-        while fz <= delta.max():
-            delta[delta > fz] = delta[delta > fz] - 1
-            nj = np.array([(delta == j).sum() for j in range(delta.max() + 2)])
+        assert(deltas.max() + 1 == thetas.shape[0])
+        _delta = np.delete(deltas, i)
+        _theta = thetas[np.array([j for j in range(_delta.max() + 1) if j in set(_delta)])]
+        nj     = np.array([(_delta == j).sum() for j in range(_delta.max() + 2)])
+        fz     = np.where(nj == 0)[0][0]
+        while fz <= _delta.max():
+            _delta[_delta > fz] = _delta[_delta > fz] - 1
+            nj = np.array([(_delta == j).sum() for j in range(_delta.max() + 2)])
             fz = np.where(nj == 0)[0][0]
-        return delta, theta
+        return _delta, _theta
 
     def sample_delta_i(self, deltas, thetas, theta0, Sigma, alpha, i):
+        assert(deltas.max() + 1 == thetas.shape[0])
         _delta, _theta = self.clean_delta_theta(deltas, thetas, i)
         _dmax  = _delta.max()
         nj     = np.array([(_delta == j).sum() for j in range(_dmax + 1 + self.m)])
@@ -248,12 +257,29 @@ class Chain(Transformer, pt.PTSlave):
         try:
             dnew   = choice(range(_dmax + 1 + self.m), 1, p = normalized)
         except ValueError:
-            nan_idx = np.where(np.isnan(normalized))[0][0]
-            print('normalized nan: {}'.format(normalized[nan_idx]))
-            print('unnormalized nan: {}'.format(unnormalized[nan_idx]))
-            print('lps nan {}'.format(lps[nan_idx]))
-            print('lj nan {}'.format(lj[nan_idx]))
-            self.fail_theta = theta[nan_idx]
+            nan_idx = np.where(np.isnan(unnormalized))[0][0]
+            print('nan idx: {}'.format(nan_idx))
+            print('normalized: {}'.format(normalized))
+            print('unnormalized: {}'.format(unnormalized))
+            print('lps: {}'.format(lps))
+            print('lj: {}'.format(lj))
+            print('nj: {}'.format(nj))
+            self.fail_state = {
+                'thetas'       : thetas,
+                'deltas'       : deltas,
+                'theta0'       : theta0,
+                'Sigma'        : Sigma,
+                'alpha'        : alpha,
+                'i'            : i,
+                'th_stack'     : th_stack,
+                'phi_stack'    : phi_stack,
+                'sses'         : sses,
+                'lps'          : lps,
+                'nj'           : nj,
+                'lj'           : lj,
+                'unnormalized' : unnormalized,
+                'normalized'   : normalized,
+                }
             raise
         if dnew > _dmax:
             theta = np.vstack((_theta, th_stack[dnew]))
@@ -288,8 +314,9 @@ class Chain(Transformer, pt.PTSlave):
         curr_cov = self.localcov(np.vstack(self.samples.theta), curr_theta_j)
         gen = mvnormal(mean = curr_theta_j, cov = curr_cov)
         prop_theta_j = gen.rvs()
-        while not self.check_constraints(prop_theta_j):
-            prop_theta_j = gen.rvs()
+
+        if not self.check_constraints(prop_theta_j):
+            return curr_theta_j
 
         prop_cov = self.localcov(np.vstack(self.samples.theta), prop_theta_j)
 
@@ -380,6 +407,7 @@ class Chain(Transformer, pt.PTSlave):
 
         # Sample new cluster assignments given current values of theta
         # (admittedly this won't mix all that well)
+        assert(deltas.max() + 1 == thetas.shape[0])
         for i in range(self.N):
             deltas, thetas = self.sample_delta_i(deltas, thetas, theta0, Sigma, alpha, i)
 
@@ -414,7 +442,7 @@ class Chain(Transformer, pt.PTSlave):
         self.samples = ChainSamples(self.N, self.d, ns)
         self.samples.delta[0] = range(self.N)
         theta_start = np.empty((self.N, self.d))
-        init_normal = normal(0, 0.5)
+        init_normal = normal(0, scale = 0.2)
         for i in range(self.N):
             theta_try = init_normal.rvs(size = self.d)
             while not self.check_constraints(theta_try):
@@ -454,7 +482,7 @@ class Chain(Transformer, pt.PTSlave):
         self.samples.delta[self.curr_iter]  = state.delta
         self.samples.Sigma[self.curr_iter]  = state.Sigma
         for substate, subchain in zip(state.substates, self.subchains):
-            subchain.set_state(substate)
+            subchain.set_substate(substate)
         return
 
     def log_posterior_state(self, state):
@@ -471,29 +499,28 @@ class Chain(Transformer, pt.PTSlave):
         lpss   = np.array([
             subchain.log_posterior_substate(sse, substate)
             for sse, subchain, substate in zip(sses, self.subchains, state.substates)
-            ])
+            ]).sum()
         # Log determinant of the jacobian for each theta
         ldjs   = sum([self.invprobitlogjac(state.thetas[i]) for i in range(state.thetas.shape[0])])
         # Log-posterior for theta (against theta0, that part that isn't covered by the subchains)
         thdiff = state.thetas - state.theta0
         lpts   = - 0.5 * self.inv_temper_temp * sum([
                 thdiff[i] @ SigInv @ thdiff[i]
-                for i in range(state.thetas.shape[0])
+                for i in range(thdiff.shape[0])
                 ])
         # Log posterior for theta0 (against mu, that part that isn't covered by lpts)
-        lpth0  = - 0.5 * (
-            (state.theta0 - self.priors.mu) @ self.priors.Sinv @ (state.theta0 - self.priors.mu)
-            )
+        t0diff = state.theta0 - self.priors.mu
+        lpth0  = - 0.5 * (t0diff @ self.priors.Sinv @ t0diff)
         # Log Posterior for Sigma (that part that isn't covered by lpts)
         lpSig  = (
             - 0.5 * (self.N * self.inv_temper_temp + self.priors.nu + self.d + 1) * slogdet(state.Sigma)[1]
-            - 0.5 * (self.prior.psi @ SigInv).trace()
+            - 0.5 * (self.priors.psi @ SigInv).trace()
             )
         # Log-posterior is the sum of these.  There's also alpha, but I haven't figured out how
         # to include that.
         return lpss + lpts + ldjs + lpth0 + lpSig
 
-    def __init__(self, path, bounds, constants, model_args, temperature = 1., m = 5):
+    def __init__(self, path, bounds, constants, model_args, temperature = 1., m = 20):
         conn = sql.connect(path)
         cursor = conn.cursor()
         self.model = MaterialModel(**model_args)
@@ -521,9 +548,9 @@ class Chain(Transformer, pt.PTSlave):
         self.m = m
         return
 
-class PTMaster(Transformer, pt.PTMaster):
-    def __init__(self, temper_ladder, **kwargs):
-        self.chains = [Chain(temperature = temp, **kwargs) for temp in temper_ladder]
+class Model(Transformer, pt.PTMaster):
+    def initialize_chains(self, temperature_ladder, kwargs):
+        self.chains = [Chain(temperature = temp, **kwargs) for temp in temperature_ladder]
         return
 
 # EOF
