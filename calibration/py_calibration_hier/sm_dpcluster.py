@@ -172,14 +172,7 @@ class ChainSamples(object):
     Sigma = None
     theta0 = None
     alpha = None
-
-    # def __init__(self, theta, delta, Sigma, theta0, alpha):
-    #     self.theta = theta
-    #     self.delta = delta
-    #     self.Sigma = Sigma
-    #     self.theta0 = theta0
-    #     self.alpha = alpha
-    #     return
+    accepted = None
 
     def __init__(self, N, d, ns):
         self.theta = []
@@ -187,6 +180,7 @@ class ChainSamples(object):
         self.Sigma = np.empty((ns + 1, d, d))
         self.theta0 = np.empty((ns + 1, d))
         self.alpha = np.empty(ns + 1)
+        self.accepted = np.empty(ns + 1)
         return
 
 class Chain(Transformer, pt.PTSlave):
@@ -328,18 +322,19 @@ class Chain(Transformer, pt.PTSlave):
 
         log_alpha = prop_lp + pc_ld - curr_lp - cp_ld
         if log(uniform.rvs()) < log_alpha:
-            return prop_theta_j
+            return prop_theta_j, True
         else:
-            return curr_theta_j
+            return curr_theta_j, False
 
     def sample_thetas(self, thetas, delta, theta0, Sigma):
         assert (thetas.shape[0] == delta.max() + 1)
         theta_new = np.empty((thetas.shape))
         SigInv = self.pd_matrix_inversion(Sigma)
+        accept = np.empty(theta_new.shape[0])
         for j in range(theta_new.shape[0]):
             cluster_j = np.where(delta == j)[0]
-            theta_new[j] = self.sample_theta_j(thetas[j], cluster_j, theta0, SigInv)
-        return theta_new
+            theta_new[j], accept[j] = self.sample_theta_j(thetas[j], cluster_j, theta0, SigInv)
+        return theta_new, accept.mean()
 
     def sample_theta0(self, theta, Sigma):
         if len(theta.shape) == 1:
@@ -414,7 +409,9 @@ class Chain(Transformer, pt.PTSlave):
         # Given the new cluster assignments, sample new values for theta
         # and the rest of the parameters
         self.samples.delta[self.curr_iter] = deltas
-        self.samples.theta.append(self.sample_thetas(thetas, self.curr_delta, theta0, Sigma))
+        new_thetas, accepted = self.sample_thetas(thetas, self.curr_delta, theta0, Sigma)
+        self.samples.theta.append(new_thetas)
+        self.samples.accepted[self.curr_iter] = accepted
         self.samples.theta0[self.curr_iter] = self.sample_theta0(thetas, Sigma)
         self.samples.Sigma[self.curr_iter] = self.sample_Sigma(self.curr_thetas, self.curr_theta0)
         self.samples.alpha[self.curr_iter] = self.sample_alpha(alpha, self.curr_delta)
@@ -458,6 +455,7 @@ class Chain(Transformer, pt.PTSlave):
         self.samples.Sigma[0] = self.sample_Sigma(self.samples.theta0[0], self.samples.theta[0])
         self.samples.alpha[0] = 5.
         self.curr_iter = 0
+        self.samples.accepted[0] = 0.
         return
 
     def set_temper_temperature(self, temperature):
@@ -520,21 +518,21 @@ class Chain(Transformer, pt.PTSlave):
         # to include that.
         return lpss + lpts + ldjs + lpth0 + lpSig
 
-    def __init__(self, path, bounds, constants, model_args, temperature = 1., m = 20):
+    def initialize_chain(self, temper_temp, path, bounds, constants, model_args, m = 20):
         conn = sql.connect(path)
         cursor = conn.cursor()
         self.model = MaterialModel(**model_args)
         self.model_args = model_args
         self.parameter_list = self.model.get_parameter_list()
-        self.constant_list  = self.model.get_constant_list()
-        self.bounds         = np.array([bounds[key] for key in self.parameter_list])
-        self.constants_vec   = np.array([constants[key] for key in self.constant_list])
+        self.constant_list = self.model.get_constant_list()
+        self.bounds = np.array([bounds[key] for key in self.parameter_list])
+        self.constants_vec = np.array([constants[key] for key in self.constant_list])
         tables = list(cursor.execute(" SELECT type, table_name FROM meta; "))
         self.subchains = [
             SubChain[type](Experiment[type](cursor, table_name, model_args))
             for type, table_name in tables
             ]
-        self.set_temper_temperature(temperature)
+        self.set_temper_temperature(temper_temp)
         self.N = len(self.subchains)
         self.d = len(self.parameter_list)
         self.pool = Pool(processes = 8)
@@ -548,7 +546,11 @@ class Chain(Transformer, pt.PTSlave):
         self.m = m
         return
 
-class Model(Transformer, pt.PTMaster):
+    def __init__(self, path, bounds, constants, model_args, temperature = 1., m = 20):
+        
+        return
+
+class Model(pt.PTMaster):
     def initialize_chains(self, temperature_ladder, kwargs):
         self.chains = [Chain(temperature = temp, **kwargs) for temp in temperature_ladder]
         return
