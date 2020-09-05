@@ -53,24 +53,19 @@ class Transformer(object):
     def pd_matrix_inversion(mat):
         return cholesky_inversion(tuple(map(tuple, mat)))
 
-    def __init__(self, bounds):
-        return
-
 SHPBTuple = namedtuple('SHPBTuple', 'X Y temp edot emax type')
 class Experiment_SHPB(object):
-    X     = None
-    Y     = None
-    model = None
-    temp  = None
-    edot  = None
-    emax  = None
+    X     = None  # Observed Strains
+    Y     = None  # Observed Flow Stresses
+    model = None  # materialModel
+    temp  = None  # Mateiral Starting Temperature
+    edot  = None  # Strain Rate of experiment
+    emax  = None  # Maximum strain that we're predicting at
+    tuple = None  # namedtuple, describing the experiment
+    table_name = None # what did this data come from?
 
     data_query = "SELECT strain,stress FROM {};"
     meta_query = "SELECT temperature, edot, emax FROM meta WHERE table_name = '{}';"
-
-    @property
-    def tuple(self):
-        return SHPBTuple(self.X, self.Y, self.temp, self.edot, self.emax, 'shpb')
 
     @property
     def parameter_list(self):
@@ -106,17 +101,23 @@ class Experiment_SHPB(object):
 
     def __init__(self, cursor, table_name, model_args):
         self.load_data(cursor, table_name)
+        self.table_name = table_name
         self.model = MaterialModel(**model_args)
+        self.tuple = SHPBTuple(self.X, self.Y, self.temp, self.edot, self.emax, 'shpb')
         return
 
+# TCTuple = namedtuple('TCTuple', fill this in)
 class Experiment_TC(object):
     pass
 
+# FPTuple = namedtuple('FPTuple', fill this in)
 class Experiment_FP(object):
     pass
 
 Experiment = {
     'shpb' : Experiment_SHPB,
+    'tc'   : Experiment_TC,
+    'fp'   : Experiment_FP,
     }
 
 # EOF

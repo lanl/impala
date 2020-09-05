@@ -1,9 +1,11 @@
 #from statistical_models_hier_mpi import ParallelTemperMaster, Dispatcher
 #from statistical_models_hier import ParallelTemperMaster
+import numpy as np
+import time
 from sm_dpcluster import Chain
+from pt import PTMaster
 from numpy import array, float64
-import numpy
-numpy.seterr(under = 'ignore')
+np.seterr(under = 'ignore')
 #from mpi4py import MPI
 
 #comm = MPI.COMM_WORLD
@@ -11,7 +13,7 @@ numpy.seterr(under = 'ignore')
 #size = comm.Get_size()
 
 rank = 0
-size = 8
+size = 4
 
 material = 'Al5083'
 
@@ -92,9 +94,9 @@ elif rank == 0:
     #     #comm = comm,
     #     #size = size,
     if __name__ == '__main__':
-        model = Chain(
-            temperature = 1.,
-            # temperature_ladder = 1.3 ** array(range(size - 1)),
+        model = PTMaster(
+            statmodel = Chain,
+            temperature_ladder = 1.3 ** array(range(size - 1)),
             path = path,
             bounds = parameter_bounds,
             constants = starting_consts,
@@ -103,8 +105,11 @@ elif rank == 0:
                 'shear_modulus_model' : 'Simple',
                 }
             )
-        model.initialize_sampler(10000)
-        model.sample_k(10000)
+        start = time.time()
+        model.sample(2000, 5)
+        elapsed = time.time() - start
+        print(elapsed / 3600)
+        model.write_to_disk('test_out.db', 1000, 2)
         # self = model
         # theta0 = self.curr_theta0
         # Sigma  = self.curr_Sigma

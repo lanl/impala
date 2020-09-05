@@ -14,11 +14,12 @@ from functools import lru_cache
 from multiprocessing import Pool
 from math import exp, log
 import sqlite3 as sql
+import os
 # Custom Modules
 from experiment import Experiment, Transformer, cholesky_inversion
 from physical_models_c import MaterialModel
 from pointcloud import localcov
-import parallel_tempering as pt
+import pt
 
 # Defining Sum-squared-error
 #   Holding this outside of the SubChain model (or Experiment)
@@ -154,6 +155,7 @@ class SubChainSHPB(SubChainBase):
 
     def __init__(self, experiment):
         self.experiment = experiment
+        self.table_name = self.experiment.table_name
         self.priors = PriorsSHPB(50, 1e-6)
         self.N = self.experiment.X.shape[0]
         return
@@ -167,6 +169,7 @@ PriorsChain = namedtuple('PriorsChain', 'psi nu mu Sinv eta_a eta_b')
 StateChain = namedtuple('StateChain','alpha theta0 Sigma delta thetas substates')
 
 class ChainSamples(object):
+    """ Sample object, where chain samples are stored. """
     theta = None
     delta = None
     Sigma = None
@@ -183,7 +186,8 @@ class ChainSamples(object):
         self.accepted = np.empty(ns + 1)
         return
 
-class Chain(Transformer, pt.PTSlave):
+class Chain(Transformer, pt.PTChain):
+    """ Chain object.  This object implements the parallel tempering  """
     samples = None
     N = None
     r0 = 1.
@@ -310,7 +314,7 @@ class Chain(Transformer, pt.PTSlave):
         prop_theta_j = gen.rvs()
 
         if not self.check_constraints(prop_theta_j):
-            return curr_theta_j
+            return curr_theta_j, False
 
         prop_cov = self.localcov(np.vstack(self.samples.theta), prop_theta_j)
 
@@ -333,7 +337,13 @@ class Chain(Transformer, pt.PTSlave):
         accept = np.empty(theta_new.shape[0])
         for j in range(theta_new.shape[0]):
             cluster_j = np.where(delta == j)[0]
-            theta_new[j], accept[j] = self.sample_theta_j(thetas[j], cluster_j, theta0, SigInv)
+            res = self.sample_theta_j(thetas[j], cluster_j, theta0, SigInv)
+            assert type((res)) is tuple
+            try:
+                theta_new[j], accept[j] = res
+            except ValueError:
+                print(res)
+                raise
         return theta_new, accept.mean()
 
     def sample_theta0(self, theta, Sigma):
@@ -419,7 +429,7 @@ class Chain(Transformer, pt.PTSlave):
         self.sample_subchains(thetas, deltas)
         return
 
-    def sample_k(self, k):
+    def sample_n(self, k):
         for _ in range(k):
             self.iter_sample()
 
@@ -458,7 +468,7 @@ class Chain(Transformer, pt.PTSlave):
         self.samples.accepted[0] = 0.
         return
 
-    def set_temper_temperature(self, temperature):
+    def set_temperature(self, temperature):
         self.temper_temp = temperature
         self.inv_temper_temp = 1. / temperature
         self.radius = self.r0 * log(temperature + 1, 10)
@@ -518,7 +528,112 @@ class Chain(Transformer, pt.PTSlave):
         # to include that.
         return lpss + lpts + ldjs + lpth0 + lpSig
 
-    def initialize_chain(self, temper_temp, path, bounds, constants, model_args, m = 20):
+    def get_accept_probability(self, nburn = 0):
+        return self.samples.accepted[nburn:].mean()
+
+    def write_to_disk(self, path, nburn = 0, thin = 1):
+        if os.path.exists(path):
+            os.remove(path)
+
+        conn   = sql.connect(path)
+        curs   = conn.cursor()
+
+        # strip and thin the resulting samples.  Add
+        thetas = np.vstack([
+            np.vstack((np.ones(theta.shape[0]) * i, list(range(theta.shape[0])), theta.T)).T
+            for i, theta in enumerate(self.samples.theta[nburn::thin])
+            ])
+        phis   = np.vstack((thetas[:,:2].T,self.unnormalize(self.invprobit(thetas[:,2:])).T)).T
+        deltas = self.samples.delta[nburn::thin]
+        Sigma  = self.samples.Sigma[nburn::thin]
+        theta0 = self.samples.theta0[nburn::thin]
+        phi0   = self.unnormalize(self.invprobit(theta0))
+        alpha  = self.samples.alpha[nburn::thin]
+        models = list(self.model.report_models_used().items())
+        constants = list(self.model.report_constants().items())
+
+        create_stmt = """ CREATE TABLE {}({}); """
+        insert_stmt = """ INSERT INTO {}({}) values ({}); """
+
+        models_create = create_stmt.format('models', 'model_type TEXT, model_name TEXT')
+        models_insert = insert_stmt.format('models', 'model_type, model_name', '?,?')
+        curs.execute(models_create)
+        curs.executemany(models_insert, models)
+
+        param_create_list = [x + ' REAL' for x in self.parameter_list]
+        thetas_create = create_stmt.format(
+                'thetas', ','.join(['iteration INT', 'cluster INT'] +  param_create_list)
+                )
+        thetas_insert = insert_stmt.format(
+                'thetas', ','.join(['iteration', 'cluster'] + self.parameter_list),
+                ','.join(['?'] * (2 + self.d))
+                )
+        curs.execute(thetas_create)
+        curs.executemany(thetas_insert, thetas.tolist())
+
+        phis_create = create_stmt.format(
+                'phis', ','.join(['iteration INT', 'cluster INT'] + param_create_list),
+                )
+        phis_insert = insert_stmt.format(
+                'phis', ','.join(['iteration', 'cluster']  + self.parameter_list),
+                ','.join(['?'] * (2 + self.d))
+                )
+        curs.execute(phis_create)
+        curs.executemany(phis_insert, phis.tolist())
+
+        theta0_create = create_stmt.format('theta0',','.join(param_create_list))
+        theta0_insert = insert_stmt.format(
+                'theta0', ','.join(self.parameter_list), ','.join(['?'] * self.d)
+                )
+        curs.execute(theta0_create)
+        curs.executemany(theta0_insert, theta0.tolist())
+
+        phi0_create = create_stmt.format('phi0', ','.join(param_create_list))
+        phi0_insert = insert_stmt.format(
+                'phi0', ','.join(self.parameter_list), ','.join(['?'] * (self.d + 2))
+                )
+        curs.execute(phi0_create)
+        print(phi0.shape)
+        curs.executemany(phi0_insert, phi0.tolist())
+
+        delta_list = ['delta_{:03d}'.format(i) for i in range(1, self.N + 1)]
+        deltas_create = create_stmt.format('delta', ','.join([x + ' INT' for x in delta_list]))
+        deltas_insert = insert_stmt.format('delta', ','.join(delta_list), ','.join(['?'] * self.N))
+        curs.execute(deltas_create)
+        curs.executemany(deltas_insert, deltas.tolist())
+
+        meta_create = create_stmt.format('meta', 'source_name TEXT, cluster_id TEXT')
+        meta_insert = insert_stmt.format('meta', 'source_name,cluster_id', '?,?')
+        curs.execute(meta_create)
+        meta_list = [
+            (subchain.table_name, delta_id)
+            for subchain, delta_id in zip(self.subchains, delta_list)
+            ]
+        curs.executemany(meta_insert, meta_list)
+
+        Sigma_cols = [
+            'Sigma_{}_{}'.format(i,j)
+            for i in range(1, self.d + 1)
+            for j in range(1, self.d + 1)
+            ]
+        Sigma_create = create_stmt.format('Sigma',','.join([x + ' REAL' for x in Sigma_cols]))
+        Sigma_insert = insert_stmt.format('Sigma',','.join(Sigma_cols), ','.join(['?'] * self.d * self.d))
+        curs.execute(Sigma_create)
+        curs.executemany(Sigma_insert, Sigma.reshape(Sigma.shape[0], -1).tolist())
+
+        constant_create = create_stmt.format('constants','constant TEXT, value REAL')
+        constant_insert = insert_stmt.format('constants','constant, value', '?,?')
+        curs.execute(constant_create)
+        curs.executemany(constant_insert, constants)
+
+        alpha_create = 'create_stmt'.format('alpha', 'alpha REAL, nclust INT')
+        alpha_insert = 'insert_stmt'.format('alpha', 'alpha, nclust', '?,?')
+        curs.execute(constant_create)
+        curs.executemany(insert_stmt, np.vstack((alpha, deltas.max(axis = 1) + 1)).T.tolist())
+        conn.commit()
+        return
+
+    def __init__(self, path, bounds, constants, model_args, temperature = 1., m = 20):
         conn = sql.connect(path)
         cursor = conn.cursor()
         self.model = MaterialModel(**model_args)
@@ -532,7 +647,7 @@ class Chain(Transformer, pt.PTSlave):
             SubChain[type](Experiment[type](cursor, table_name, model_args))
             for type, table_name in tables
             ]
-        self.set_temper_temperature(temper_temp)
+        self.set_temperature(temperature)
         self.N = len(self.subchains)
         self.d = len(self.parameter_list)
         self.pool = Pool(processes = 8)
@@ -544,15 +659,6 @@ class Chain(Transformer, pt.PTSlave):
             2., 1.,
             )
         self.m = m
-        return
-
-    def __init__(self, path, bounds, constants, model_args, temperature = 1., m = 20):
-        
-        return
-
-class Model(pt.PTMaster):
-    def initialize_chains(self, temperature_ladder, kwargs):
-        self.chains = [Chain(temperature = temp, **kwargs) for temp in temperature_ladder]
         return
 
 # EOF
