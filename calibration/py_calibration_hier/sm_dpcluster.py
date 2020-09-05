@@ -543,6 +543,7 @@ class Chain(Transformer, pt.PTChain):
             np.vstack((np.ones(theta.shape[0]) * i, list(range(theta.shape[0])), theta.T)).T
             for i, theta in enumerate(self.samples.theta[nburn::thin])
             ])
+        # thetas_df = pd.DataFrame(thetas, cols =)
         phis   = np.vstack((thetas[:,:2].T,self.unnormalize(self.invprobit(thetas[:,2:])).T)).T
         deltas = self.samples.delta[nburn::thin]
         Sigma  = self.samples.Sigma[nburn::thin]
@@ -590,10 +591,9 @@ class Chain(Transformer, pt.PTChain):
 
         phi0_create = create_stmt.format('phi0', ','.join(param_create_list))
         phi0_insert = insert_stmt.format(
-                'phi0', ','.join(self.parameter_list), ','.join(['?'] * (self.d + 2))
+                'phi0', ','.join(self.parameter_list), ','.join(['?'] * self.d)
                 )
         curs.execute(phi0_create)
-        print(phi0.shape)
         curs.executemany(phi0_insert, phi0.tolist())
 
         delta_list = ['delta_{:03d}'.format(i) for i in range(1, self.N + 1)]
@@ -626,10 +626,10 @@ class Chain(Transformer, pt.PTChain):
         curs.execute(constant_create)
         curs.executemany(constant_insert, constants)
 
-        alpha_create = 'create_stmt'.format('alpha', 'alpha REAL, nclust INT')
-        alpha_insert = 'insert_stmt'.format('alpha', 'alpha, nclust', '?,?')
-        curs.execute(constant_create)
-        curs.executemany(insert_stmt, np.vstack((alpha, deltas.max(axis = 1) + 1)).T.tolist())
+        alpha_create = create_stmt.format('alpha', 'alpha REAL, nclust INT')
+        alpha_insert = insert_stmt.format('alpha', 'alpha, nclust', '?,?')
+        curs.execute(alpha_create)
+        curs.executemany(alpha_insert, np.vstack((alpha, deltas.max(axis = 1) + 1)).T.tolist())
         conn.commit()
         return
 
