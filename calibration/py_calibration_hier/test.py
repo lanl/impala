@@ -1,19 +1,17 @@
-#from statistical_models_hier_mpi import ParallelTemperMaster, Dispatcher
-#from statistical_models_hier import ParallelTemperMaster
 import numpy as np
 import time
 from sm_dpcluster import Chain
-from pt import PTMaster
+from pt_mpi import PTMaster, PTSlave
 from numpy import array, float64
 np.seterr(under = 'ignore')
-#from mpi4py import MPI
+from mpi4py import MPI
 
-#comm = MPI.COMM_WORLD
-#rank = comm.Get_rank()
-#size = comm.Get_size()
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+size = comm.Get_size()
 
-rank = 0
-size = 4
+# rank = 0
+# size = 4
 
 material = 'Al5083'
 
@@ -83,54 +81,22 @@ if True:
             'yInf'  : (0.0001,   0.01),
             }
 
-if rank > 0:
-    pass
-    #dispatcher = Dispatcher(comm, rank)
-    #dispatcher.watch()
-
-elif rank == 0:
-    # Define the Model
-    # model = ParallelTemperMaster(
-    #     #comm = comm,
-    #     #size = size,
-    if __name__ == '__main__':
-        model = PTMaster(
-            statmodel = Chain,
-            temperature_ladder = 1.3 ** array(range(size - 1)),
-            path = path,
-            bounds = parameter_bounds,
-            constants = starting_consts,
-            model_args = {
-                'flow_stress_model' : 'PTW',
-                'shear_modulus_model' : 'Simple',
-                }
-            )
-        start = time.time()
-        model.sample(2000, 5)
-        elapsed = time.time() - start
-        print(elapsed / 3600)
-        model.write_to_disk('test_out.db', 1000, 2)
-        # self = model
-        # theta0 = self.curr_theta0
-        # Sigma  = self.curr_Sigma
-        # thetas = self.curr_thetas
-        # deltas = self.curr_delta
-        # alpha  = self.curr_alpha
-        # self.curr_iter += 1
-
-
-
-
-
-
-        # model.sample(20000)
-        # model.write_to_disk('Ti64_results.db', 50000, 20)
-        # theta0 = model.invprobit(model.get_history(50000,20))
-        # model.parameter_pairwise_plot(theta0, 'Ti64_pairwise.png')
-        # model.parameter_trace_plot(theta0, 'Ti64_trace.png')
-        # model.complete()
-
 if __name__ == '__main__':
-    pass
+    if rank > 0:
+        chain = PTSlave(comm = comm, statmodel = Chain)
+        chain.watch()
+
+    elif rank == 0:
+        model = PTMaster(
+            comm,
+            temperature_ladder = 1.3 ** array(range(size - 1)),
+            path       = path,
+            bounds     = parameter_bounds,
+            constants  = starting_consts,
+            model_args = {'flow_stress_model'   : 'PTW', 'shear_modulus_model' : 'Simple'},
+            )
+        model.sample(20000, 5)
+        model.write_to_disk('test_out.db', 10001, 5)
+        model.complete()
 
 # EOF

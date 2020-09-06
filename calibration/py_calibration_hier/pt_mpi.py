@@ -2,6 +2,7 @@
 MPI enabled Parallel Tempering
 """
 import pt
+MPI_MESSAGE_SIZE = 2**16
 
 class BreakException(Exception):
     pass
@@ -11,7 +12,7 @@ class PTSlave(pt.PTSlave):
         try:
             recv = self.comm.irecv(MPI_MESSAGE_SIZE, source = 0)
             parcel = recv.wait()
-            self.dispatch[parcel[0]](*parcel[1:])
+            self.dispatch[parcel[0]](**parcel[1])
         except BreakException:
             pass
         return
@@ -47,7 +48,7 @@ class PTSlave(pt.PTSlave):
         parcel = recv.wait()
         if parcel == 'swap_yes':
             self.set_state(state1)
-        elif parcel = 'swap_no':
+        elif parcel == 'swap_no':
             pass
         else:
             raise ValueError('Acceptable: swap_yes, swap_no; Observed {}'.format(parcel))
@@ -66,6 +67,10 @@ class PTSlave(pt.PTSlave):
         self.comm.send(True, dest = 0)
         return
 
+    def get_accept_probability(self, nburn):
+        self.comm.send(self.chain.get_accept_probability(nburn), dest = 0)
+        return
+
     def write_to_disk(self, path, nburn, thin):
         self.chain.write_to_disk(path, nburn, thin)
         self.comm.send(True, dest = 0)
@@ -80,42 +85,59 @@ class PTSlave(pt.PTSlave):
             'sample_n'           : self.sample_n,
             'get_state'          : self.get_state,
             'set_state'          : self.set_state,
-            'get_accept_prob'    : self.get_accept_prob,
+            'get_accept_prob'    : self.get_accept_probability,
             'write_to_disk'      : self.write_to_disk,
             'complete'           : self.complete,
             'try_swap_state_inf' : self.try_swap_state_inf,
-            'try_swap_state_sub' : self.try_swap_state_sub,
+            'try_swap_state_sup' : self.try_swap_state_sup,
             }
         return
 
     def __init__(self, comm, statmodel):
+        self.comm      = comm
         self.statmodel = statmodel
         self.build_dispatch()
         pass
 
 class PTMaster(pt.PTMaster):
     def try_swap_states(self, sup_rank, inf_rank):
-        return self.chains[sup_rank].try_swap_state_sup(self.chains[inf_rank])
+        sent1 = self.comm.isend(('try_swap_state_sup', {'inf_rank' : inf_rank}), dest = sup_rank)
+        sent2 = self.comm.isend(('try_swap_state_inf', {'sup_rank' : sup_rank}), dest = inf_rank)
+        return self.comm.irecv(source = sup_rank)
 
     def temper_chains(self):
-        ranks = list(range(len(self.chains)))
+        ranks = self.chain_ranks.copy()
         shuffle(ranks)
-
         swaps = []
         for rank1, rank2 in zip(ranks[::2], ranks[1::2]):
-            swaps.append(rank1, rank2, self.try_swap_states(rank_1, rank_2))
-        self.swaps.append(swaps)
+            swaps.append((rank1, rank2, self.try_swap_states(rank_1, rank_2)))
+        _swaps = [(rank1, rank2, swapped.wait()) for rank1, rank2, swapped in swaps]
+        self.swaps.append(_swaps)
+        return
+
+    def sample_n(self, n):
+        sent = [self.comm.isend(('sample_n', {'n' : n}), dest = rank) for rank in self.chain_ranks]
+        recv = [self.comm.irecv(source = rank) for rank in self.chain_ranks]
+        assert all([r.wait() for r in recv])
         return
 
     def set_temperature_ladder(self, temperature_ladder):
-        assert len(temperature_ladder) == len(self.chains)
-        for temp, chain in zip(temperature_ladder, self.chains):
-            chain.set_temperature(temp)
+        assert len(temperature_ladder) == len(self.chain_ranks)
+        sent = [
+            self.comm.isend(('set_temperature', {'temp' : temp}), dest = rank)
+            for temp, rank in zip(temperature_ladder, self.chain_ranks)
+            ]
+        recv = [self.comm.irecv(source = rank) for rank in self.chain_ranks]
+        assert all([r.wait() for r in recv])
         return
 
     def initialize_sampler(self, ns):
-        for chain in self.chains:
-            chain.initialize_sampler(ns)
+        sent = [
+            self.comm.isend(('init_sampler', {'ns' : ns}), dest = rank)
+            for rank in self.chain_ranks
+            ]
+        recv = [self.comm.irecv(source = rank) for rank in self.chain_ranks]
+        assert all([r.wait() for r in recv])
         return
 
     def sample(self, ns, k = 5):
@@ -151,15 +173,19 @@ class PTMaster(pt.PTMaster):
         return swap_y / (swap_y + swap_n)
 
     def pairwise_parameter_plot(self, path):
-        sent = self.comm.isend(('pairwise_plot', path), dest = 1)
+        sent = self.comm.isend(('pairwise_plot', {'path' : path}), dest = 1)
         recv = self.comm.irecv(source = 1)
         parcel = recv.wait()
         assert parcel
         return
 
     def get_accept_probability(self, nburn):
-        self.comm.send(self.chain.get_acceot_probability(nburn), dest = 0)
-        return
+        sent = [
+            self.comm.isend(('get_accept_prob', {'nburn' : nburn}), dest = rank)
+            for rank in self.chain_ranks
+            ]
+        recv = [self.comm.irecv(source = rank) for rank in self.chain_ranks]
+        return np.array([r.wait() for r in recv])
 
     def initialize_chains(self, temperature_ladder, kwargs):
         self.chain_ranks = list(range(1, self.size))
@@ -172,7 +198,10 @@ class PTMaster(pt.PTMaster):
         return
 
     def write_to_disk(self, path, nburn, thin):
-        sent = self.comm.isend(('write_to_disk', path,  nburn, thin), dest = 1)
+        sent = self.comm.isend(
+            ('write_to_disk', {'path' : path, 'nburn' : nburn, 'thin' : thin}),
+            dest = 1,
+            )
         recv = self.comm.irecv(source = 1)
         parcel = recv.wait()
         assert parcel
