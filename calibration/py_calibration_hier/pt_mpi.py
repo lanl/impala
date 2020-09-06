@@ -61,6 +61,7 @@ class PTSlave(pt.PTSlave):
 
     def complete(self):
         raise BreakException('Done')
+        return
 
     def pairwise_parameter_plot(self, path):
         super().pairwise_parameter_plot(path)
@@ -73,6 +74,16 @@ class PTSlave(pt.PTSlave):
 
     def write_to_disk(self, path, nburn, thin):
         self.chain.write_to_disk(path, nburn, thin)
+        self.comm.send(True, dest = 0)
+        return
+
+    def sample_n(self, n):
+        self.chain.sample_n(n)
+        self.comm.send(True, dest = 0)
+        return
+
+    def initialize_sampler(self, ns):
+        self.chain.initialize_sampler(ns)
         self.comm.send(True, dest = 0)
         return
 
@@ -95,6 +106,7 @@ class PTSlave(pt.PTSlave):
 
     def __init__(self, comm, statmodel):
         self.comm      = comm
+        self.rank      = self.comm.Get_rank()
         self.statmodel = statmodel
         self.build_dispatch()
         pass
@@ -132,45 +144,17 @@ class PTMaster(pt.PTMaster):
         return
 
     def initialize_sampler(self, ns):
+        print('sending init to chains')
         sent = [
             self.comm.isend(('init_sampler', {'ns' : ns}), dest = rank)
             for rank in self.chain_ranks
             ]
+        print('declaring recv from chains')
         recv = [self.comm.irecv(source = rank) for rank in self.chain_ranks]
+        print('waiting to receive init from chains')
         assert all([r.wait() for r in recv])
+        print('received all from chains')
         return
-
-    def sample(self, ns, k = 5):
-        self.initialize_sampler(ns)
-
-        sampled = 0
-        print('\rSampling {:.1%} Complete'.format(sampled / ns), end = '')
-        for _ in range(ns // k):
-            self.sample_n(k)
-            self.temper_chains()
-            sampled += k
-            print('\rSampling {:.1%} Complete'.format(sampled / ns), end = '')
-
-        self.sample_k(ns % k)
-        sampled += (ns % k)
-        print('\rSampling {:.1%} Complete'.format(sampled / ns))
-        return
-
-    def get_swap_probability(self):
-        try:
-            k = len(self.chain_ranks)
-        except NameError:
-            k = len(self.chain)
-        swap_y = np.zeros((k,k))
-        swap_n = np.zeros((k,k))
-        for swap_generation in self.swaps:
-            for chain_a, chain_b, swapped in swap_generation:
-                swap_y[chain_a, chain_b] += swapped
-                swap_n[chain_a, chain_b] += 1 - swapped
-
-        swap_y = swap_y + swap_y.T
-        swap_n = swap_n + swap_n.T
-        return swap_y / (swap_y + swap_n)
 
     def pairwise_parameter_plot(self, path):
         sent = self.comm.isend(('pairwise_plot', {'path' : path}), dest = 1)
@@ -205,6 +189,10 @@ class PTMaster(pt.PTMaster):
         recv = self.comm.irecv(source = 1)
         parcel = recv.wait()
         assert parcel
+        return
+
+    def complete(self):
+        sent = [self.comm.isend(('complete', {}), dest = rank) for rank in self.chain_ranks]
         return
 
     def __init__(self, comm, temperature_ladder, **kwargs):

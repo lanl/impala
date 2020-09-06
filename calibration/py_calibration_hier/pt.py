@@ -51,6 +51,7 @@ class PTChain(object):
         """ advance the sampler by n iterations """
         for _ in range(n):
             self.iter_sample()
+        return
 
     def set_temperature(self, temperature):
         """ Set the tempering temperature of the sampler """
@@ -164,7 +165,7 @@ class PTMaster(object):
         try:
             k = len(self.chain_ranks)
         except NameError:
-            k = len(self.chain)
+            k = len(self.chains)
         swap_y = np.zeros((k,k))
         swap_n = np.zeros((k,k))
         for swap_generation in self.swaps:
