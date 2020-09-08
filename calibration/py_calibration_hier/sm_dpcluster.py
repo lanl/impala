@@ -252,6 +252,7 @@ class Chain(Transformer, pt.PTChain):
         substate = self.subchains[i].get_substate()
         lps    = np.array([self.subchains[i].log_posterior_theta(sse, substate) for sse in sses])
         unnormalized = np.exp(lps) * lj
+        unnormalized[np.isnan(unnormalized)] = 0.
         normalized = unnormalized / unnormalized.sum()
         try:
             dnew   = choice(range(_dmax + 1 + self.m), 1, p = normalized)

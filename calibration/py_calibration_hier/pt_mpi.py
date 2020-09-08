@@ -8,7 +8,7 @@ import numpy as np
 from math import log
 np.seterr(under = 'ignore')
 
-MPI_MESSAGE_SIZE = 2**16
+MPI_MESSAGE_SIZE = 2**12
 
 class BreakException(Exception):
     pass
