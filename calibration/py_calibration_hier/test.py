@@ -2,6 +2,7 @@ import numpy as np
 import time
 from sm_dpcluster import Chain
 from pt_mpi import PTMaster, PTSlave
+# from pt import PTMaster
 from numpy import array, float64
 np.seterr(under = 'ignore')
 from mpi4py import MPI
@@ -83,20 +84,32 @@ if True:
 
 if __name__ == '__main__':
     if rank > 0:
+        # pass
         chain = PTSlave(comm = comm, statmodel = Chain)
         chain.watch()
 
     elif rank == 0:
         model = PTMaster(
             comm,
+            # statmosel = Chain,
             temperature_ladder = 1.3 ** array(range(size - 1)),
             path       = path,
             bounds     = parameter_bounds,
             constants  = starting_consts,
             model_args = {'flow_stress_model'   : 'PTW', 'shear_modulus_model' : 'Simple'},
             )
-        model.sample(20000, 5)
-        model.write_to_disk('test_out.db', 10001, 5)
+        print('initializing sampler')
+        model.initialize_sampler(5000)
+        print('Sample round 1')
+        model.sample_n(5)
+        print('attempting tempering')
+        model.temper_chains()
+        print('Sample round 2')
+        model.sample_n(5)
+
+
+        # model.sample(20000, 5)
+        # model.write_to_disk('test_out.db', 10001, 5)
         model.complete()
 
 # EOF

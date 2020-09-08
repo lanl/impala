@@ -2,6 +2,9 @@
 MPI enabled Parallel Tempering
 """
 import pt
+from random import shuffle
+from numpy.random import uniform
+
 MPI_MESSAGE_SIZE = 2**16
 
 class BreakException(Exception):
@@ -10,12 +13,19 @@ class BreakException(Exception):
 class PTSlave(pt.PTSlave):
     def watch(self):
         try:
-            recv = self.comm.irecv(MPI_MESSAGE_SIZE, source = 0)
-            parcel = recv.wait()
-            self.dispatch[parcel[0]](**parcel[1])
+            while True:
+                recv = self.comm.irecv(MPI_MESSAGE_SIZE, source = 0)
+                parcel = recv.wait()
+                self.dispatch[parcel[0]](**parcel[1])
+
         except BreakException:
             pass
         return
+
+    # def test_function(self, **kwargs):
+    #     print('test function on {}: kwargs = {}'.format(self.rank, kwargs))
+    #     self.comm.send(True, dest = 0)
+    #     return
 
     def try_swap_state_sup(self, inf_rank):
         state1 = self.get_state()
@@ -37,7 +47,7 @@ class PTSlave(pt.PTSlave):
         return
 
     def try_swap_state_inf(self, sup_rank):
-        state2 = self.get_state(sup_rank)
+        state2 = self.get_state()
         sent = self.comm.isend(state2, dest = sup_rank)
         recv = self.comm.irecv(MPI_MESSAGE_SIZE, source = sup_rank)
         lp22 = self.log_posterior_state(state2)
@@ -73,22 +83,26 @@ class PTSlave(pt.PTSlave):
         return
 
     def write_to_disk(self, path, nburn, thin):
-        self.chain.write_to_disk(path, nburn, thin)
+        super().write_to_disk(path, nburn, thin)
+        # self.chain.write_to_disk(path, nburn, thin)
         self.comm.send(True, dest = 0)
         return
 
     def sample_n(self, n):
-        self.chain.sample_n(n)
+        super().sample_n(n)
+        # self.chain.sample_n(n)
         self.comm.send(True, dest = 0)
         return
 
     def initialize_sampler(self, ns):
-        self.chain.initialize_sampler(ns)
+        super().initialize_sampler(ns)
+        # self.chain.initialize_sampler(ns)
         self.comm.send(True, dest = 0)
         return
 
     def build_dispatch(self):
         self.dispatch = {
+            # 'test'               : self.test_function,
             'pairwise_plot'      : self.pairwise_parameter_plot,
             'init_chain'         : self.initialize_chain,
             'set_temperature'    : self.set_temperature,
@@ -122,7 +136,7 @@ class PTMaster(pt.PTMaster):
         shuffle(ranks)
         swaps = []
         for rank1, rank2 in zip(ranks[::2], ranks[1::2]):
-            swaps.append((rank1, rank2, self.try_swap_states(rank_1, rank_2)))
+            swaps.append((rank1, rank2, self.try_swap_states(rank1, rank2)))
         _swaps = [(rank1, rank2, swapped.wait()) for rank1, rank2, swapped in swaps]
         self.swaps.append(_swaps)
         return
@@ -144,6 +158,7 @@ class PTMaster(pt.PTMaster):
         return
 
     def initialize_sampler(self, ns):
+        print(self.chain_ranks)
         print('sending init to chains')
         sent = [
             self.comm.isend(('init_sampler', {'ns' : ns}), dest = rank)
@@ -172,11 +187,16 @@ class PTMaster(pt.PTMaster):
         return np.array([r.wait() for r in recv])
 
     def initialize_chains(self, temperature_ladder, kwargs):
-        self.chain_ranks = list(range(1, self.size))
         sent = [
             self.comm.isend(('init_chain', {'temperature' : temp, **kwargs}), dest = rank)
             for temp,  rank in zip(temperature_ladder, self.chain_ranks)
             ]
+        recv = [self.comm.irecv(source = rank) for rank in self.chain_ranks]
+        assert all([r.wait() for r in recv])
+        return
+
+    def test_function(self, **kwargs):
+        sent = [self.comm.isend(('test', kwargs), dest = rank) for rank in self.chain_ranks]
         recv = [self.comm.irecv(source = rank) for rank in self.chain_ranks]
         assert all([r.wait() for r in recv])
         return
@@ -198,6 +218,7 @@ class PTMaster(pt.PTMaster):
     def __init__(self, comm, temperature_ladder, **kwargs):
         self.comm = comm
         self.size = self.comm.Get_size()
+        self.chain_ranks = list(range(1, self.size))
         self.initialize_chains(temperature_ladder, kwargs)
         return
 
