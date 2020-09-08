@@ -100,17 +100,19 @@ if __name__ == '__main__':
             constants  = starting_consts,
             model_args = {'flow_stress_model'   : 'PTW', 'shear_modulus_model' : 'Simple'},
             )
-        print('initializing sampler')
-        model.initialize_sampler(5000)
-        print('Sample round 1')
-        model.sample_n(5)
+        # print('initializing sampler')
+        # model.initialize_sampler(5000)
+        # print('Sample round 1')
+        # model.sample_n(5)
         # print('attempting tempering')
         # model.temper_chains()
-        print('Sample round 2')
-        model.sample_n(5)
-
-
-        # model.sample(20000, 5)
+        # print('Sample round 2')
+        # model.sample_n(5)
+        # print('attempting tempering')
+        # model.temper_chains()
+        # print('Sample round 3')
+        # model.sample_n(5)
+        model.sample(20000, 5)
         # model.write_to_disk('test_out.db', 10001, 5)
         model.complete()
 
