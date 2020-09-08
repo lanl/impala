@@ -29,32 +29,32 @@ class PTSlave(pt.PTSlave):
 
     def try_swap_state_sup(self, inf_rank):
         state1 = self.get_state()
-        sent = self.comm.isend(state1, dest = inf_rank)
-        recv = self.comm.irecv(MPI_MESSAGE_SIZE, source =  inf_rank)
+        sent = self.comm.isend(state1, dest = inf_rank)              # state1
+        recv = self.comm.irecv(MPI_MESSAGE_SIZE, source =  inf_rank) # state2
         lp11 = self.log_posterior_state(state1)
         state2 = recv.wait()
+        recv = self.comm.irecv(source = inf_rank)                    # lp21, lp22
         lp12 = self.log_posterior_state(state2)
-        recv = self.comm.irecv(source = inf_rank)
         lp21, lp22 = recv.wait()
         log_alpha = lp12 + lp21 - lp11 - lp22
         if log(uniform()) < log_alpha:
-            self.comm.send('swap_yes', dest = inf_rank)
+            self.comm.send('swap_yes', dest = inf_rank)              # swap_yes
             self.set_state(state2)
             self.comm.send(True, dest = 0)
         else:
-            self.comm.send('swap_no', dest = inf_rank)
+            self.comm.send('swap_no', dest = inf_rank)               # swap_no
             self.comm.send(False, dest = 0)
         return
 
     def try_swap_state_inf(self, sup_rank):
         state2 = self.get_state()
-        sent = self.comm.isend(state2, dest = sup_rank)
-        recv = self.comm.irecv(MPI_MESSAGE_SIZE, source = sup_rank)
+        recv = self.comm.irecv(MPI_MESSAGE_SIZE, source = sup_rank) # state1
+        sent = self.comm.isend(state2, dest = sup_rank)             # state2
         lp22 = self.log_posterior_state(state2)
         state1 = recv.wait()
         lp21 = self.log_posterior_state(state1)
-        sent = self.comm.isend((lp21, lp22), dest = sup_rank)
-        recv = self.comm.irecv(source = sup_rank)
+        sent = self.comm.isend((lp21, lp22), dest = sup_rank)       # lp21, lp22
+        recv = self.comm.irecv(source = sup_rank)                   # swap_yes / swap_no
         parcel = recv.wait()
         if parcel == 'swap_yes':
             self.set_state(state1)
