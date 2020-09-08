@@ -14,7 +14,7 @@ rank = comm.Get_rank()
 size = comm.Get_size()
 
 # rank = 0
-# size = 4 
+# size = 4
 
 material = 'Al5083'
 
@@ -113,7 +113,7 @@ if __name__ == '__main__':
         # print('Sample round 3')
         # model.sample_n(5)
         model.sample(20000, 5)
-        # model.write_to_disk('test_out.db', 10001, 5)
+        model.write_to_disk('test_out.db', 10001, 5)
         model.complete()
 
 # EOF
