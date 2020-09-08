@@ -1,11 +1,13 @@
 import numpy as np
 import time
-from sm_dpcluster import Chain
-from pt_mpi import PTMaster, PTSlave
-# from pt import PTMaster
 from numpy import array, float64
 np.seterr(under = 'ignore')
 from mpi4py import MPI
+
+from sm_dpcluster import Chain
+from pt_mpi import PTMaster, PTSlave
+# from pt import PTMaster
+
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
@@ -102,8 +104,8 @@ if __name__ == '__main__':
         model.initialize_sampler(5000)
         print('Sample round 1')
         model.sample_n(5)
-        print('attempting tempering')
-        model.temper_chains()
+        # print('attempting tempering')
+        # model.temper_chains()
         print('Sample round 2')
         model.sample_n(5)
 

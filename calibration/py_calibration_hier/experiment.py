@@ -6,6 +6,7 @@ from math import ceil, sqrt, pi, log
 import methodtools as mt
 import functools as ft
 import numpy as np
+np.seterr(under = 'ignore')
 import pandas as pd
 import sqlite3 as sql
 import os

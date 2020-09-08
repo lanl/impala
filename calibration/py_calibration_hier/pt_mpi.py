@@ -4,6 +4,8 @@ MPI enabled Parallel Tempering
 import pt
 from random import shuffle
 from numpy.random import uniform
+import numpy as np
+np.seterr(under = 'ignore')
 
 MPI_MESSAGE_SIZE = 2**16
 

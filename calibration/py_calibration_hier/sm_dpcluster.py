@@ -11,7 +11,7 @@ np.seterr(under = 'ignore')
 from collections import namedtuple
 from itertools import repeat
 from functools import lru_cache
-from multiprocessing import Pool
+# from multiprocessing import Pool
 from math import exp, log
 import sqlite3 as sql
 import os
@@ -247,7 +247,8 @@ class Chain(Transformer, pt.PTChain):
                 repeat(self.constants_vec),
                 repeat(self.model_args),
                 )
-        sses   = np.array(list(self.pool.map(sse_wrapper, args)))
+        # sses   = np.array(list(self.pool.map(sse_wrapper, args)))
+        sses   = np.array(list(map(sse_wrapper, args)))
         substate = self.subchains[i].get_substate()
         lps    = np.array([self.subchains[i].log_posterior_theta(sse, substate) for sse in sses])
         unnormalized = np.exp(lps) * lj
@@ -294,7 +295,8 @@ class Chain(Transformer, pt.PTChain):
                 clust_exp_tuples,           repeat(phi_j),
                 repeat(self.constants_vec), repeat(self.model_args),
                 )
-        sses  = np.array(list(self.pool.map(sse_wrapper, args)))
+        # sses  = np.array(list(self.pool.map(sse_wrapper, args)))
+        sses   = np.array(list(map(sse_wrapper, args)))
         lliks = np.array([
                     self.subchains[i].log_posterior_theta(sse, self.subchains[i].get_substate())
                     for i, sse in zip(cluster_j, sses)
@@ -394,7 +396,8 @@ class Chain(Transformer, pt.PTChain):
         exp_tuples = [self.subchains[i].experiment.tuple for i in range(self.N)]
         phis = self.unnormalize(self.invprobit(thetas[deltas]))
         args = zip(exp_tuples, phis.tolist(), repeat(self.constants_vec), repeat(self.model_args))
-        sses = np.array(list(self.pool.map(sse_wrapper, args)))
+        # sses = np.array(list(self.pool.map(sse_wrapper, args)))
+        sses   = np.array(list(map(sse_wrapper, args)))
         for i in range(self.N):
             self.subchains[i].iter_sample(sses[i])
         return
@@ -502,7 +505,8 @@ class Chain(Transformer, pt.PTChain):
         phis   = self.unnormalize(self.invprobit(thetas))
         args   = zip(exp_tuples, phis, repeat(self.constants_vec), repeat(self.model_args))
         # farm calculating sse's out to the pool
-        sses   = np.array(list(self.pool.map(sse_wrapper, args)))
+        # sses   = np.array(list(self.pool.map(sse_wrapper, args)))
+        sses   = np.array(list(map(sse_wrapper, args)))
         # calculate log-posteriors given calculated sse's, substates
         lpss   = np.array([
             subchain.log_posterior_substate(sse, substate)
@@ -650,7 +654,7 @@ class Chain(Transformer, pt.PTChain):
         self.set_temperature(temperature)
         self.N = len(self.subchains)
         self.d = len(self.parameter_list)
-        self.pool = Pool(processes = 8)
+        # self.pool = Pool(processes = 8)
         self.priors = PriorsChain(
             np.eye(self.d) * 0.5,
             self.d + 2,

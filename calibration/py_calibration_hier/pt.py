@@ -4,6 +4,8 @@ Generic rewrite of parallel_tempering.  Meant to take generic object.  Make it c
 from random import shuffle
 from numpy.random import uniform
 from math import log
+import numpy as np
+np.seterr(under = 'ignore')
 
 class Samples(object):
     """ A generic samples object.  Meant to show you how I'm expecting the chain object to be
