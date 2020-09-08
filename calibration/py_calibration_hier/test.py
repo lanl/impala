@@ -14,7 +14,7 @@ rank = comm.Get_rank()
 size = comm.Get_size()
 
 # rank = 0
-# size = 4
+# size = 4 
 
 material = 'Al5083'
 

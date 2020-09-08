@@ -646,6 +646,7 @@ class Chain(Transformer, pt.PTChain):
         self.constant_list = self.model.get_constant_list()
         self.bounds = np.array([bounds[key] for key in self.parameter_list])
         self.constants_vec = np.array([constants[key] for key in self.constant_list])
+        self.model.initialize_constants(self.constants_vec)
         tables = list(cursor.execute(" SELECT type, table_name FROM meta; "))
         self.subchains = [
             SubChain[type](Experiment[type](cursor, table_name, model_args))
