@@ -73,6 +73,7 @@ class PTSlave(pt.PTSlave):
         return
 
     def complete(self):
+        super().complete()
         raise BreakException('Done')
         return
 

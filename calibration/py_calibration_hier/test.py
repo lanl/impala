@@ -4,19 +4,23 @@ from numpy import array, float64
 np.seterr(under = 'ignore')
 from mpi4py import MPI
 
-from sm_dpcluster import Chain
-from pt_mpi import PTMaster, PTSlave
-# from pt import PTMaster
+# from sm_dpcluster import Chain
+import sm_dpcluster as sm
+sm.POOL_SIZE = 8
+import pt
+# import pt_mpi as pt
+pt.MPI_MESSAGE_SIZE = 2**12
+
 
 
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
-# rank = 0
-# size = 4
+rank = 0
+size = 4
 
-material = 'Al5083'
+material = 'Ti64'
 
 # Defining Paths, Constants, Parameter Ranges
 if True:
@@ -86,34 +90,22 @@ if True:
 
 if __name__ == '__main__':
     if rank > 0:
-        # pass
-        chain = PTSlave(comm = comm, statmodel = Chain)
-        chain.watch()
+        pass
+        # chain = pt.PTSlave(comm = comm, statmodel = sm.Chain)
+        # chain.watch()
 
     elif rank == 0:
-        model = PTMaster(
-            comm,
-            # statmosel = Chain,
+        model = pt.PTMaster(
+            # comm,
+            statmodel = sm.Chain,
             temperature_ladder = 1.3 ** array(range(size - 1)),
             path       = path,
             bounds     = parameter_bounds,
             constants  = starting_consts,
-            model_args = {'flow_stress_model'   : 'PTW', 'shear_modulus_model' : 'Simple'},
+            model_args = {'flow_stress_model'   : 'PTW', 'shear_modulus_model' : 'Stein'},
             )
-        # print('initializing sampler')
-        # model.initialize_sampler(5000)
-        # print('Sample round 1')
-        # model.sample_n(5)
-        # print('attempting tempering')
-        # model.temper_chains()
-        # print('Sample round 2')
-        # model.sample_n(5)
-        # print('attempting tempering')
-        # model.temper_chains()
-        # print('Sample round 3')
-        # model.sample_n(5)
-        model.sample(20000, 5)
-        model.write_to_disk('test_out.db', 10001, 5)
+        model.sample(40000, 3)
+        model.write_to_disk('results_cluster_ti64.db', 20001, 5)
         model.complete()
 
 # EOF

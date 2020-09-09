@@ -1,4 +1,10 @@
-""" Base code for Chinese Restaurant Process clustering of Strength Model Parameters """
+"""
+Base code for Chinese Restaurant Process clustering of Strength Model Parameters
+
+Chain - main sampler.
+
+User-Definable Constants: POOL_SIZE (size of multiprocessing pool that gets spawned)
+"""
 # Required Modules
 from scipy.stats import invgamma, invwishart, uniform, beta, gamma
 from scipy.stats import multivariate_normal as mvnormal, norm as normal
@@ -21,12 +27,24 @@ from physical_models_c import MaterialModel
 from pointcloud import localcov
 import pt
 
+POOL_SIZE = 8
+
 # Defining Sum-squared-error
 #   Holding this outside of the SubChain model (or Experiment)
 #   for the purpose of parallelizing it.  Cluster membership
 #   can be farmed out to multiple processors without issue.
 #   Not sure how much cost there is in *making* the material model
 #   relative to going through the model updating.  I guess we'll see...
+
+
+def predict_shpb(exp_tuple, parameters, constants, model_args):
+    """ Form the prediction output for a SHPB experiment """
+    model = MaterialModel(**model_args)
+    model.set_history_variables(exp_tuple.emax, exp_tuple.edot, 100)
+    model.initialize_constants(constants)
+    model.update_parameters(np.array(parameters))
+    model.initialize_state(exp_tuple.temp)
+    return model.compute_state_history()[:,1:3]
 
 def sse_shpb(exp_tuple, parameters, constants, model_args):
     """
@@ -37,12 +55,13 @@ def sse_shpb(exp_tuple, parameters, constants, model_args):
     model_args : dict (defines what physical models are used)
     """
     # Build model, predict stress at given strain values
-    model = MaterialModel(**model_args)
-    model.set_history_variables(exp_tuple.emax, exp_tuple.edot, 100)
-    model.initialize_constants(constants)
-    model.update_parameters(np.array(parameters))
-    model.initialize_state(exp_tuple.temp)
-    res = (model.compute_state_history()[:, 1:3]).T
+    res = predict_shpb(exp_tuple, parameters, constants, model_args).T
+    # model = MaterialModel(**model_args)
+    # model.set_history_variables(exp_tuple.emax, exp_tuple.edot, 100)
+    # model.initialize_constants(constants)
+    # model.update_parameters(np.array(parameters))
+    # model.initialize_state(exp_tuple.temp)
+    # res = (model.compute_state_history()[:, 1:3]).T
     if np.isnan(res).any():
         return 1.e9
     est_curve = interp1d(res[0], res[1], kind = 'cubic')
@@ -63,9 +82,16 @@ sse = {
     'flyer' : sse_flyer,
     }
 
+predict = {
+    'shpb' : predict_shpb,
+    }
+
 # sse_wrapper
 #  Provides a wrapper around the sse dictionary such that it can be called by the multiprocessing
 #  pool against a row of a given iterator.  I.e., pool.map(sse_wrapper, arg_iterable)
+
+def predict_wrapper(args):
+    return predict[args[0].type](*args)
 
 def sse_wrapper(args):
     """ Provides a wrapper around the sse dictionary so that we can invoke the particular SSE
@@ -103,13 +129,6 @@ class SubChainBase(object):
 
     def __init__(self, **kwargs):
         raise NotImplementedError('Overwrite this!')
-
-class ResultBase(object):
-    def plot_calibrated(self):
-        pass
-
-    def __init__(self, pool, experiment, samples):
-        pass
 
 PriorsSHPB = namedtuple('PriorsSHPB', 'a b')
 SubstateSHPB = namedtuple('SubstateSHPB','sigma2')
@@ -167,14 +186,14 @@ class SubChainSHPB(SubChainBase):
         self.N = self.experiment.X.shape[0]
         return
 
-class ResultSHPB(ResultBase):
-    pass
-
 SubChain = {
     'shpb' : SubChainSHPB
     }
 
-# Samples = namedtuple("Samples", "theta delta Sigma theta0 alpha")
+# Defining Chain
+#  The Chain object defines the sampler; instantiates observed data and assigns it to the subchains.
+#  at the end of a model run, it writes samples to disk.
+
 PriorsChain = namedtuple('PriorsChain', 'psi nu mu Sinv eta_a eta_b')
 StateChain = namedtuple('StateChain', 'alpha theta0 Sigma delta thetas substates')
 
@@ -261,16 +280,18 @@ class Chain(Transformer, pt.PTChain):
         # sses   = np.array(list(map(sse_wrapper, args)))
         substate = self.subchains[i].get_substate()
         lps    = np.array([self.subchains[i].log_posterior_theta(sse, substate) for sse in sses])
+        lps    = lps - lps.max() # normalizing the log-posteriors so at least some of the sse's
+                                 # will produce non-zero posteriors when exponentiated.
         unnormalized = np.exp(lps) * lj
         unnormalized[np.isnan(unnormalized)] = 0.
-        normalized = unnormalized / unnormalized.sum()
         try:
+            normalized = unnormalized / unnormalized.sum()
             dnew   = choice(range(_dmax + 1 + self.m), 1, p = normalized)
-        except ValueError:
-            nan_idx = np.where(np.isnan(unnormalized))[0][0]
-            print('nan idx: {}'.format(nan_idx))
-            print('normalized: {}'.format(normalized))
+        except (ValueError, FloatingPointError):
+            # nan_idx = np.where(np.isnan(unnormalized))[0][0]
+            # print('nan idx: {}'.format(nan_idx))
             print('unnormalized: {}'.format(unnormalized))
+            print('sses: {}'.format(sses))
             print('lps: {}'.format(lps))
             print('lj: {}'.format(lj))
             print('nj: {}'.format(nj))
@@ -648,6 +669,10 @@ class Chain(Transformer, pt.PTChain):
         conn.commit()
         return
 
+    def complete(self):
+        self.pool.close()
+        return
+
     def __init__(self, path, bounds, constants, model_args, temperature = 1., m = 20):
         conn = sql.connect(path)
         cursor = conn.cursor()
@@ -676,6 +701,51 @@ class Chain(Transformer, pt.PTChain):
             )
         self.m = m
         return
+
+class ResultBase(object):
+    def plot_calibrated(self):
+        pass
+
+    def __init__(self, experiment, cluster_samples, hier_samples, subchain_samples, constants, model_args):
+        """
+        experiment       : model experiment (As defined by experiment.py)
+        cluster_samples  : samples of phi (theta in real space) relevant to observation's cluster
+        hier_samples     : samples of phi0 (theta0 in real space)
+        subchain_samples : samples of relevant items from subchain
+        constants        : vector of constants that were supplied when model was calibrated
+        model_args       : dictionary of physical models used when model was calibrated
+        """
+        self.experiment = experiment
+        self.cluster_samples = cluster_samples
+        self.hier_samples = hier_samples
+        self.subchain_samples = subchain_samples
+        self.constants = constants
+        self.model_args = model_args
+        return
+
+class ResultSHPB(ResultBase):
+    def plot_calibrated(self, emax, smax = None):
+        nsamp = self.cluster_samples.shape[0]
+        pool = Pool(POOL_SIZE)
+        args_cluster = zip(
+            repeat(self.experiment.tuple),
+            self.cluster_samples.tolist(),
+            repeat(self.constants),
+            repeat(self.model_args),
+            )
+        args_hier    = zip(
+            repeat(self.experiment.tuple),
+            self.hier_samples.tolist(),
+            repeat(self.constants),
+            repeat(self.model_args),
+            )
+        res_cluster  = pool.map(predict_wrapper, args_cluster)
+        res_hier     = pool.map(predict_wrapper, args_hier)
+        strain = np.empty(100)
+        stress = np.empty((self.cluster_sammples.shape[0], 100))
+        for i in range(cluster_samples.shape[0]):
+            pass
+        pass
 
 class ResultSummary(Transformer):
     @classmethod

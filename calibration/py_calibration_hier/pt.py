@@ -111,6 +111,10 @@ class PTSlave(object):
     def initialize_sampler(self, ns):
         return self.chain.initialize_sampler(ns)
 
+    def complete(self):
+        self.chain.complete()
+        return
+
     def __init__(self, chain):
         self.chain = chain
         return
