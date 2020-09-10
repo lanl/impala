@@ -17,7 +17,7 @@ np.seterr(under = 'ignore')
 from collections import namedtuple
 from itertools import repeat
 from functools import lru_cache
-# from multiprocessing import Pool
+from multiprocessing import Pool
 from math import exp, log
 import sqlite3 as sql
 import os
