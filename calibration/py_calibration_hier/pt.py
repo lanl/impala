@@ -199,6 +199,11 @@ class PTMaster(object):
         self.chains = [PTSlave(statmodel(temperature = temp, **kwargs)) for temp in temperature_ladder]
         return
 
+    def complete(self):
+        for chain in self.chains:
+            chain.complete()
+        return
+
     def __init__(self, statmodel, temperature_ladder, **kwargs):
         self.initialize_chains(statmodel, temperature_ladder, kwargs)
         return
