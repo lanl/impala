@@ -56,7 +56,13 @@ def load_Ti64_shpb(curs):
             data[:,1] = data[:,1] * 1e-5 # Transform from MPa to Mbar
             xps.append({'data' : data[1:], 'temp' : temp, 'edot' : edot,
                         'pname' : pname, 'fname' : fname})
-            shpb_emax = max(shpb_emax, data[:,0].max())
+            # shpb_emax = max(shpb_emax, data[:,0].max())
+
+    # truncate to first 40 for runtime
+    xps = xps[:40]
+
+    for xp in xps:
+        shpb_emax = max(shpb_emax, xp['data'][:,0].max())
 
     # For each experiment:
     for xp in xps:
