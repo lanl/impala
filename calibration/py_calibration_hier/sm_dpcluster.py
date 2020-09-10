@@ -44,7 +44,7 @@ def predict_shpb(exp_tuple, parameters, constants, model_args):
     model.initialize_constants(constants)
     model.update_parameters(np.array(parameters))
     model.initialize_state(exp_tuple.temp)
-    return model.compute_state_history()[:,1:3]
+    return (model.compute_state_history()[:,1:3]).T
 
 def sse_shpb(exp_tuple, parameters, constants, model_args):
     """
@@ -55,7 +55,7 @@ def sse_shpb(exp_tuple, parameters, constants, model_args):
     model_args : dict (defines what physical models are used)
     """
     # Build model, predict stress at given strain values
-    res = predict_shpb(exp_tuple, parameters, constants, model_args).T
+    res = predict_shpb(exp_tuple, parameters, constants, model_args)
     # model = MaterialModel(**model_args)
     # model.set_history_variables(exp_tuple.emax, exp_tuple.edot, 100)
     # model.initialize_constants(constants)
@@ -343,14 +343,14 @@ class Chain(Transformer, pt.PTChain):
         cluster_j is an array of indices on which cluster j holds sway.
         I.e., curr_theta_j is the current value of theta for cluster j.
         """
-        curr_cov = self.localcov(np.vstack(self.samples.theta), curr_theta_j)
+        curr_cov = self.localcov(curr_theta_j)
         gen = mvnormal(mean = curr_theta_j, cov = curr_cov)
         prop_theta_j = gen.rvs()
 
         if not self.check_constraints(prop_theta_j):
             return curr_theta_j, False
 
-        prop_cov = self.localcov(np.vstack(self.samples.theta), prop_theta_j)
+        prop_cov = self.localcov(prop_theta_j)
 
         curr_lp = self.log_posterior_theta_j(curr_theta_j, cluster_j, theta0, SigInv)
         prop_lp = self.log_posterior_theta_j(prop_theta_j, cluster_j, theta0, SigInv)
@@ -456,6 +456,7 @@ class Chain(Transformer, pt.PTChain):
         self.samples.delta[self.curr_iter] = deltas
         new_thetas, accepted = self.sample_thetas(thetas, self.curr_delta, theta0, Sigma)
         self.samples.theta.append(new_thetas)
+        self.curr_theta_stack = np.vstack(self.samples.theta)
         self.samples.accepted[self.curr_iter] = accepted
         self.samples.theta0[self.curr_iter] = self.sample_theta0(thetas, Sigma)
         self.samples.Sigma[self.curr_iter] = self.sample_Sigma(self.curr_thetas, self.curr_theta0)
@@ -477,8 +478,8 @@ class Chain(Transformer, pt.PTChain):
         self.model.update_parameters(self.unnormalize(self.invprobit(theta)))
         return self.model.check_constraints()
 
-    def localcov(self, history, target):
-        return localcov(history, target, self.radius, self.nu, self.psi0)
+    def localcov(self, target):
+        return localcov(self.curr_theta_stack, target, self.radius, self.nu, self.psi0)
 
     def initialize_sampler(self, ns):
         self.samples = ChainSamples(self.N, self.d, ns)
@@ -493,6 +494,7 @@ class Chain(Transformer, pt.PTChain):
             self.subchains[i].initialize_sampler(ns)
 
         self.samples.theta.append(theta_start)
+        self.curr_theta_stack = np.vstack(self.samples.theta)
         theta_try = init_normal.rvs(size = self.d)
         while not self.check_constraints(theta_try):
             theta_try = init_normal.rvs(size = self.d)
@@ -715,37 +717,74 @@ class ResultBase(object):
         constants        : vector of constants that were supplied when model was calibrated
         model_args       : dictionary of physical models used when model was calibrated
         """
-        self.experiment = experiment
-        self.cluster_samples = cluster_samples
-        self.hier_samples = hier_samples
+        self.experiment       = experiment
+        self.cluster_samples  = cluster_samples
+        self.hier_samples     = hier_samples
         self.subchain_samples = subchain_samples
-        self.constants = constants
-        self.model_args = model_args
+        self.constants        = constants
+        self.model_args       = model_args
         return
 
 class ResultSHPB(ResultBase):
-    def plot_calibrated(self, emax, smax = None):
+    def plot_calibrated(self, path, smax = None):
+        ul_alpha = 0.6; m_alpha = 0.95; linewidth = 0.4
+        # Start computing calibrated curves
         nsamp = self.cluster_samples.shape[0]
         pool = Pool(POOL_SIZE)
+        # Curves calibrated to observation/cluster
         args_cluster = zip(
             repeat(self.experiment.tuple),
             self.cluster_samples.tolist(),
             repeat(self.constants),
             repeat(self.model_args),
             )
+        res_cluster  = pool.map(predict_wrapper, args_cluster)
+        # Curves calibrated to hierarchical mean
         args_hier    = zip(
             repeat(self.experiment.tuple),
             self.hier_samples.tolist(),
             repeat(self.constants),
             repeat(self.model_args),
             )
-        res_cluster  = pool.map(predict_wrapper, args_cluster)
         res_hier     = pool.map(predict_wrapper, args_hier)
-        strain = np.empty(100)
-        stress = np.empty((self.cluster_sammples.shape[0], 100))
-        for i in range(cluster_samples.shape[0]):
+        # Extract curve results
+        strain = res_cluster[0][0]
+        stress_cluster = np.vstack([res[1] for res in res_cluster])
+        stress_hier    = np.vstack([res[1] for res in res_hier])
+        #sigma2s        = self.subchain_samples.sigma2
+        # Compute curve summaries, generate posterior predictive
+        err = normal.rvs(scale = np.sd(sigma2s), size = (sigma2s.shape[0], 100))
+        stress_cluster_summary = np.quantile(res_cluster + err, (0.05, 0.5, 0.95), axis = 0)
+        stress_hier_summary    = np.quantile(res_hier    + err, (0.05, 0.5, 0.95), axis = 0)
+
+        ul_line_args = {'alpha' : 0.60, 'linestype' : '-', 'linewidth' : 0.4}
+        me_line_args  = {'alpha' : 0.95, 'linestyle' : '-', 'linewidth' : 0.4}
+
+        plt.plot(strain, stress_cluster_summary[0], color = 'blue', **ul_line_args)
+        plt.plot(strain, stress_cluster_summary[1], color = 'blue', **me_line_args)
+        plt.plot(strain, stress_cluster_summary[2], color = 'blue', **ul_line_args)
+
+        plt.plot(strain, stress_hier_summary[0], color = 'green', **ul_line_args)
+        plt.plot(strain, stress_hier_summary[1], color = 'green', **me_line_args)
+        plt.plot(strain, stress_hier_summary[2], color = 'green', **ul_line_args)
+
+        plt.plot(self.experiment.X, self.experiment.Y, 'bo')
+        if smax:
             pass
-        pass
+        else:
+            smax = max(
+                    stress_cluster_summary.max(),
+                    strain_cluster_summary.max(),
+                    self.experiment.Y.max()
+                    )
+        plt.ylim((0., smax))
+        if os.path.exists(path):
+            os.remove(path)
+        plt.savefig(path)
+        plt.clf()
+        return
+
+    pass
 
 class ResultSummary(Transformer):
     @classmethod
