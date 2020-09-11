@@ -181,7 +181,28 @@ class PTMaster(object):
 
         swap_y = swap_y + swap_y.T
         swap_n = swap_n + swap_n.T
-        return swap_y / (swap_y + swap_n)
+        return swap_y / (swap_y + swap_n + 1e-9)
+
+    def plot_swap_probability(self, path, figsize = (5,6), dpi = 300):
+        swap_matrix = self.get_swap_probability()
+        fig = plt.figure(figsize = figsize)
+        plt.matshow(swap_matrix)
+        plt.colorbar()
+        plt.savefig(path, dpi = dpi)
+        plt.close()
+        return
+
+    def plot_accept_probability(self, path, figsize = (3,5), dpi = 300):
+        accept_prob = self.get_accept_probability()
+        idx = range(accept_prob.shape[0])
+        temps = ['{:.2f}'.format(x) for x in self.temp_ladder]
+        fig = plt.figure(figsize = figsize)
+        plt.bar(idx, height = accept_prob, tick_label = temps)
+        plt.xticks(rotation = 60)
+        plt.title('Acceptance Probability by Temperature')
+        plt.savefig(path, dpi = dpi)
+        plt.close()
+        return
 
     def pairwise_parameter_plot(self, path):
         self.chains[0].pairwise_parameter_plot(self, path)
@@ -205,6 +226,7 @@ class PTMaster(object):
         return
 
     def __init__(self, statmodel, temperature_ladder, **kwargs):
+        self.temp_ladder = temperature_ladder
         self.initialize_chains(statmodel, temperature_ladder, kwargs)
         return
 

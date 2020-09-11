@@ -280,13 +280,13 @@ class Chain(Transformer, pt.PTChain):
         # sses   = np.array(list(map(sse_wrapper, args)))
         substate = self.subchains[i].get_substate()
         lps    = np.array([self.subchains[i].log_posterior_theta(sse, substate) for sse in sses])
-        lps    = lps - lps.max() # normalizing the log-posteriors so at least some of the sse's
+        lps[np.isnan(lps)] = - np.inf
+        lps -= lps.max() # normalizing the log-posteriors so at least some of the sse's
                                  # will produce non-zero posteriors when exponentiated.
         unnormalized = np.exp(lps) * lj
-        unnormalized[np.isnan(unnormalized)] = 0.
         try:
             normalized = unnormalized / unnormalized.sum()
-            dnew   = choice(range(_dmax + 1 + self.m), 1, p = normalized)
+            dnew   = choice(range(_dmax + self.m + 1), 1, p = normalized)
         except (ValueError, FloatingPointError):
             # nan_idx = np.where(np.isnan(unnormalized))[0][0]
             # print('nan idx: {}'.format(nan_idx))
@@ -792,8 +792,33 @@ class ResultSummary(Transformer):
         conn = sql.connect(path)
         cursor = conn.cursor()
 
+    def plot_clustplot(self, path):
+        delta = self.samples.delta
+        nsamp, ndat = delta.shape
+        clust_mat_sum = np.zeros((ndat, ndat))
+        for i in range(nsamp):
+            clust_mat = np.zeros((ndat, delta[i].max() + 1))
+            clust_mat[:,delta[i]] = 1.
+            clust_mat_sum += clust_mat @ clust_mat.T
+        clust_mat_prb = clust_mat_sum / delta.shape[0]
+        fig = plt.figure(figsize = figsize)
+        plt.matshow(clust_mat_prb)
+        plt.colorbar()
+        plt.savefig(path, dpi = dpi)
+        plt.close()
+        return
+
+
+
+
     def __init__(self, samples, subchain_samples, bounds, constants, model_args, source_path):
-        pass
+        self.samples = samples
+        self.subchain_samples = subchain_samples
+        self.bounds = bounds
+        self.constants = constants
+        self.model_args = model_args
+        self.source_path = source_path
+        return
 
 
 
