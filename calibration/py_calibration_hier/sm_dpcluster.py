@@ -19,6 +19,7 @@ from itertools import repeat
 from functools import lru_cache
 from multiprocessing import Pool
 from math import exp, log
+import matplotlib.pyplot as plt
 import sqlite3 as sql
 import os
 # Custom Modules
@@ -36,6 +37,14 @@ POOL_SIZE = 8
 #   Not sure how much cost there is in *making* the material model
 #   relative to going through the model updating.  I guess we'll see...
 
+class Bunch(object):
+    """
+    Bunch object.  Object for holding arbitrary keywords
+        (like a dictionary, but neater; like a namedtuple, but less restrictive.)
+    """
+    def __init__(self, **kwargs):
+        self.__dict__.update(**kwargs)
+        return
 
 def predict_shpb(exp_tuple, parameters, constants, model_args):
     """ Form the prediction output for a SHPB experiment """
@@ -182,7 +191,7 @@ class SubChainSHPB(SubChainBase):
     def __init__(self, experiment):
         self.experiment = experiment
         self.table_name = self.experiment.table_name
-        self.priors = PriorsSHPB(50, 1e-6)
+        self.priors = PriorsSHPB(25, 1e-6)
         self.N = self.experiment.X.shape[0]
         return
 
@@ -694,20 +703,21 @@ class Chain(Transformer, pt.PTChain):
         self.d = len(self.parameter_list)
         self.pool = Pool(processes = 8)
         self.priors = PriorsChain(
-            np.eye(self.d) * 0.5,
-            self.d + 2,
-            np.zeros(self.d),
-            np.eye(self.d) * 1e-6,
-            2., 1.,
+            psi = np.eye(self.d) * 0.5,
+            nu = self.d + 2,
+            mu = np.zeros(self.d),
+            Sinv = np.eye(self.d) * 1e-6,
+            eta_a = 2.,
+            eta_b = 5.,
             )
         self.m = m
         return
-
+'psi nu mu Sinv eta_a eta_b'
 class ResultBase(object):
     def plot_calibrated(self):
         pass
 
-    def __init__(self, experiment, cluster_samples, hier_samples, subchain_samples, constants, model_args):
+    def __init__(self, parent, subchain_samples, experiment, constants, model_args):
         """
         experiment       : model experiment (As defined by experiment.py)
         cluster_samples  : samples of phi (theta in real space) relevant to observation's cluster
@@ -716,9 +726,8 @@ class ResultBase(object):
         constants        : vector of constants that were supplied when model was calibrated
         model_args       : dictionary of physical models used when model was calibrated
         """
+        self.parent           = parent
         self.experiment       = experiment
-        self.cluster_samples  = cluster_samples
-        self.hier_samples     = hier_samples
         self.subchain_samples = subchain_samples
         self.constants        = constants
         self.model_args       = model_args
@@ -783,22 +792,75 @@ class ResultSHPB(ResultBase):
         plt.clf()
         return
 
-    pass
-
 class ResultSummary(Transformer):
     @classmethod
-    def from_path(cls, path, source_path):
+    def from_path(cls, path_results, path_inputs):
         """ from the path, forms a Samples objects that represents samples from the model chain """
-        conn = sql.connect(path)
-        cursor = conn.cursor()
+        conn_i = sql.connect(path_inputs)
+        conn_o = sql.connect(path_results)
 
-    def plot_clustplot(self, path):
-        delta = self.samples.delta
+        cursor = conn_o.cursor()
+        lookup = dict(list(cursor.execute(' SELECT source_name, cluster_id FROM meta; ')))
+        models = dict(list(cursor.execute(' SELECT model_type, model_name FROM models; ')))
+        temp   = np.array(list(cursor.execute(' SELECT alpha, nclust FROM alpha; ')))
+        alpha  = temp[:,0]
+        nclust = temp[:,1]
+        delta  = np.array(list(cursor.execute(' SELECT * FROM delta; ')))
+        N      = delta.shape[1]
+        constants = dict(list(cursor.execute(' SELECT constant, value FROM constants; ')))
+        theta0 = np.array(list(cursor.execute(' SELECT * FROM theta0; ')))
+        phi0   = np.array(list(cursor.execute(' SELECT * FROM phi0; ')))
+        ns, d  = theta0.shape
+        Sigma  = np.array(list(cursor.execute(' SELECT * FROM Sigma; '))).reshape(ns,d,d)
+        temp   = np.array(list(cursor.execute(' SELECT * FROM thetas; ')))
+        thetas = [temp[np.where(temp.T[0] == i)[0], 2:] for i in range(ns)]
+        temp   = np.array(list(cursor.execute(' SELECT * FROM phis; ')))
+        phis   = [temp[np.where(temp.T[0] == i)[0], 2:] for i in range(ns)]
+
+        samples = Bunch(
+            theta  = thetas,
+            phi    = phis,
+            delta  = delta,
+            theta0 = theta0,
+            phi0   = phi0,
+            Sigma  = Sigma,
+            alpha  = alpha,
+            nclust = nclust,
+            )
+
+        bounds = None
+        model = MaterialModel(**models)
+        const_order = model.get_constant_list()
+        constant_vec = np.array([constants[x] for x in const_order])
+        param_order = model.get_parameter_list()
+
+        cursor = conn_i.cursor()
+        tables = list(cursor.execute(' SELECT type, table_name FROM meta; '))
+        experiments = [
+            Experiment[type](cursor, table_name, models)
+            for type, table_name in tables
+            ]
+
+        conn_i.close()
+        conn_o.close()
+
+        return cls(samples, bounds, constant_vec, models, experiments)
+
+    @classmethod
+    def from_chain(cls, chain, nburn, thin):
+        theta = chain.samples.theta[nburn::thin]
+        Sigma = chain.samples.Sigma[nburn::thin]
+        theta0 = chain.samples.theta0[nburn::thin]
+        delta = chain.samples.delta[nburn::thin]
+
+    def plot_clustplot(self, path, figsize = (5,6), dpi = 300):
+        delta = self.chain_samples.delta
         nsamp, ndat = delta.shape
         clust_mat_sum = np.zeros((ndat, ndat))
         for i in range(nsamp):
             clust_mat = np.zeros((ndat, delta[i].max() + 1))
-            clust_mat[:,delta[i]] = 1.
+            for j in range(ndat):
+                clust_mat[j, delta[i,j]] = 1
             clust_mat_sum += clust_mat @ clust_mat.T
         clust_mat_prb = clust_mat_sum / delta.shape[0]
         fig = plt.figure(figsize = figsize)
@@ -808,16 +870,13 @@ class ResultSummary(Transformer):
         plt.close()
         return
 
-
-
-
-    def __init__(self, samples, subchain_samples, bounds, constants, model_args, source_path):
-        self.samples = samples
-        self.subchain_samples = subchain_samples
-        self.bounds = bounds
-        self.constants = constants
-        self.model_args = model_args
-        self.source_path = source_path
+    def __init__(self, chain_samples, bounds, constants, model_args, experiments):
+        self.chain_samples = chain_samples
+        # self.subchain_samples = subchain_samples
+        self.bounds        = bounds
+        self.constants_vec = constants
+        self.model_args    = model_args
+        self.experiments   = experiments
         return
 
 
