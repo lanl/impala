@@ -99,6 +99,8 @@ if __name__ == '__main__':
             )
         model.sample(40000, 5)
         model.write_to_disk('res_ti64_clst.db', 20001, 5)
+        model.plot_accept_probability('res_ti64_clst_accept.png', 20000)
+        model.plot_swap_probability('res_ti64_clst_swapped.png', 20000 // 5)
         model.complete()
 
 # EOF

@@ -141,7 +141,9 @@ class PTMaster(pt.PTMaster):
         swaps = []
         for rank1, rank2 in zip(ranks[::2], ranks[1::2]):
             swaps.append((rank1, rank2, self.try_swap_states(rank1, rank2)))
-        _swaps = [(rank1, rank2, swapped.wait()) for rank1, rank2, swapped in swaps]
+        _swaps = [(rank1 - 1, rank2 - 1, swapped.wait()) for rank1, rank2, swapped in swaps]
+        # chain_ranks starts at 1.  We need rank - 1 for compatibility with
+        # the rank system in the non-mpi PT, to reuse the swap probability function there.
         self.swaps.append(_swaps)
         return
 
@@ -182,7 +184,7 @@ class PTMaster(pt.PTMaster):
         assert parcel
         return
 
-    def get_accept_probability(self, nburn):
+    def get_accept_probability(self, nburn = 0):
         sent = [
             self.comm.isend(('get_accept_prob', {'nburn' : nburn}), dest = rank)
             for rank in self.chain_ranks

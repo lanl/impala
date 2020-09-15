@@ -712,7 +712,7 @@ class Chain(Transformer, pt.PTChain):
             )
         self.m = m
         return
-'psi nu mu Sinv eta_a eta_b'
+
 class ResultBase(object):
     def plot_calibrated(self):
         pass

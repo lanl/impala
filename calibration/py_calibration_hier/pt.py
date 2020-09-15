@@ -4,6 +4,7 @@ Generic rewrite of parallel_tempering.  Meant to take generic object.  Make it c
 from random import shuffle
 from numpy.random import uniform
 from math import log
+import matplotlib.pyplot as plt
 import numpy as np
 np.seterr(under = 'ignore')
 
@@ -87,7 +88,7 @@ class PTSlave(object):
         self.chain.pairwise_parameter_plot(self, path)
         return
 
-    def get_accept_probability(self, nburn):
+    def get_accept_probability(self, nburn = 0):
         return self.chain.get_accept_probability(nburn)
 
     def try_swap_state_sup(self, inf_chain):
@@ -167,14 +168,14 @@ class PTMaster(object):
         print('\rSampling {:.1%} Complete'.format(sampled / ns))
         return
 
-    def get_swap_probability(self):
+    def get_swap_probability(self, nburn = 0):
         try:
             k = len(self.chain_ranks)
-        except NameError:
+        except AttributeError:
             k = len(self.chains)
         swap_y = np.zeros((k,k))
         swap_n = np.zeros((k,k))
-        for swap_generation in self.swaps:
+        for swap_generation in self.swaps[nburn:]:
             for chain_a, chain_b, swapped in swap_generation:
                 swap_y[chain_a, chain_b] += swapped
                 swap_n[chain_a, chain_b] += 1 - swapped
@@ -183,8 +184,8 @@ class PTMaster(object):
         swap_n = swap_n + swap_n.T
         return swap_y / (swap_y + swap_n + 1e-9)
 
-    def plot_swap_probability(self, path, figsize = (5,6), dpi = 300):
-        swap_matrix = self.get_swap_probability()
+    def plot_swap_probability(self, path, nburn = 0, figsize = (5,6), dpi = 300):
+        swap_matrix = self.get_swap_probability(nburn)
         fig = plt.figure(figsize = figsize)
         plt.matshow(swap_matrix)
         plt.colorbar()
@@ -192,8 +193,8 @@ class PTMaster(object):
         plt.close()
         return
 
-    def plot_accept_probability(self, path, figsize = (3,5), dpi = 300):
-        accept_prob = self.get_accept_probability()
+    def plot_accept_probability(self, path, nburn = 0, figsize = (3,5), dpi = 300):
+        accept_prob = self.get_accept_probability(nburn)
         idx = range(accept_prob.shape[0])
         temps = ['{:.2f}'.format(x) for x in self.temp_ladder]
         fig = plt.figure(figsize = figsize)
@@ -208,7 +209,7 @@ class PTMaster(object):
         self.chains[0].pairwise_parameter_plot(self, path)
         return
 
-    def get_accept_probability(self, nburn):
+    def get_accept_probability(self, nburn = 0):
         probs = np.array([chain.get_accept_probability(nburn) for chain in self.chains])
         return probs
 
