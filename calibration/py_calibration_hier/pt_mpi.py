@@ -226,6 +226,7 @@ class PTMaster(pt.PTMaster):
         self.size = self.comm.Get_size()
         self.chain_ranks = list(range(1, self.size))
         self.initialize_chains(temperature_ladder, kwargs)
+        self.temp_ladder = temperature_ladder
         return
 
 # EOF
