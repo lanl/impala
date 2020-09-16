@@ -117,6 +117,10 @@ class SubChainBase(object):
     samples = None
     experiment = None
     N = None
+    def set_temperature(self, temperature):
+        self.temper_temp = temperature
+        self.inv_temper_temp = 1. / temperature
+        return
 
     def get_substate(self):
         raise NotImplementedError('overwrite this!')
@@ -144,8 +148,8 @@ SubstateSHPB = namedtuple('SubstateSHPB','sigma2')
 class SamplesSHPB(object):
     sigma2 = None
 
-    def __init__(self, sigma2):
-        self.sigma2 = sigma2
+    def __init__(self, ns):
+        self.sigma2 = np.empty(ns + 1)
         return
 
 class SubChainSHPB(SubChainBase):
@@ -183,7 +187,7 @@ class SubChainSHPB(SubChainBase):
         return
 
     def initialize_sampler(self, ns):
-        self.samples = SamplesSHPB(np.empty(ns + 1))
+        self.samples = SamplesSHPB(ns)
         self.samples.sigma2[0] = invgamma.rvs(self.priors.a, scale = self.priors.b)
         self.curr_iter = 0
         return
@@ -438,8 +442,10 @@ class Chain(Transformer, pt.PTChain):
         args = zip(exp_tuples, phis.tolist(), repeat(self.constants_vec), repeat(self.model_args))
         sses = np.array(list(self.pool.map(sse_wrapper, args)))
         # sses = np.array(list(map(sse_wrapper, args)))
-        for i in range(self.N):
-            self.subchains[i].iter_sample(sses[i])
+        for sse, subchain in zip(sses, self.subchains):
+            subchain.iter_sample(sse)
+        # for i in range(self.N):
+        #     self.subchains[i].iter_sample(sses[i])
         return
 
     def iter_sample(self):
@@ -518,7 +524,7 @@ class Chain(Transformer, pt.PTChain):
         self.inv_temper_temp = 1. / temperature
         self.radius = self.r0 * log(temperature + 1, 10)
         for subchain in self.subchains:
-            subchain.inv_temper_temp = self.inv_temper_temp
+            subchain.set_temperature(temperature)
         return
 
     def get_state(self):
@@ -676,6 +682,15 @@ class Chain(Transformer, pt.PTChain):
         alpha_insert = insert_stmt.format('alpha', 'alpha, nclust', '?,?')
         curs.execute(alpha_create)
         curs.executemany(alpha_insert, np.vstack((alpha, deltas.max(axis = 1) + 1)).T.tolist())
+
+        bounds_create = create_stmt.format('bounds', 'parameter TEXT, lower REAL, upper REAL')
+        bounds_insert = insert_stmt.format('bounds', 'parameter, lower, upper', '?,?,?')
+        curs.execute(bounds_create)
+        bounds = [
+            (param, bound[0],bound[1])
+            for param, bound in zip(self.parameter_list, self.bounds)
+            ]
+        curs.executemany(bounds_insert, bounds)
         conn.commit()
         return
 
@@ -701,7 +716,7 @@ class Chain(Transformer, pt.PTChain):
         self.set_temperature(temperature)
         self.N = len(self.subchains)
         self.d = len(self.parameter_list)
-        self.pool = Pool(processes = 8)
+        self.pool = Pool(processes = POOL_SIZE)
         self.priors = PriorsChain(
             psi = np.eye(self.d) * 0.5,
             nu = self.d + 2,

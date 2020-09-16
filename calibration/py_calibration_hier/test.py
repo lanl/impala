@@ -4,8 +4,8 @@ from numpy import array, float64
 np.seterr(under = 'ignore')
 from mpi4py import MPI
 
-# from sm_dpcluster import Chain
-import sm_dpcluster as sm
+#import sm_dpcluster as sm
+import sm_pooled as sm
 # import pt
 import pt_mpi as pt
 pt.MPI_MESSAGE_SIZE = 2**12
@@ -19,7 +19,7 @@ size = comm.Get_size()
 # rank = 0
 # size = 4
 
-material = 'Ti64'
+material = 'Al5083'
 
 # Defining Paths, Constants, Parameter Ranges
 if True:
@@ -89,7 +89,7 @@ if True:
 
 if __name__ == '__main__':
     if rank > 0:
-        # pass
+        pass
         chain = pt.PTSlave(comm = comm, statmodel = sm.Chain)
         chain.watch()
 
@@ -101,10 +101,13 @@ if __name__ == '__main__':
             path       = path,
             bounds     = parameter_bounds,
             constants  = starting_consts,
-            model_args = {'flow_stress_model'   : 'PTW', 'shear_modulus_model' : 'Stein'},
+            # model_args = {'flow_stress_model'   : 'PTW', 'shear_modulus_model' : 'Stein'},
+            model_args = {'flow_stress_model'   : 'PTW', 'shear_modulus_model' : 'Simple'},
             )
-        model.sample(40000, 5)
-        model.write_to_disk('results_cluster_ti64.db', 20001, 5)
-        model.complete()
+        model.sample(20000, 5)
+        #model.write_to_disk('results_pool_Al5083.db', 20001, 5)
+        # model.plot_accept_probability('results_cluster_ti64_accept.png')
+        # model.plot_swap_probability('results_cluster_ti64_swapped.png')
+        # model.complete()
 
 # EOF

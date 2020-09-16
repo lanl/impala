@@ -1,223 +1,270 @@
-from experiment import Experiment, Transformer
-from physical_models_c import MaterialModel
-import parallel_tempering as pt
+# Required Modules
+from scipy.stats import invgamma, invwishart, uniform, beta, gamma
+from scipy.stats import multivariate_normal as mvnormal, norm as normal
+from scipy.interpolate import interp1d
+from numpy.linalg import multi_dot, slogdet
+from numpy.random import choice
+import numpy as np
+np.seterr(under = 'ignore')
+# Builtins
+from collections import namedtuple
+from itertools import repeat
+from functools import lru_cache
+from multiprocessing import Pool
 from math import exp, log
 import sqlite3 as sql
-import numpy as np
+import os
+# Custom Modules
+from experiment import Experiment, Transformer, cholesky_inversion
+from physical_models_c import MaterialModel
+from pointcloud import localcov
+import pt
 
-class SubChain(Transformer):
-    """ experiment-specific sampling of strength parameters """
-    s_theta  = None
-    s_sigma2 = None
-    s_iter   = 0
+import sm_dpcluster as smdp
 
-    prior_sigma2_a = 100.
-    prior_sigma2_b = 1.e-4
 
-    def set_state(self, theta, sigma2):
-        self.s_theta[self.s_iter] = theta
-        self.s_sigma2[self.s_iter] = sigma2
+class SubChainHierBase(smdp.SubChainBase):
+    """ In the hierarchical model, sampling of theta_i (for observation i) has been moved into
+    subchain i... therefore the covariance estimation for theta_i must happen in subchain_i """
+    # parameters relevant to localcov
+    r0 = 1.
+    nu = 50
+    psi0 = 1e-4
 
-    @property
-    def curr_theta(self):
-        return self.s_theta[self.s_iter]
-
-    @property
-    def curr_sigma2(self):
-        return self.s_sigma2[self.s_iter]
-
-    @property
-    def curr_theta0(self):
-        return self.parent.curr_theta0
-
-    @property
-    def curr_Sigma(self):
-        return self.parent.curr_Sigma
-
-    def probit_sse(self, theta):
-        return self.experiment.sse(tuple(self.unnormalize(self.invprobit(theta))))
-
-    def initialize_sampler(self, ns):
-        self.s_iter = 0
-        self.s_theta = np.array((ns, self.d))
-        self.s_sigma2 = np.array(ns)
-        self.s_theta[0] = 0
+    def set_temperature(self, temperature):
+        super().set_temperature(temperature)
+        self.radius = self.r0 * log(temperature + 1, 10)
         return
-
-    def sample_sigma2(self, theta):
-        aa = 0.5 * self.N / self.temper_temp + self.priors_sigma2.a
-        bb = 0.5 * self.probit_sse(theta) / self.temper_temp + self.priors_sigma2.b
-        return invgamma.rvs(aa, scale = bb)
-
-    def log_posterior_theta(self, theta, sigma2, theta0, SigmaInv):
-        ssse = self.probit_sse(theta) / sigma2
-        sssd = (theta - theta0).dot(SigmaInv).dot(theta - theta0)
-        ldj  = self.invprobitlogjac(theta)
-        ll   = 0.5 * (ssse + sssd) / self.temper_temp
-        return ll + ldj
 
     def localcov(self, target):
-        lc = localcov(self.s_theta[:(self.s_iter - 1)], target, **self.temper_args)
-        return lc
+        # localized covariance matrix
+        return localcov(self.samples.theta[:self.curr_iter], target, self.radius, self.nu, self.psi0)
 
-    def sample_theta(self, curr_theta, sigma2):
-        curr_cov = self.localcov(curr_theta)
-        prop_theta = curr_theta + normal(size = self.d).dot(cholesky(curr_cov))
-        if not self.check_constraints(prop_theta):
-            return curr_theta
-        prop_cov = self.localcov(prop_theta)
-        curr_lp = self.log_posterior_theta(curr_theta,       sigma2,
-                                           self.curr_theta0, self.curr_Sigma)
-        prop_lp = self.log_posterior_theta(prop_theta,       sigma2,
-                                           self.curr_theta0, self.curr_Sigma)
-        cp_ld = mvnorm.logpdf(prop_theta, curr_theta, curr_cov)
-        pc_ld = mvnorm.logpdf(curr_theta, prop_theta, prop_cov)
+PriorsSHPB = namedtuple('PriorsSHPB','a b')
+SubstateSHPB = namedtuple('SubstateSHPB', 'theta sigma2')
+class SamplesSHPB(object):
+    sigma2 = None
+    theta  = None
+    accepted = None
 
-        log_alpha = prop_lp + pc_ld - curr_lp - cp_ld
-
-        if log(uniform()) < log_alpha:
-            return prop_theta
-        else:
-            return curr_theta
-
-    def iter_sample(self):
-        curr_theta = self.curr_theta
-        self.s_iter += 1
-
-        self.s_sigma2[self.s_iter] = self.sample_sigma2(curr_theta)
-        self.s_theta[self.s_iter] = self.sample_theta(curr_theta, self.curr_sigma2)
+    def __init__(self, d, ns):
+        self.sigma2   = np.empty(ns)
+        self.theta    = np.empty((ns, d))
+        self.accepted = np.empty(ns)
         return
 
-    def sample(self, ns):
-        for _ in range(ns):
-            self.iter_sample()
-        return
-
-    def __init__(self, parent, conn, table_name, type, bounds, constants, model_args):
-        cursor = conn.cursor()
-        self.experiment = Experiment[type](cursor, table_name, model_args)
-        # Exposing Model Properties
-        self.parameter_list = self.experiment.parameter_list
-        self.d = len(self.parameter_list)
-        # Initializing Model
-        self.bounds = np.array([bounds[key] for key in self.parameter_list])
-        init_param = self.unnormalize(np.array([.5] * self.d))
-        init_param_d = {x : y for x, y in zip(self.parameter_list, init_param)}
-        self.experiment.initialize_model(init_param_d, constants)
-        return
-
-class Chain(Transformer, pt.PTSlave):
-    """ hierarchical sampling of strength parameters """
-    s_theta0 = None
-    s_Sigma  = None
-
-    def get_state(self):
-        state = {
-            'theta'    : self.curr_theta,
-            'sigma2'   : self.curr_sigma2,
-            'theta0'   : self.curr_theta0,
-            'Sigma'    : self.curr_Sigma,
-            'SigmaInv' : self.curr_Sigma_Inv,
-            }
-        return state
-
-    def set_state(self, state):
-        self.s_theta0[self.s_iter] = state['theta0']
-        self.s_Sigma[self.s_iter] = state['Sigma']
-        for i in range(N):
-            self.subchains[i].set_state(state['theta'][i], state['sigma2'][i])
-        return
-
-    @property
-    def curr_theta(self):
-        return np.array([subchain.curr_theta for subchain in self.subchains])
+class SubChainSHPB(SubChainHierBase):
+    samples = None
+    experiment = None
+    N = None
 
     @property
     def curr_sigma2(self):
-        return np.array([subchain.curr_sigma2 for subchain in self.subchains])
+        return self.samples.sigma2[self.curr_iter].copy()
 
     @property
-    def curr_theta0(self):
-        return self.s_theta0[self.s_iter]
+    def curr_theta(self):
+        return self.samples.theta[self.curr_iter].copy()
+
+    def set_substate(self, substate):
+        self.samples.sigma2[self.curr_iter] = substate.sigma2
+        self.samples.theta[self.curr_iter] = substate.theta
+
+    def sample_sigma2(self, sse):
+        aa = self.N * self.inv_temper_temp + self.priors.a
+        bb = sse * self.inv_temper_temp + self.priors.b
+        return invgamma.rvs(aa, scale = bb)
+
+    def log_posterior_theta(self, theta, sigma2, theta0, SigInv):
+        phi = self.unnormalize(self.invprobit(theta))
+        sse = smdp.sse_shpb(self.experiment.tuple, phi, self.constants_vec, self.model_args)
+        # (scaled) sum squared error
+        ssse = sse / sigma2
+        sssd = (theta - theta0).T @ SigInv @ (theta - theta0)
+        ldj  = self.invprobitlogjac(theta)
+        lp = (
+            - 0.5 * self.inv_temper_temp * ssse
+            - 0.5 * self.inv_temper_temp * sssd
+            + ldj
+            )
+        return lp
+
+    def log_posterior_substate(self, state, substate):
+        # Log posterior for theta_i -- includes the difference from prior theta0..
+        lpt = self.log_posterior_theta(substate.theta, substate.sigma2, state.theta0, state.SigInv)
+        # additional contribution from sigma2
+        lpp = -((self.N * self.inv_temper_temp + self.priors.a + 1) * log(substate.sigma2)
+                + self.priors.b / substate.sigma2)
+        return lpt + lpp
+
+    def sample_theta(self, curr_theta, sigma2, theta0, SigInv):
+        curr_cov   = self.localcov(curr_theta)
+        prop_theta = curr_theta + cholesky(curr_cov) @ normal.rvs(size = self.d)
+        if not self.check_constraints(prop_theta):
+            return curr_theta, False
+        prop_cov   = self.localcov(prop_theta)
+
+        curr_logd  = self.log_posterior_theta(curr_theta, sigma2, theta0, SigInv)
+        prop_logd  = self.log_posterior_theta(prop_theta, sigma2, theta0, SigInv)
+
+        cp_ld = mvnormal(mean = curr_theta, cov = curr_cov).logpdf(prop_theta)
+        pc_ld = mvnormal(mean = prop_theta, cov = prop_cov).logpdf(curr_theta)
+
+        log_alpha = prop_logd + pc_ld - curr_logd - cp_ld
+        if log(uniform.rvs()) < log_alpha:
+            return prop_theta, True
+        else:
+            return curr_theta, False
+
+    def iter_sample(self, theta0, SigInv):
+        sigma2 = self.curr_sigma2
+        theta  = self.curr_theta
+        self.curr_iter += 1
+
+        theta_new, accepted = self.sample_theta(theta, sigma2, theta0, SigInv)
+        self.samples.theta[self.curr_iter] = theta_new
+        self.samples.accepted[self.curr_iter] = accepted
+        self.samples.sigma2[self.curr_iter] = self.sample_sigma2(sse)
+        return
+
+    def get_substate(self):
+        return SubstateSHPB(self.curr_theta, self.curr_sigma2)
+
+    def set_substate(self, substate):
+        self.samples.theta[self.curr_iter] = substate.theta
+        self.samples.sigma2[self.curr_iter] = substate.sigma2
+        return
+
+    def initialize_sampler(self, d, ns):
+        self.d = d
+        self.samples = SamplesSHPB(self.d, ns)
+        self.samples.theta[0] = 0.
+        self.samples.accepted[0] = 0
+
+        for subchain in self.subchains:
+            subchain.initialize_sampler(ns)
+        return
+
+
+    def __init__(self, experiment, constant_vec):
+        self.experiment = experiment
+        self.table_name = self.experiment.table_name
+        self.priors = PriorsSHPB(25, 1.e-6)
+        self.N = self.experiment.X.shape[0]
+        self.model = self.experiment.model
+        self.model.initialize_constants(constant_vec)
+        return
+
+class SubChainEmulated(SubChainHierBase):
+    pass
+
+SubChain = {
+    'shpb' : SubChainSHPB,
+    }
+
+PriorsChain = namedtuple('PriorsChain', 'psi nu mu Sinv')
+StateChain = namedtuple('StateChain','theta0 Sigma substates')
+class ChainSamples(object):
+    theta0 = None
+    Sigma  = None
+
+    def __init__(self, d, ns):
+        self.theta0 = np.empty((ns, d))
+        self.Sigma = np.empty((ns, d, d))
+        return
+
+class Chain(Transformer, pt.PTChain):
+    samples = None
+    N = None
+
+    def set_temperature(self, temperature):
+        self.inv_temper_temp = 1 / temperature
+        self.temper_temp = temperature
+        return
 
     @property
     def curr_Sigma(self):
-        return self.s_Sigma[self.s_iter]
+        return self.samples.Sigma[self.curr_iter].copy()
 
     @property
-    def curr_Sigma_Inv(self):
+    def curr_SigInv(self):
         return self.pd_matrix_inversion(self.curr_Sigma)
 
-    def initialize_sampler(self, ns):
-        for subchain in self.subchains:
-            subchain.initialize_sampler(ns)
+    @property
+    def curr_theta0(self):
+        return self.samples.theta0[self.curr_iter].copy()
 
-        self.s_iter   = 0
-        self.s_theta0 = np.array((ns, self.d))
-        self.s_Sigma  = np.array((ns, self.d, self.d))
-        self.s_theta0[0] = 0
-        self.s_Sigma[0] = np.eye(self.d)
-        return
+    @property
+    def curr_substates(self):
+        return [subchain.get_substate() for subchain in self.subchains]
 
-    def iter_sample(self):
-        for subchain in self.subchains:
-            subchain.iter_sample()
+    @property
+    def curr_thetas(self):
+        return np.vstack([subchain.curr_theta for subchain in self.subchains])
 
-        curr_Sigma = self.curr_Sigma
-
-        self.s_iter += 1
-        self.s_theta0[self.s_iter] = self.sample_theta0(self.curr_theta, curr_Sigma)
-        self.s_Sigma[self.s_iter]  = self.sample_Sigma(self.curr_theta, self.curr_theta0)
-        return
-
-    def sample_Sigma(self, theta, theta0):
-        tdiff = theta - theta0
-        C = sum([np.outer(tdiff[i], tdiff[i]) for i in range(tdiff.shape[0])])
-        psi0 = self.prior_Sigma_psi + C / self.temper_temp
-        nu0  = self.prior_Sigma_nu  + self.N / self.temper_temp
-        return invwishart.rvs(df = nu0, scale = psi0)
-
-    def sample_theta0(self, theta, Sigma):
-        theta_bar = theta.mean(axis = 0)
-        SigInv = self.pd_matrix_inversion(Sigma)
-        S0 = self.pd_matrix_inversion(
-            (self.N / self.temper_temp) * SigInv + self.prior_theta0_Sinv
-            )
-        M0 = S0.dot((self.N / self.temper_temp) * SigInv.dot(theta_bar) +
-                    self.prior_theta0_Sinv.dot(self.prior_theta0_mu))
-        gen = mvnorm(mean = M0, cov = S0)
+    def sample_theta0(self, thetas, SigInv):
+        theta_bar = thetas.mean(axis = 0)
+        N = thetas.shape[0]
+        S0 = self.pd_matrix_inversion(N * self.inv_temper_temp * SigInv + self.priors.Sinv)
+        M0 = S0.dot(N * self.inv_temper_temp * SigInv.dot(theta_bar) +
+                                        self.priors.Sinv.dot(self.priors.mu))
+        gen = mvnormal(mean = M0, cov = S0)
         theta0_try = gen.rvs()
         while not self.check_constraints(theta0_try):
             theta0_try = gen.rvs()
         return theta0_try
 
+    def sample_Sigma(self, thetas, theta0):
+        N = thetas.shape
+        diff = thetas - theta0
+        C = np.array([np.outer(diff[i], diff[i]) for i in range(N)]).sum(axis = 0)
+        psi0 = self.priors.psi + C * self.inv_temper_temp
+        nu0  = self.priors.nu  + N * self.inv_temper_temp
+        return invwishart.rvs(df = nu0, scale = psi0)
+
+    def sample_subchains(self, theta0, SigInv):
+        for subchain in self.subchains:
+            subchain.iter_sample(theta0, SigInv)
+        return
+
+    def iter_sample(self):
+        theta0, SigInv = self.curr_theta0, self.curr_SigInv
+        self.sample_subchains(theta0, SigInv)
+        self.curr_iter += 1
+        self.samples.theta0[self.curr_iter] = self.sample_theta0(self.curr_thetas, SigInv)
+        self.samples.Sigma[self.curr_iter] = self.sample_Sigma(self.curr_thetas, self.curr_theta0)
+
+    def sample_n(self, n):
+        for _ in range(k):
+            self.iter_sample()
+        return
+
+    def initialize_sampler(self, ns):
+        for subchain in self.subchains:]
+            subchain.initialize_sampler(ns)
+        self.samples = ChainSamples(self.d, ns)
+
     def check_constraints(self, theta):
-        param = self.unnormalize(self.invprobit(theta))
-        self.model.update_parameters(param)
+        phi = self.unnormalize(self.invprobit(theta))
+        self.model.update_parameters(phi)
         return self.model.check_constraints()
 
-    def __init__(self, temp, path, bounds, constants, model_args):
-        self.model = MaterialModel(model_args)
+    def __init__(self, path, bounds, constants, model_args, temperature = 1.):
+        self.model = MaterialModel(**model_args)
+        self.model_args = model_args
         self.parameter_list = self.model.get_parameter_list()
+        self.constant_list = self.model.get_constant_list()
         self.bounds = np.array([bounds[key] for key in self.parameter_list])
-        self.d = len(self.parameter_list)
-        self.set_temper_temp(temp)
+        self.constant_vec = np.array([constants[key] for key in self.constant_list])
+        self.model.initializze_constants(self.constants_vec)
+        conn = sql.connect(path)
+        cursor = conn.cursor()
+        tables = list(cursor.execute(' SELECT type, table_name FROM meta;'))
+        self.subchains = [
+            SubChain[type](Experiment[type](cursor, table_name, model_args), self.constant_vec)
+            for type, table_name in tables
+            ]
         return
 
-class PTMaster(pt.PTMaster):
-    def initialize_sampler(self, ns):
-        for chain in self.chains:
-            chain.initialize_sampler(ns)
 
-    def sample(self, nsamp, k):
-        self.initialize_sampler(nsamp + 1)
-        for _ in range(int(nsamp / k)):
-            self.sample_k(k)
-            self.try_swap_states()
-        self.sample(nsamp % k)
-        return
-
-    def __init__(self, temperatures, **kwargs):
-        self.chains = [Chain(temp, **kwargs) for temp in temperatures]
-        return
 # EOF
