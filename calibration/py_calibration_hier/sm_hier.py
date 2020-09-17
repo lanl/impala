@@ -314,7 +314,7 @@ class Chain(Transformer, pt.PTChain):
     def get_state(self):
         return StateChain(self.curr_theta0, self.curr_Sigma, self.curr_SigInv, self.curr_substates)
 
-    def set_state(self):
+    def set_state(self, state):
         self.samples.theta0[self.curr_iter] = state.theta0
         self.samples.Sigma[self.curr_iter] = state.Sigma
         for subchain, substate in zip(self.subchains, state.substates):
