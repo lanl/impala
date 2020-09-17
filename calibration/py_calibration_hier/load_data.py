@@ -74,8 +74,7 @@ def load_Ti64_shpb(curs):
         # Create the corresponding line in the meta table
         curs.execute(
             shpb_meta_insert,
-            ('shpb', xp['temp'], xp['edot'], shpb_emax,
-                xp['pname'], xp['fname'], table_name)
+            ('shpb', xp['temp'], xp['edot'], shpb_emax, xp['pname'], xp['fname'], table_name)
             )
         # Fill the data tables
         curs.executemany(
@@ -98,11 +97,11 @@ def load_Ti64():
     ti64_shpb_emax = 0
 
     # Clear the old database
-    if os.path.exists('./data_Ti64.db'):
-        os.remove('./data_Ti64.db')
+    if os.path.exists('./data/data_Ti64.db'):
+        os.remove('./data/data_Ti64.db')
 
     # Start the SQLite connection
-    connection = sql.connect('./data_Ti64.db')
+    connection = sql.connect('./data/data_Ti64.db')
     cursor = connection.cursor()
     cursor.execute(meta_create)
     connection.commit()
@@ -172,10 +171,10 @@ def load_copper():
     global copper_curr_id
     copper_curr_id = 0
 
-    if os.path.exists('./data_copper.db'):
-        os.remove('./data_copper.db')
+    if os.path.exists('./data/data_copper.db'):
+        os.remove('./data/data_copper.db')
 
-    connection = sql.connect('./data_copper.db')
+    connection = sql.connect('./data/data_copper.db')
     cursor = connection.cursor()
     cursor.execute(meta_create)
     connection.commit()
@@ -243,9 +242,9 @@ def load_Al5083():
     global al5083_curr_id
     al5083_curr_id = 0
 
-    if os.path.exists('./data_Al5083.db'):
-        os.remove('./data_Al5083.db')
-    connection = sql.connect('./data_Al5083.db')
+    if os.path.exists('./data/data_Al5083.db'):
+        os.remove('./data/data_Al5083.db')
+    connection = sql.connect('./data/data_Al5083.db')
     cursor = connection.cursor()
     cursor.execute(meta_create)
 
