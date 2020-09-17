@@ -77,7 +77,7 @@ class SubChainSHPB(SubChainHierBase):
 
     def log_posterior_theta(self, theta, sigma2, theta0, SigInv):
         phi = self.unnormalize(self.invprobit(theta))
-        sse = smdp.sse_shpb(self.experiment.tuple, phi, self.constants_vec, self.model_args)
+        sse = smdp.sse_shpb(self.experiment.tuple, phi, self.constant_vec, self.model_args)
         # (scaled) sum squared error
         ssse = sse / sigma2
         sssd = (theta - theta0).T @ SigInv @ (theta - theta0)
@@ -331,7 +331,7 @@ class Chain(Transformer, pt.PTChain):
         self.constant_list = self.model.get_constant_list()
         self.bounds = np.array([bounds[key] for key in self.parameter_list])
         self.constant_vec = np.array([constants[key] for key in self.constant_list])
-        self.model.initialize_constants(self.constants_vec)
+        self.model.initialize_constants(self.constant_vec)
         conn = sql.connect(path)
         cursor = conn.cursor()
         tables = list(cursor.execute(' SELECT type, table_name FROM meta;'))
