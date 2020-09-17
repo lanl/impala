@@ -89,9 +89,9 @@ class SubChainSHPB(SubChainHierBase):
             )
         return lp
 
-    def log_posterior_substate(self, state, substate):
+    def log_posterior_substate(self, theta0, Sigma, substate):
         # Log posterior for theta_i -- includes the difference from prior theta0..
-        lpt = self.log_posterior_theta(substate.theta, substate.sigma2, state.theta0, state.SigInv)
+        lpt = self.log_posterior_theta(substate.theta, substate.sigma2, theta0, SigInv)
         # additional contribution from sigma2
         lpp = -((self.N * self.inv_temper_temp + self.priors.a + 1) * log(substate.sigma2)
                 + self.priors.b / substate.sigma2)
@@ -291,6 +291,22 @@ class Chain(Transformer, pt.PTChain):
         self.model.update_parameters(phi)
         return self.model.check_constraints()
 
+    def log_posterior_state(self, state):
+        lps = np.array([
+            subchain.log_posterior_substate(substate)
+            for subchain, substate in zip(self.subchains, state.substates)
+        ])
+
+    def get_state(self):
+        return StateChain(self.curr_theta0, self.curr_Sigma, self.curr_substates)
+
+    def set_state(self):
+        self.samples.theta0[self.curr_iter] = state.theta0
+        self.samples.Sigma[self.curr_iter] = state.Sigma
+        for subchain, substate in zip(self.subchains, state.substates):
+            subchain.set_substate(substate)
+        return
+
     def write_to_disk(self, path, nburn, thin):
         nburn += 1
         if os.path.exists(path):
@@ -365,6 +381,12 @@ class Chain(Transformer, pt.PTChain):
         self.N = len(self.subchains)
         self.d = len(self.parameter_list)
         self.subchain_prefix_list = ['subchain_{}'.format(i) for i in range(self.N)]
+        self.priors = PriorsChain(
+            psi = np.eye(self.d) * 0.5,
+            nu = self.d + 2,
+            mu = np.zeros(self.d),
+            Sinv = np.eye(self.d) * 1e-6,
+            )
         return
 
 # EOF
