@@ -262,9 +262,10 @@ class Chain(Transformer, pt.PTChain):
         return
 
     def initialize_sampler(self, ns):
-        for subchain in self.subchains:]
+        for subchain in self.subchains:
             subchain.initialize_sampler(ns)
         self.samples = ChainSamples(self.d, ns)
+        return
 
     def check_constraints(self, theta):
         phi = self.unnormalize(self.invprobit(theta))
