@@ -182,6 +182,7 @@ class SubChainSHPB(SubChainHierBase):
         self.N = self.experiment.X.shape[0]
         self.model = self.experiment.model
         self.model.initialize_constants(constant_vec)
+        self.model_args = self.model.report_models_used()
         self.constant_vec = constant_vec
         self.parameter_list = self.model.get_parameter_list()
         self.d = len(self.parameter_list)
