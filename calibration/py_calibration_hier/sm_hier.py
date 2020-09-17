@@ -2,7 +2,7 @@
 from scipy.stats import invgamma, invwishart, uniform, beta, gamma
 from scipy.stats import multivariate_normal as mvnormal, norm as normal
 from scipy.interpolate import interp1d
-from numpy.linalg import multi_dot, slogdet
+from numpy.linalg import multi_dot, slogdet, cholesky
 from numpy.random import choice
 import numpy as np
 np.seterr(under = 'ignore')
