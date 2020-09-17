@@ -267,7 +267,7 @@ class Chain(Transformer, pt.PTChain):
         self.samples.Sigma[self.curr_iter] = self.sample_Sigma(self.curr_thetas, self.curr_theta0)
 
     def sample_n(self, n):
-        for _ in range(k):
+        for _ in range(n):
             self.iter_sample()
         return
 
