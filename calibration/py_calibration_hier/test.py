@@ -105,9 +105,10 @@ if __name__ == '__main__':
             model_args = {'flow_stress_model'   : 'PTW', 'shear_modulus_model' : 'Simple'},
             )
         model.sample(20000, 5)
-        model.write_to_disk('results_pool_Al5083.db', 20001, 5)
+        model.write_to_disk('results_hier_Al5083.db', 10000, 5)
         # model.plot_accept_probability('results_cluster_ti64_accept.png')
-        model.plot_swap_probability('results_cluster_ti64_swapped.png')
+        model.plot_swap_probability('results_hier_Al5083_swapped.png', 10000)
+        model.plot_accept_probability('results_hier_Al5083_accept.png', 10000)
         model.complete()
 
 # EOF
