@@ -127,6 +127,8 @@ class SubChainSHPB(SubChainHierBase):
         self.curr_iter += 1
 
         theta_new, accepted = self.sample_theta(theta, sigma2, theta0, SigInv)
+        phi = self.unnormalize(self.invprobit(theta_new))
+        sse = smdp.sse_shpb(self.experiment.tuple, phi, self.constant_vec, self.model_args)
         self.samples.theta[self.curr_iter] = theta_new
         self.samples.accepted[self.curr_iter] = accepted
         self.samples.sigma2[self.curr_iter] = self.sample_sigma2(sse)
