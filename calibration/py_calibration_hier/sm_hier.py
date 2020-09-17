@@ -48,9 +48,9 @@ class SamplesSHPB(object):
     accepted = None
 
     def __init__(self, d, ns):
-        self.sigma2   = np.empty(ns)
-        self.theta    = np.empty((ns, d))
-        self.accepted = np.empty(ns)
+        self.sigma2   = np.empty(ns + 1)
+        self.theta    = np.empty((ns + 1, d))
+        self.accepted = np.empty(ns + 1)
         return
 
 class SubChainSHPB(SubChainHierBase):
@@ -204,8 +204,8 @@ class ChainSamples(object):
     Sigma  = None
 
     def __init__(self, d, ns):
-        self.theta0 = np.empty((ns, d))
-        self.Sigma = np.empty((ns, d, d))
+        self.theta0 = np.empty((ns + 1, d))
+        self.Sigma = np.empty((ns + 1, d, d))
         return
 
 class Chain(Transformer, pt.PTChain):
