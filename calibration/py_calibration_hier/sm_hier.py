@@ -330,7 +330,7 @@ class Chain(Transformer, pt.PTChain):
         cursor = conn.cursor()
 
         theta0    = self.samples.theta0[nburn::thin]
-        phi0      = self.unnormalize(self.invprobit(theta))
+        phi0      = self.unnormalize(self.invprobit(theta0))
         Sigma     = self.samples.Sigma[nburn::thin]
         models    = list(self.model.report_models_used().items())
         constants = list(self.model.report_constants().items())
