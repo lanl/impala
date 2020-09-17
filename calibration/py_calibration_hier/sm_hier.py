@@ -89,7 +89,7 @@ class SubChainSHPB(SubChainHierBase):
             )
         return lp
 
-    def log_posterior_substate(self, theta0, Sigma, substate):
+    def log_posterior_substate(self, theta0, SigInv, substate):
         # Log posterior for theta_i -- includes the difference from prior theta0..
         lpt = self.log_posterior_theta(substate.theta, substate.sigma2, theta0, SigInv)
         # additional contribution from sigma2
@@ -198,7 +198,7 @@ SubChain = {
     }
 
 PriorsChain = namedtuple('PriorsChain', 'psi nu mu Sinv')
-StateChain = namedtuple('StateChain','theta0 Sigma substates')
+StateChain = namedtuple('StateChain','theta0 Sigma SigInv substates')
 class ChainSamples(object):
     theta0 = None
     Sigma  = None
@@ -269,6 +269,7 @@ class Chain(Transformer, pt.PTChain):
         self.curr_iter += 1
         self.samples.theta0[self.curr_iter] = self.sample_theta0(self.curr_thetas, SigInv)
         self.samples.Sigma[self.curr_iter] = self.sample_Sigma(self.curr_thetas, self.curr_theta0)
+        return
 
     def sample_n(self, n):
         for _ in range(n):
@@ -299,7 +300,7 @@ class Chain(Transformer, pt.PTChain):
 
     def log_posterior_state(self, state):
         lps = np.array([
-            subchain.log_posterior_substate(state.theta0, state.Sigma, substate)
+            subchain.log_posterior_substate(state.theta0, state.SigInv, substate)
             for subchain, substate in zip(self.subchains, state.substates)
             ]).sum()
         tdiff = state.theta0 - self.priors.mu
@@ -311,7 +312,7 @@ class Chain(Transformer, pt.PTChain):
         return lps + ldp1 + ldp2
 
     def get_state(self):
-        return StateChain(self.curr_theta0, self.curr_Sigma, self.curr_substates)
+        return StateChain(self.curr_theta0, self.curr_Sigma, self.curr_SigInv, self.curr_substates)
 
     def set_state(self):
         self.samples.theta0[self.curr_iter] = state.theta0
