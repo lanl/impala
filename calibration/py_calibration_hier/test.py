@@ -25,7 +25,7 @@ material = 'Al5083'
 # Defining Paths, Constants, Parameter Ranges
 if True:
     if material == 'Al5083':
-        path = './data_Al5083.db'
+        path = './data/data_Al5083.db'
         starting_consts = {
             'y1'     : 0.094, 'y2'      : 0.575, 'beta' : 0.25,
             'alpha'  : 0.2,   'matomic' : 27.,   'Tref' : 298.,
@@ -43,7 +43,7 @@ if True:
             'yInf'  : (0.0001,   0.005),
             }
     if material == 'copper':
-        path = './data_copper.db'
+        path = './data/data_copper.db'
         parameter_bounds = {
             'theta' : (1e-3, 0.1),
             'p'     : (9e-3, 10.),
@@ -63,7 +63,7 @@ if True:
             'y1'     : 0.0245, 'y2'      : 0.33,
             }
     if material == 'Ti64':
-        path = './data_Ti64.db'
+        path = './data/data_Ti64.db'
         starting_consts = {
             'alpha'  : 0.2,
             'y1'     : 0.0245,
@@ -106,10 +106,10 @@ if __name__ == '__main__':
             model_args = {'flow_stress_model'   : 'PTW', 'shear_modulus_model' : 'Simple'},
             )
         model.sample(20000, 5)
-        model.write_to_disk('results_hier_Al5083.db', 10000, 5)
+        model.write_to_disk('./results/Al5083/results_hier_Al5083.db', 10000, 5)
         # model.plot_accept_probability('results_cluster_ti64_accept.png')
-        model.plot_swap_probability('results_hier_Al5083_swapped.png', 10000)
-        model.plot_accept_probability('results_hier_Al5083_accept.png', 10000)
+        model.plot_swap_probability('./results/Al5083/results_hier_Al5083_swapped.png', 10000)
+        model.plot_accept_probability('./results/Al5083/results_hier_Al5083_accept.png', 10000)
         model.complete()
 
 # EOF
