@@ -211,6 +211,8 @@ class Chain(Transformer, pt.PTChain):
     def set_temperature(self, temperature):
         self.inv_temper_temp = 1 / temperature
         self.temper_temp = temperature
+        for subchain in self.subchains:
+            subchain.set_temperature(temperature)
         return
 
     @property
@@ -295,7 +297,14 @@ class Chain(Transformer, pt.PTChain):
         lps = np.array([
             subchain.log_posterior_substate(substate)
             for subchain, substate in zip(self.subchains, state.substates)
-        ])
+            ]).sum()
+        tdiff = state.theta0 - self.priors.mu
+        ldp1 = - 0.5 * tdiff @ self.priors.Sinv @ tdiff
+        ldp2 = (
+            - 0.5 * (self.N * self.inv_temper_temp + self.priors.nu + self.d + 1) * slogdet(state.Sigma)[1]
+            - 0.5 * (self.priors.psi @ SigInv).trace()
+            )
+        return lps + ldp1 + ldp2
 
     def get_state(self):
         return StateChain(self.curr_theta0, self.curr_Sigma, self.curr_substates)
@@ -378,6 +387,7 @@ class Chain(Transformer, pt.PTChain):
                 )
             for type, table_name in tables
             ]
+        self.set_temperature(temperature)
         self.N = len(self.subchains)
         self.d = len(self.parameter_list)
         self.subchain_prefix_list = ['subchain_{}'.format(i) for i in range(self.N)]
