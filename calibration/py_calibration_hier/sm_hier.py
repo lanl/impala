@@ -246,9 +246,8 @@ class Chain(Transformer, pt.PTChain):
         return theta0_try
 
     def sample_Sigma(self, thetas, theta0):
-        N = thetas.shape
         diff = thetas - theta0
-        C = np.array([np.outer(diff[i], diff[i]) for i in range(N)]).sum(axis = 0)
+        C = np.array([np.outer(diff[i], diff[i]) for i in range(self.N)]).sum(axis = 0)
         psi0 = self.priors.psi + C * self.inv_temper_temp
         nu0  = self.priors.nu  + N * self.inv_temper_temp
         return invwishart.rvs(df = nu0, scale = psi0)
