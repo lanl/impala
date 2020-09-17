@@ -331,7 +331,7 @@ class Chain(Transformer, pt.PTChain):
         self.constant_list = self.model.get_constant_list()
         self.bounds = np.array([bounds[key] for key in self.parameter_list])
         self.constant_vec = np.array([constants[key] for key in self.constant_list])
-        self.model.initializze_constants(self.constants_vec)
+        self.model.initialize_constants(self.constants_vec)
         conn = sql.connect(path)
         cursor = conn.cursor()
         tables = list(cursor.execute(' SELECT type, table_name FROM meta;'))
