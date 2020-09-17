@@ -299,7 +299,7 @@ class Chain(Transformer, pt.PTChain):
 
     def log_posterior_state(self, state):
         lps = np.array([
-            subchain.log_posterior_substate(substate)
+            subchain.log_posterior_substate(state.theta0, state.Sigma, substate)
             for subchain, substate in zip(self.subchains, state.substates)
             ]).sum()
         tdiff = state.theta0 - self.priors.mu
