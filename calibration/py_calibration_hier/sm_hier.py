@@ -23,7 +23,7 @@ import pt
 import sm_dpcluster as smdp
 
 
-class SubChainHierBase(smdp.SubChainBase):
+class SubChainHierBase(smdp.SubChainBase, Transformer):
     """ In the hierarchical model, sampling of theta_i (for observation i) has been moved into
     subchain i... therefore the covariance estimation for theta_i must happen in subchain_i """
     # parameters relevant to localcov

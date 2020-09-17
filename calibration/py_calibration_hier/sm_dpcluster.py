@@ -111,7 +111,7 @@ def sse_wrapper(args):
 #  Each SubChain object is built towards sampling a particular type, and whatever error structure
 #  is associated with that type.
 
-class SubChainBase(Transformer, object):
+class SubChainBase(object):
     """ Base object for subchains to inherit from.  Method signatures set here MUST be overwritten,
     as the Chain object expects them. """
     samples = None
