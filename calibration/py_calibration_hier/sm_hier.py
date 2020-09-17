@@ -307,7 +307,7 @@ class Chain(Transformer, pt.PTChain):
         ldp1 = - 0.5 * tdiff @ self.priors.Sinv @ tdiff
         ldp2 = (
             - 0.5 * (self.N * self.inv_temper_temp + self.priors.nu + self.d + 1) * slogdet(state.Sigma)[1]
-            - 0.5 * (self.priors.psi @ SigInv).trace()
+            - 0.5 * (self.priors.psi @ state.SigInv).trace()
             )
         return lps + ldp1 + ldp2
 
