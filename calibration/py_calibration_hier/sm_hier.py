@@ -174,8 +174,9 @@ class SubChainSHPB(SubChainHierBase):
         cursor.executemany(phi_insert, phi.tolist())
         return
 
-    def __init__(self, experiment, constant_vec):
+    def __init__(self, experiment, constant_vec, bounds):
         self.experiment = experiment
+        self.bounds = bounds
         self.table_name = self.experiment.table_name
         self.priors = PriorsSHPB(25, 1.e-6)
         self.N = self.experiment.X.shape[0]
@@ -355,7 +356,11 @@ class Chain(Transformer, pt.PTChain):
         cursor = conn.cursor()
         tables = list(cursor.execute(' SELECT type, table_name FROM meta;'))
         self.subchains = [
-            SubChain[type](Experiment[type](cursor, table_name, model_args), self.constant_vec)
+            SubChain[type](
+                Experiment[type](cursor, table_name, model_args),
+                self.constant_vec,
+                self.bounds,
+                )
             for type, table_name in tables
             ]
         self.N = len(self.subchains)
