@@ -135,8 +135,7 @@ class SubChainSHPB(SubChainHierBase):
         self.samples.sigma2[self.curr_iter] = substate.sigma2
         return
 
-    def initialize_sampler(self, d, ns):
-        self.d = d
+    def initialize_sampler(self, ns):
         self.samples = SamplesSHPB(self.d, ns)
         self.samples.theta[0] = 0.
         self.samples.accepted[0] = 0
@@ -175,6 +174,7 @@ class SubChainSHPB(SubChainHierBase):
         self.model = self.experiment.model
         self.model.initialize_constants(constant_vec)
         self.parameter_list = self.model.get_parameter_list()
+        self.d = len(self.parameter_list)
         return
 
 class SubChainEmulated(SubChainHierBase):
