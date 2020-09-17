@@ -275,7 +275,7 @@ class Chain(Transformer, pt.PTChain):
         for subchain in self.subchains:
             subchain.initialize_sampler(ns)
 
-        self.samples = ChainSamples(self.d, ns)]
+        self.samples = ChainSamples(self.d, ns)
 
         gen = normal(scale = 0.1)
         theta_try = gen.rvs(size = self.d)
