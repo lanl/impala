@@ -176,10 +176,11 @@ class Chain(Transformer, pt.PTChain):
         cursor.execute(consts_create)
         cursor.executemany(consts_insert, constants)
 
-        for subchain in self.subchains:
-            subchain.write_to_disk(cursor, nburn, thin)
+        for prefix, subchain in zip(self.subchain_prefix_list, self.subchains):
+            subchain.write_to_disk(cursor, prefix, nburn, thin)
 
         conn.commit()
+        conn.close()
         return
 
     def check_constraints(self, theta):
@@ -206,6 +207,7 @@ class Chain(Transformer, pt.PTChain):
         self.set_temperature(temperature)
         self.N = len(self.subchains)
         self.d = len(self.parameter_list)
+        self.subchain_prefix_list = ['subchain_{}'.format(i) for i in range(self.N)]
         self.pool = Pool(processes = POOL_SIZE)
         return
 

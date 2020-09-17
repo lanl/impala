@@ -315,6 +315,12 @@ class Chain(Transformer, pt.PTChain):
         Sigma_insert = self.insert_stmt.format('Sigma',','.join(Sigma_cols), ','.join(['?'] * self.d * self.d))
         curs.execute(Sigma_create)
         curs.executemany(Sigma_insert, Sigma.reshape(Sigma.shape[0], -1).tolist())
+
+        for prefix, subchain in zip(self.subchain_prefix_list, self.subchains):
+            subchain.write_to_disk(curs, prefix, nburn, thin)
+
+        conn.commit()
+        conn.close()
         return
 
     def __init__(self, path, bounds, constants, model_args, temperature = 1.):

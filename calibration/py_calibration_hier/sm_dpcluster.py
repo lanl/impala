@@ -249,7 +249,7 @@ class Chain(Transformer, pt.PTChain):
     r0 = 1.
     nu = 50
     psi0 = 1e-4
-    
+
     @property
     def curr_Sigma(self):
         return self.samples.Sigma[self.curr_iter].copy()
@@ -705,7 +705,12 @@ class Chain(Transformer, pt.PTChain):
             for param, bound in zip(self.parameter_list, self.bounds)
             ]
         curs.executemany(bounds_insert, bounds)
+
+        for prefix, subchain in zip(self.subchain_prefix_list, self.subchains):
+            subchain.write_to_disk(curs, prefix, nburn, thin)
+
         conn.commit()
+        conn.close()
         return
 
     def complete(self):
@@ -730,6 +735,7 @@ class Chain(Transformer, pt.PTChain):
         self.set_temperature(temperature)
         self.N = len(self.subchains)
         self.d = len(self.parameter_list)
+        self.subchain_prefix_list = ['subchain_{}'.format(i) for i in range(self.N)]
         self.pool = Pool(processes = POOL_SIZE)
         self.priors = PriorsChain(
             psi = np.eye(self.d) * 0.5,
