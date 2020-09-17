@@ -188,6 +188,10 @@ class Chain(Transformer, pt.PTChain):
         self.model.update_parameters(phi)
         return self.model.check_constraints()
 
+    def complete(self):
+        self.pool.close()
+        return
+
     def __init__(self, path, bounds, constants, model_args, temperature = 1.):
         conn = sql.connect(path)
         cursor = conn.cursor()
