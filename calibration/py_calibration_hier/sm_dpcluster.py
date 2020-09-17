@@ -205,7 +205,7 @@ class SubChainSHPB(SubChainBase):
         cursor.execute(sigma2_create)
         cursor.executemany(sigma2_insert, self.samples.sigma2[nburn::thin].tolist())
         return
-    
+
     def __init__(self, experiment):
         self.experiment = experiment
         self.table_name = self.experiment.table_name
@@ -249,10 +249,7 @@ class Chain(Transformer, pt.PTChain):
     r0 = 1.
     nu = 50
     psi0 = 1e-4
-
-    create_stmt = """ CREATE TABLE {}({}); """
-    insert_stmt = """ INSERT INTO {}({}) values ({}); """
-
+    
     @property
     def curr_Sigma(self):
         return self.samples.Sigma[self.curr_iter].copy()

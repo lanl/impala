@@ -74,7 +74,7 @@ class Experiment_SHPB(object):
 
     def predict(self, param, x_new):
         self.model.initialize_state(T = self.temp)
-        self.model.update_parameters(theta)
+        self.model.update_parameters(param)
         res  = self.model.compute_state_history()[:,1:3]
         est_curve = interp1d(model_curve[:,0], model_curve[:,1], kind = 'cubic')
         yhat = est_curve(x_new)
@@ -85,7 +85,8 @@ class Experiment_SHPB(object):
         ydiff = self.Y - self.predict(np.array(param), x_new = self.X)
         return (ydiff * ydiff).sum()
 
-    def check_constraints(self):
+    def check_constraints(self, param):
+        self.model.update_parameters(param)        
         return self.model.check_constraints()
 
     def load_data(self, cursor, table_name):

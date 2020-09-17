@@ -28,6 +28,9 @@ class PTChain(object):
     inv_temper_temp = None
     samples         = None  # class with numpy arrays for each element
 
+    create_stmt = """ CREATE TABLE {}({}); """
+    insert_stmt = """ INSERT INTO {}({}) values ({}); """
+
     def pairwise_parameter_plot(self, path):
         raise NotImplementedError
 
