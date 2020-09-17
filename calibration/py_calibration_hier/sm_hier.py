@@ -145,6 +145,27 @@ class SubChainSHPB(SubChainHierBase):
             subchain.initialize_sampler(ns)
         return
 
+    def write_to_disk(self, cursor, prefix, nburn, thin):
+        sigma2_create = self.create_stmt.format('{}_sigma2'.format(prefix), 'sigma2 REAL')
+        sigma2_insert = self.insert_stmt.format('{}_sigma2'.format(insert), 'sigma2', '?')
+        cursor.execute(sigma2_create)
+        cursor.executemany(sigma2_insert, self.samples.sigma2[nburn::thin].tolist())
+
+        theta  = self.samples.theta[nburn::thin]
+        phi    = self.unnormalize(self.invprobit(theta))
+
+        param_create_list = ','.join([x + ' REAL' for x in self.parameter_list])
+        param_insert_tple = (','.join(self.parameter_list), ','.join(['?'] * self.d))
+
+        theta_create = create_stmt.format('theta', param_create_list)
+        theta_insert = insert_stmt.format('theta', *param_insert_tple)
+        phi_create   = create_stmt.format('phi',   param_create_list)
+        phi_insert   = insert_stmt.format('phi',   *param_insert_tple)
+        cursor.execute(theta_create)
+        cursor.executemany(theta_insert, theta.tolist())
+        cursor.execute(phi_create)
+        cursor.executemany(phi_insert, phi.tolist())
+        return
 
     def __init__(self, experiment, constant_vec):
         self.experiment = experiment
@@ -153,6 +174,7 @@ class SubChainSHPB(SubChainHierBase):
         self.N = self.experiment.X.shape[0]
         self.model = self.experiment.model
         self.model.initialize_constants(constant_vec)
+        self.parameter_list = self.model.get_parameter_list()
         return
 
 class SubChainEmulated(SubChainHierBase):
@@ -249,6 +271,52 @@ class Chain(Transformer, pt.PTChain):
         self.model.update_parameters(phi)
         return self.model.check_constraints()
 
+    def write_to_disk(self, path, nburn, thin):
+        nburn += 1
+        if os.path.exists(path):
+            os.remove(path)
+
+        conn = sql.connect(path)
+        cursor = conn.cursor()
+
+        theta0    = self.samples.theta0[nburn::thin]
+        phi0      = self.unnormalize(self.invprobit(theta))
+        Sigma     = self.samples.Sigma[nburn::thin]
+        models    = list(self.model.report_models_used().items())
+        constants = list(self.model.report_constants().items())
+
+        param_create_list = ','.join([x + ' REAL' for x in self.parameter_list])
+        param_insert_tple = (','.join(self.parameter_list), ','.join(['?'] * self.d))
+        theta0_create = self.create_stmt.format('theta0', param_create_list)
+        theta0_insert = self.insert_stmt.format('theta0', *param_insert_tple)
+        phi0_create   = self.create_stmt.format('phi0',   param_create_list)
+        phi0_insert   = self.insert_stmt.format('phi0',   *param_insert_tple)
+        cursor.execute(theta0_create)
+        cursor.executemany(theta0_insert, theta0.tolist())
+        cursor.execute(phi0_create)
+        cursor.executemany(phi0_insert, phi0.tolist())
+
+        models_create = self.create_stmt.format('models', 'model_type TEXT, model_name TEXT')
+        models_insert = self.insert_stmt.format('models', 'model_type, model_name', '?,?')
+        cursor.execute(models_create)
+        cursor.executemany(models_insert, models)
+
+        consts_create = self.create_stmt.format('constants', 'constant REAL, value REAL')
+        consts_insert = self.insert_stmt.format('constants', 'constant, value', '?,?')
+        cursor.execute(consts_create)
+        cursor.executemany(consts_insert, constants)
+
+        Sigma_cols = [
+            'Sigma_{}_{}'.format(i,j)
+            for i in range(1, self.d + 1)
+            for j in range(1, self.d + 1)
+            ]
+        Sigma_create = self.create_stmt.format('Sigma',','.join([x + ' REAL' for x in Sigma_cols]))
+        Sigma_insert = self.insert_stmt.format('Sigma',','.join(Sigma_cols), ','.join(['?'] * self.d * self.d))
+        curs.execute(Sigma_create)
+        curs.executemany(Sigma_insert, Sigma.reshape(Sigma.shape[0], -1).tolist())
+        return
+
     def __init__(self, path, bounds, constants, model_args, temperature = 1.):
         self.model = MaterialModel(**model_args)
         self.model_args = model_args
@@ -264,7 +332,9 @@ class Chain(Transformer, pt.PTChain):
             SubChain[type](Experiment[type](cursor, table_name, model_args), self.constant_vec)
             for type, table_name in tables
             ]
+        self.N = len(self.subchains)
+        self.d = len(self.parameter_list)
+        self.subchain_prefix_list = ['subchain_{}'.format(i) for i in range(self.N)]
         return
-
 
 # EOF

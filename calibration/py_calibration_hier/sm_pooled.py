@@ -150,9 +150,6 @@ class Chain(Transformer, pt.PTChain):
         conn = sql.connect(path)
         cursor = conn.cursor()
 
-        create_stmt = """ CREATE TABLE {}({}); """
-        insert_stmt = """ INSERT INTO {}({}) values ({}); """
-
         theta  = self.samples.theta[nburn::thin]
         phi    = self.unnormalize(self.invprobit(theta))
         models = list(self.model.report_models_used().items())
@@ -160,22 +157,22 @@ class Chain(Transformer, pt.PTChain):
 
         param_create_list = ','.join([x + ' REAL' for x in self.parameter_list])
         param_insert_tple = (','.join(self.parameter_list), ','.join(['?'] * self.d))
-        theta_create = create_stmt.format('theta', param_create_list)
-        theta_insert = insert_stmt.format('theta', *param_insert_tple)
-        phi_create   = create_stmt.format('phi',   param_create_list)
-        phi_insert   = insert_stmt.format('phi',   *param_insert_tple)
+        theta_create = self.create_stmt.format('theta', param_create_list)
+        theta_insert = self.insert_stmt.format('theta', *param_insert_tple)
+        phi_create   = self.create_stmt.format('phi',   param_create_list)
+        phi_insert   = self.insert_stmt.format('phi',   *param_insert_tple)
         cursor.execute(theta_create)
         cursor.executemany(theta_insert, theta.tolist())
         cursor.execute(phi_create)
         cursor.executemany(phi_insert, phi.tolist())
 
-        models_create = create_stmt.format('models', 'model_type TEXT, model_name TEXT')
-        models_insert = insert_stmt.format('models', 'model_type, model_name', '?,?')
+        models_create = self.create_stmt.format('models', 'model_type TEXT, model_name TEXT')
+        models_insert = self.insert_stmt.format('models', 'model_type, model_name', '?,?')
         cursor.execute(models_create)
         cursor.executemany(models_insert, models)
 
-        consts_create = create_stmt.format('constants', 'constant REAL, value REAL')
-        consts_insert = insert_stmt.format('constants', 'constant, value', '?,?')
+        consts_create = self.create_stmt.format('constants', 'constant REAL, value REAL')
+        consts_insert = self.insert_stmt.format('constants', 'constant, value', '?,?')
         cursor.execute(consts_create)
         cursor.executemany(consts_insert, constants)
 

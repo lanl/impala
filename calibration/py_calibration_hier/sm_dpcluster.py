@@ -117,6 +117,10 @@ class SubChainBase(object):
     samples = None
     experiment = None
     N = None
+
+    create_stmt = """ CREATE TABLE {}({}); """
+    insert_stmt = """ INSERT INTO {}({}) values ({}); """
+
     def set_temperature(self, temperature):
         self.temper_temp = temperature
         self.inv_temper_temp = 1. / temperature
@@ -139,6 +143,9 @@ class SubChainBase(object):
 
     def initialize_sampler(self, ns):
         raise NotImplementedError('Overwrite this!')
+
+    def write_to_disk(self, cursor, prefix, nburn, thin):
+        raise NotImplementedError('Overwrite this')
 
     def __init__(self, **kwargs):
         raise NotImplementedError('Overwrite this!')
@@ -192,6 +199,13 @@ class SubChainSHPB(SubChainBase):
         self.curr_iter = 0
         return
 
+    def write_to_disk(self, cursor, prefix, nburn, thin):
+        sigma2_create = self.create_stmt.format('{}_sigma2'.format(prefix), 'sigma2 REAL')
+        sigma2_insert = self.insert_stmt.format('{}_sigma2'.format(insert), 'sigma2', '?')
+        cursor.execute(sigma2_create)
+        cursor.executemany(sigma2_insert, self.samples.sigma2[nburn::thin].tolist())
+        return
+    
     def __init__(self, experiment):
         self.experiment = experiment
         self.table_name = self.experiment.table_name
@@ -235,6 +249,9 @@ class Chain(Transformer, pt.PTChain):
     r0 = 1.
     nu = 50
     psi0 = 1e-4
+
+    create_stmt = """ CREATE TABLE {}({}); """
+    insert_stmt = """ INSERT INTO {}({}) values ({}); """
 
     @property
     def curr_Sigma(self):
@@ -605,57 +622,57 @@ class Chain(Transformer, pt.PTChain):
         models = list(self.model.report_models_used().items())
         constants = list(self.model.report_constants().items())
 
-        create_stmt = """ CREATE TABLE {}({}); """
-        insert_stmt = """ INSERT INTO {}({}) values ({}); """
+        # create_stmt = """ CREATE TABLE {}({}); """
+        # insert_stmt = """ INSERT INTO {}({}) values ({}); """
 
-        models_create = create_stmt.format('models', 'model_type TEXT, model_name TEXT')
-        models_insert = insert_stmt.format('models', 'model_type, model_name', '?,?')
+        models_create = self.create_stmt.format('models', 'model_type TEXT, model_name TEXT')
+        models_insert = self.insert_stmt.format('models', 'model_type, model_name', '?,?')
         curs.execute(models_create)
         curs.executemany(models_insert, models)
 
         param_create_list = [x + ' REAL' for x in self.parameter_list]
-        thetas_create = create_stmt.format(
+        thetas_create = self.create_stmt.format(
                 'thetas', ','.join(['iteration INT', 'cluster INT'] +  param_create_list)
                 )
-        thetas_insert = insert_stmt.format(
+        thetas_insert = self.insert_stmt.format(
                 'thetas', ','.join(['iteration', 'cluster'] + self.parameter_list),
                 ','.join(['?'] * (2 + self.d))
                 )
         curs.execute(thetas_create)
         curs.executemany(thetas_insert, thetas.tolist())
 
-        phis_create = create_stmt.format(
+        phis_create = self.create_stmt.format(
                 'phis', ','.join(['iteration INT', 'cluster INT'] + param_create_list),
                 )
-        phis_insert = insert_stmt.format(
+        phis_insert = self.insert_stmt.format(
                 'phis', ','.join(['iteration', 'cluster']  + self.parameter_list),
                 ','.join(['?'] * (2 + self.d))
                 )
         curs.execute(phis_create)
         curs.executemany(phis_insert, phis.tolist())
 
-        theta0_create = create_stmt.format('theta0',','.join(param_create_list))
-        theta0_insert = insert_stmt.format(
+        theta0_create = self.create_stmt.format('theta0',','.join(param_create_list))
+        theta0_insert = self.insert_stmt.format(
                 'theta0', ','.join(self.parameter_list), ','.join(['?'] * self.d)
                 )
         curs.execute(theta0_create)
         curs.executemany(theta0_insert, theta0.tolist())
 
-        phi0_create = create_stmt.format('phi0', ','.join(param_create_list))
-        phi0_insert = insert_stmt.format(
+        phi0_create = self.create_stmt.format('phi0', ','.join(param_create_list))
+        phi0_insert = self.insert_stmt.format(
                 'phi0', ','.join(self.parameter_list), ','.join(['?'] * self.d)
                 )
         curs.execute(phi0_create)
         curs.executemany(phi0_insert, phi0.tolist())
 
         delta_list = ['delta_{:03d}'.format(i) for i in range(1, self.N + 1)]
-        deltas_create = create_stmt.format('delta', ','.join([x + ' INT' for x in delta_list]))
-        deltas_insert = insert_stmt.format('delta', ','.join(delta_list), ','.join(['?'] * self.N))
+        deltas_create = self.create_stmt.format('delta', ','.join([x + ' INT' for x in delta_list]))
+        deltas_insert = self.insert_stmt.format('delta', ','.join(delta_list), ','.join(['?'] * self.N))
         curs.execute(deltas_create)
         curs.executemany(deltas_insert, deltas.tolist())
 
-        meta_create = create_stmt.format('meta', 'source_name TEXT, cluster_id TEXT')
-        meta_insert = insert_stmt.format('meta', 'source_name,cluster_id', '?,?')
+        meta_create = self.create_stmt.format('meta', 'source_name TEXT, cluster_id TEXT')
+        meta_insert = self.insert_stmt.format('meta', 'source_name,cluster_id', '?,?')
         curs.execute(meta_create)
         meta_list = [
             (subchain.table_name, delta_id)
@@ -668,23 +685,23 @@ class Chain(Transformer, pt.PTChain):
             for i in range(1, self.d + 1)
             for j in range(1, self.d + 1)
             ]
-        Sigma_create = create_stmt.format('Sigma',','.join([x + ' REAL' for x in Sigma_cols]))
-        Sigma_insert = insert_stmt.format('Sigma',','.join(Sigma_cols), ','.join(['?'] * self.d * self.d))
+        Sigma_create = self.create_stmt.format('Sigma',','.join([x + ' REAL' for x in Sigma_cols]))
+        Sigma_insert = self.insert_stmt.format('Sigma',','.join(Sigma_cols), ','.join(['?'] * self.d * self.d))
         curs.execute(Sigma_create)
         curs.executemany(Sigma_insert, Sigma.reshape(Sigma.shape[0], -1).tolist())
 
-        constant_create = create_stmt.format('constants','constant TEXT, value REAL')
-        constant_insert = insert_stmt.format('constants','constant, value', '?,?')
+        constant_create = self.create_stmt.format('constants','constant TEXT, value REAL')
+        constant_insert = self.insert_stmt.format('constants','constant, value', '?,?')
         curs.execute(constant_create)
         curs.executemany(constant_insert, constants)
 
-        alpha_create = create_stmt.format('alpha', 'alpha REAL, nclust INT')
-        alpha_insert = insert_stmt.format('alpha', 'alpha, nclust', '?,?')
+        alpha_create = self.create_stmt.format('alpha', 'alpha REAL, nclust INT')
+        alpha_insert = self.insert_stmt.format('alpha', 'alpha, nclust', '?,?')
         curs.execute(alpha_create)
         curs.executemany(alpha_insert, np.vstack((alpha, deltas.max(axis = 1) + 1)).T.tolist())
 
-        bounds_create = create_stmt.format('bounds', 'parameter TEXT, lower REAL, upper REAL')
-        bounds_insert = insert_stmt.format('bounds', 'parameter, lower, upper', '?,?,?')
+        bounds_create = self.create_stmt.format('bounds', 'parameter TEXT, lower REAL, upper REAL')
+        bounds_insert = self.insert_stmt.format('bounds', 'parameter, lower, upper', '?,?,?')
         curs.execute(bounds_create)
         bounds = [
             (param, bound[0],bound[1])
