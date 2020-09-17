@@ -141,8 +141,9 @@ class SubChainSHPB(SubChainHierBase):
         return
 
     def initialize_sampler(self, ns):
+        self.curr_iter = 0
         self.samples = SamplesSHPB(self.d, ns)
-        gen = mvnormal(scale = 0.2)
+        gen = normal(scale = 0.2)
         theta_try = gen.rvs(size = self.d)
         while not self.check_constraints(theta_try):
             theta_try = gen.rvs(size = self.d)
@@ -269,9 +270,20 @@ class Chain(Transformer, pt.PTChain):
         return
 
     def initialize_sampler(self, ns):
+        self.curr_iter = 0
+
         for subchain in self.subchains:
             subchain.initialize_sampler(ns)
-        self.samples = ChainSamples(self.d, ns)
+
+        self.samples = ChainSamples(self.d, ns)]
+
+        gen = normal(scale = 0.1)
+        theta_try = gen.rvs(size = self.d)
+        while not self.check_constraints(theta_try):
+            theta_try = gen.rvs(size = self.d)
+
+        self.samples.theta0[0] = theta_try
+        self.samples.Sigma[0] = self.sample_Sigma(self.curr_thetas, self.curr_theta0)
         return
 
     def check_constraints(self, theta):
