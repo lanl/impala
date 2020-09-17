@@ -97,6 +97,11 @@ class SubChainSHPB(SubChainHierBase):
                 + self.priors.b / substate.sigma2)
         return lpt + lpp
 
+    def check_constraints(self, theta):
+        phi = self.unnormalize(self.invprobit(theta))
+        self.model.update_parameters(phi)
+        return self.model.check_constraints()
+
     def sample_theta(self, curr_theta, sigma2, theta0, SigInv):
         curr_cov   = self.localcov(curr_theta)
         prop_theta = curr_theta + cholesky(curr_cov) @ normal.rvs(size = self.d)
@@ -137,11 +142,13 @@ class SubChainSHPB(SubChainHierBase):
 
     def initialize_sampler(self, ns):
         self.samples = SamplesSHPB(self.d, ns)
-        self.samples.theta[0] = 0.
+        gen = mvnormal(scale = 0.2)
+        theta_try = gen.rvs(size = self.d)
+        while not self.check_constraints(theta_try):
+            theta_try = gen.rvs(size = self.d)
+        self.samples.theta[0] = theta_try
+        self.samples.sigma2[0] = invgamma(self.priors.a, scale = self.priors.b).rvs()
         self.samples.accepted[0] = 0
-
-        for subchain in self.subchains:
-            subchain.initialize_sampler(ns)
         return
 
     def write_to_disk(self, cursor, prefix, nburn, thin):
