@@ -276,7 +276,7 @@ class Chain(Transformer, pt.PTChain):
         self.curr_iter += 1
         self.samples.theta0[self.curr_iter] = self.sample_theta0(self.curr_thetas, SigInv)
         self.samples.Sigma[self.curr_iter] = self.sample_Sigma(self.curr_thetas, self.curr_theta0)
-        self.accepted[self.curr_iter] = np.array([
+        self.samples.accepted[self.curr_iter] = np.array([
             subchain.curr_accepted
             for subchain in self.subchains
             ]).mean()
