@@ -203,7 +203,7 @@ class SubChainSHPB(SubChainBase):
         sigma2_create = self.create_stmt.format('{}_sigma2'.format(prefix), 'sigma2 REAL')
         sigma2_insert = self.insert_stmt.format('{}_sigma2'.format(prefix), 'sigma2', '?')
         cursor.execute(sigma2_create)
-        cursor.executemany(sigma2_insert, self.samples.sigma2[nburn::thin].tolist())
+        cursor.executemany(sigma2_insert, [(x,) for x in self.samples.sigma2[nburn::thin].tolist()])
         return
 
     def __init__(self, experiment):
