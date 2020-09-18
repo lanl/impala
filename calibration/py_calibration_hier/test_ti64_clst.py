@@ -91,14 +91,14 @@ if __name__ == '__main__':
     elif rank == 0:
         model = pt.PTMaster(
             comm,
-            temperature_ladder = 1.3 ** array(range(size - 1)),
+            temperature_ladder = 1.1 ** array(range(size - 1)),
             path       = path,
             bounds     = parameter_bounds,
             constants  = starting_consts,
             model_args = {'flow_stress_model'   : 'PTW', 'shear_modulus_model' : 'Stein'},
             )
         model.sample(40000, 5)
-        model.write_to_disk('./results/Ti64/res_ti64_clst.db', 20001, 5)
+        model.write_to_disk('./results/Ti64/res_ti64_clst.db', 20000, 5)
         model.plot_accept_probability('./results/Ti64/res_ti64_clst_accept.png', 20000)
         model.plot_swap_probability('./results/Ti64/res_ti64_clst_swapped.png', 20000 // 5)
         model.complete()

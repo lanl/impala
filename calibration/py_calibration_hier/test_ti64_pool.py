@@ -4,12 +4,10 @@ from numpy import array, float64
 np.seterr(under = 'ignore')
 from mpi4py import MPI
 
-# import sm_dpcluster as sm
-# import sm_pooled as sm
-import sm_hier as sm
+import sm_pooled as sm
 # import pt
 import pt_mpi as pt
-pt.MPI_MESSAGE_SIZE = 2**12
+pt.MPI_MESSAGE_SIZE = 2**13
 sm.POOL_SIZE = 8
 
 
@@ -17,10 +15,7 @@ comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
-# rank = 0
-# size = 3
-
-material = 'Al5083'
+material = 'Ti64'
 
 # Defining Paths, Constants, Parameter Ranges
 if True:
@@ -90,25 +85,22 @@ if True:
 
 if __name__ == '__main__':
     if rank > 0:
-        # pass
         chain = pt.PTSlave(comm = comm, statmodel = sm.Chain)
         chain.watch()
 
     elif rank == 0:
         model = pt.PTMaster(
             comm,
-            # statmodel = sm.Chain,
-            temperature_ladder = 1.1 ** array(range(size - 1)),
+            temperature_ladder = 1.2 ** array(range(size - 1)),
             path       = path,
             bounds     = parameter_bounds,
             constants  = starting_consts,
-            # model_args = {'flow_stress_model'   : 'PTW', 'shear_modulus_model' : 'Stein'},
-            model_args = {'flow_stress_model'   : 'PTW', 'shear_modulus_model' : 'Simple'},
+            model_args = {'flow_stress_model'   : 'PTW', 'shear_modulus_model' : 'Stein'},
             )
-        model.sample(20000, 5)
-        model.write_to_disk('./results/Al5083/results_hier_Al5083.db', 10000, 5)
-        model.plot_swap_probability('./results/Al5083/results_hier_Al5083_swapped.png', 10000)
-        model.plot_accept_probability('./results/Al5083/results_hier_Al5083_accept.png', 10000)
+        model.sample(40000, 5)
+        model.write_to_disk('./results/Ti64/res_ti64_pool.db', 20000, 5)
+        model.plot_accept_probability('./results/Ti64/res_ti64_pool_accept.png', 20000)
+        model.plot_swap_probability('./results/Ti64/res_ti64_pool_swapped.png', 20000 // 5)
         model.complete()
 
 # EOF
