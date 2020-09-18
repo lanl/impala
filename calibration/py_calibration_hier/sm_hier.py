@@ -66,6 +66,10 @@ class SubChainSHPB(SubChainHierBase):
     def curr_theta(self):
         return self.samples.theta[self.curr_iter].copy()
 
+    @property
+    def curr_accepted(self):
+        return self.samples.accepted[self.curr_iter].copy()
+
     def set_substate(self, substate):
         self.samples.sigma2[self.curr_iter] = substate.sigma2
         self.samples.theta[self.curr_iter] = substate.theta
@@ -202,10 +206,13 @@ StateChain = namedtuple('StateChain','theta0 Sigma SigInv substates')
 class ChainSamples(object):
     theta0 = None
     Sigma  = None
+    accepted = None
 
     def __init__(self, d, ns):
         self.theta0 = np.empty((ns + 1, d))
         self.Sigma = np.empty((ns + 1, d, d))
+        self.accepted = np.empty(ns + 1)
+        self.accepted[0] = 0
         return
 
 class Chain(Transformer, pt.PTChain):
@@ -269,6 +276,10 @@ class Chain(Transformer, pt.PTChain):
         self.curr_iter += 1
         self.samples.theta0[self.curr_iter] = self.sample_theta0(self.curr_thetas, SigInv)
         self.samples.Sigma[self.curr_iter] = self.sample_Sigma(self.curr_thetas, self.curr_theta0)
+        self.accepted[self.curr_iter] = np.array([
+            subchain.curr_accepted
+            for subchain in self.subchains
+            ]).mean()
         return
 
     def sample_n(self, n):
