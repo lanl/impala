@@ -156,7 +156,7 @@ class SubChainSHPB(SubChainHierBase):
 
     def write_to_disk(self, cursor, prefix, nburn, thin):
         sigma2_create = self.create_stmt.format('{}_sigma2'.format(prefix), 'sigma2 REAL')
-        sigma2_insert = self.insert_stmt.format('{}_sigma2'.format(insert), 'sigma2', '?')
+        sigma2_insert = self.insert_stmt.format('{}_sigma2'.format(prefix), 'sigma2', '?')
         cursor.execute(sigma2_create)
         cursor.executemany(sigma2_insert, self.samples.sigma2[nburn::thin].tolist())
 
