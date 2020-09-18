@@ -7,18 +7,18 @@ np.seterr(under = 'ignore')
 # import sm_dpcluster as sm
 # import sm_pooled as sm
 import sm_hier as sm
-import pt
-# import pt_mpi as pt
+# import pt
+import pt_mpi as pt
 pt.MPI_MESSAGE_SIZE = 2**12
 sm.POOL_SIZE = 8
 
 
-# comm = MPI.COMM_WORLD
-# rank = comm.Get_rank()
-# size = comm.Get_size()
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
+size = comm.Get_size()
 
-rank = 0
-size = 3
+# rank = 0
+# size = 3
 
 material = 'Al5083'
 
@@ -90,14 +90,14 @@ if True:
 
 if __name__ == '__main__':
     if rank > 0:
-        pass
-        # chain = pt.PTSlave(comm = comm, statmodel = sm.Chain)
-        # chain.watch()
+        # pass
+        chain = pt.PTSlave(comm = comm, statmodel = sm.Chain)
+        chain.watch()
 
     elif rank == 0:
         model = pt.PTMaster(
-            # comm,
-            statmodel = sm.Chain,
+            comm,
+            # statmodel = sm.Chain,
             temperature_ladder = 1.3 ** array(range(size - 1)),
             path       = path,
             bounds     = parameter_bounds,
@@ -107,7 +107,6 @@ if __name__ == '__main__':
             )
         model.sample(20000, 5)
         model.write_to_disk('./results/Al5083/results_hier_Al5083.db', 10000, 5)
-        # model.plot_accept_probability('results_cluster_ti64_accept.png')
         model.plot_swap_probability('./results/Al5083/results_hier_Al5083_swapped.png', 10000)
         model.plot_accept_probability('./results/Al5083/results_hier_Al5083_accept.png', 10000)
         model.complete()
