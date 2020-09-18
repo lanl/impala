@@ -2,23 +2,23 @@ import numpy as np
 import time
 from numpy import array, float64
 np.seterr(under = 'ignore')
-from mpi4py import MPI
+# from mpi4py import MPI
 
 # import sm_dpcluster as sm
 # import sm_pooled as sm
 import sm_hier as sm
-# import pt
-import pt_mpi as pt
+import pt
+# import pt_mpi as pt
 pt.MPI_MESSAGE_SIZE = 2**12
 sm.POOL_SIZE = 8
 
 
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
-size = comm.Get_size()
+# comm = MPI.COMM_WORLD
+# rank = comm.Get_rank()
+# size = comm.Get_size()
 
-# rank = 0
-# size = 4
+rank = 0
+size = 3
 
 material = 'Al5083'
 
@@ -91,13 +91,13 @@ if True:
 if __name__ == '__main__':
     if rank > 0:
         pass
-        chain = pt.PTSlave(comm = comm, statmodel = sm.Chain)
-        chain.watch()
+        # chain = pt.PTSlave(comm = comm, statmodel = sm.Chain)
+        # chain.watch()
 
     elif rank == 0:
         model = pt.PTMaster(
-            comm,
-            # statmodel = sm.Chain,
+            # comm,
+            statmodel = sm.Chain,
             temperature_ladder = 1.3 ** array(range(size - 1)),
             path       = path,
             bounds     = parameter_bounds,
