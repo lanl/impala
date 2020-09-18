@@ -2,7 +2,7 @@ import numpy as np
 import time
 from numpy import array, float64
 np.seterr(under = 'ignore')
-# from mpi4py import MPI
+from mpi4py import MPI
 
 # import sm_dpcluster as sm
 # import sm_pooled as sm
