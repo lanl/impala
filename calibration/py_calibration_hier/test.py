@@ -98,7 +98,7 @@ if __name__ == '__main__':
         model = pt.PTMaster(
             comm,
             # statmodel = sm.Chain,
-            temperature_ladder = 1.3 ** array(range(size - 1)),
+            temperature_ladder = 1.05 ** array(range(size - 1)),
             path       = path,
             bounds     = parameter_bounds,
             constants  = starting_consts,
