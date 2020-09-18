@@ -179,6 +179,15 @@ class Chain(Transformer, pt.PTChain):
         for prefix, subchain in zip(self.subchain_prefix_list, self.subchains):
             subchain.write_to_disk(cursor, prefix, nburn, thin)
 
+        meta_list = list(zip(
+            [subchain.experiment.table_name for subchain in self.subchains],
+            self.subchain_prefix_list,
+            ))
+        meta_create = self.create_stmt.format('meta', 'table_name TEXT, prefix TEXT')
+        meta_insert = self.insert_stmt.format('meta', 'table_name, prefix', '?,?')
+        cursor.execute(meta_create)
+        cursor.executemany(meta_insert, meta_list)
+
         conn.commit()
         conn.close()
         return

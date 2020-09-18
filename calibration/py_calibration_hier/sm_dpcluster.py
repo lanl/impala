@@ -668,12 +668,12 @@ class Chain(Transformer, pt.PTChain):
         curs.execute(deltas_create)
         curs.executemany(deltas_insert, deltas.tolist())
 
-        meta_create = self.create_stmt.format('meta', 'source_name TEXT, cluster_id TEXT')
-        meta_insert = self.insert_stmt.format('meta', 'source_name,cluster_id', '?,?')
+        meta_create = self.create_stmt.format('meta', 'table_name TEXT, cluster_id TEXT, prefix TEXT')
+        meta_insert = self.insert_stmt.format('meta', 'table_name, cluster_id, prefix', '?,?,?')
         curs.execute(meta_create)
         meta_list = [
             (subchain.table_name, delta_id)
-            for subchain, delta_id in zip(self.subchains, delta_list)
+            for subchain, delta_id in zip(self.subchains, delta_list, self.subchain_prefix_list)
             ]
         curs.executemany(meta_insert, meta_list)
 

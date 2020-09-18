@@ -363,11 +363,20 @@ class Chain(Transformer, pt.PTChain):
             ]
         Sigma_create = self.create_stmt.format('Sigma',','.join([x + ' REAL' for x in Sigma_cols]))
         Sigma_insert = self.insert_stmt.format('Sigma',','.join(Sigma_cols), ','.join(['?'] * self.d * self.d))
-        curs.execute(Sigma_create)
-        curs.executemany(Sigma_insert, Sigma.reshape(Sigma.shape[0], -1).tolist())
+        cursor.execute(Sigma_create)
+        cursor.executemany(Sigma_insert, Sigma.reshape(Sigma.shape[0], -1).tolist())
 
         for prefix, subchain in zip(self.subchain_prefix_list, self.subchains):
-            subchain.write_to_disk(curs, prefix, nburn, thin)
+            subchain.write_to_disk(cursor, prefix, nburn, thin)
+
+        meta_list = list(zip(
+            [subchain.experiment.table_name for subchain in self.subchains],
+            self.subchain_prefix_list,
+            ))
+        meta_create = self.create_stmt.format('meta', 'table_name TEXT, prefix TEXT')
+        meta_insert = self.insert_stmt.format('meta', 'table_name, prefix', '?,?')
+        cursor.execute(meta_create)
+        cursor.executemany(meta_insert, meta_list)
 
         conn.commit()
         conn.close()
