@@ -155,16 +155,10 @@ class SubChainSHPB(SubChainHierBase):
         return
 
     def write_to_disk(self, cursor, prefix, nburn, thin):
-        try:
-            sigma2_create = self.create_stmt.format('{}_sigma2'.format(prefix), 'sigma2 REAL')
-            sigma2_insert = self.insert_stmt.format('{}_sigma2'.format(prefix), 'sigma2', '?')
-            cursor.execute(sigma2_create)
-            cursor.executemany(sigma2_insert, [(x,) for x in self.samples.sigma2[nburn::thin].tolist()])
-        except ValueError:
-            print(sigma2_create)
-            print(sigma2_insert)
-            print(self.samples.sigma2[nburn::thin].tolist())
-            raise
+        sigma2_create = self.create_stmt.format('{}_sigma2'.format(prefix), 'sigma2 REAL')
+        sigma2_insert = self.insert_stmt.format('{}_sigma2'.format(prefix), 'sigma2', '?')
+        cursor.execute(sigma2_create)
+        cursor.executemany(sigma2_insert, [(x,) for x in self.samples.sigma2[nburn::thin].tolist()])
 
         theta  = self.samples.theta[nburn::thin]
         phi    = self.unnormalize(self.invprobit(theta))
@@ -172,10 +166,10 @@ class SubChainSHPB(SubChainHierBase):
         param_create_list = ','.join([x + ' REAL' for x in self.parameter_list])
         param_insert_tple = (','.join(self.parameter_list), ','.join(['?'] * self.d))
 
-        theta_create = create_stmt.format('theta', param_create_list)
-        theta_insert = insert_stmt.format('theta', *param_insert_tple)
-        phi_create   = create_stmt.format('phi',   param_create_list)
-        phi_insert   = insert_stmt.format('phi',   *param_insert_tple)
+        theta_create = self.create_stmt.format('theta', param_create_list)
+        theta_insert = self.insert_stmt.format('theta', *param_insert_tple)
+        phi_create   = self.create_stmt.format('phi',   param_create_list)
+        phi_insert   = self.insert_stmt.format('phi',   *param_insert_tple)
         cursor.execute(theta_create)
         cursor.executemany(theta_insert, theta.tolist())
         cursor.execute(phi_create)
