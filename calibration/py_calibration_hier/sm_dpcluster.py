@@ -203,7 +203,7 @@ class SubChainSHPB(SubChainBase):
         sigma2_create = self.create_stmt.format('{}_sigma2'.format(prefix), 'sigma2 REAL')
         sigma2_insert = self.insert_stmt.format('{}_sigma2'.format(prefix), 'sigma2', '?')
         cursor.execute(sigma2_create)
-        cursor.executemany(sigma2_insert, self.samples.sigma2[nburn::thin].tolist())
+        cursor.executemany(sigma2_insert, [(x,) for x in self.samples.sigma2[nburn::thin].tolist()])
         return
 
     def __init__(self, experiment):
@@ -272,7 +272,7 @@ class Chain(Transformer, pt.PTChain):
 
     @property
     def curr_substates(self):
-        return [subchain.get_substate() for subchain in self.subchains]
+        return tuple(subchain.get_substate() for subchain in self.subchains)
 
     @staticmethod
     def clean_delta_theta(deltas, thetas, i):
@@ -668,12 +668,12 @@ class Chain(Transformer, pt.PTChain):
         curs.execute(deltas_create)
         curs.executemany(deltas_insert, deltas.tolist())
 
-        meta_create = self.create_stmt.format('meta', 'source_name TEXT, cluster_id TEXT')
-        meta_insert = self.insert_stmt.format('meta', 'source_name,cluster_id', '?,?')
+        meta_create = self.create_stmt.format('meta', 'table_name TEXT, cluster_id TEXT, prefix TEXT')
+        meta_insert = self.insert_stmt.format('meta', 'table_name, cluster_id, prefix', '?,?,?')
         curs.execute(meta_create)
         meta_list = [
             (subchain.table_name, delta_id)
-            for subchain, delta_id in zip(self.subchains, delta_list)
+            for subchain, delta_id in zip(self.subchains, delta_list, self.subchain_prefix_list)
             ]
         curs.executemany(meta_insert, meta_list)
 

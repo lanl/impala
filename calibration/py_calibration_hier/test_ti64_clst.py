@@ -20,7 +20,7 @@ material = 'Ti64'
 # Defining Paths, Constants, Parameter Ranges
 if True:
     if material == 'Al5083':
-        path = './data_Al5083.db'
+        path = './data/data_Al5083.db'
         starting_consts = {
             'y1'     : 0.094, 'y2'      : 0.575, 'beta' : 0.25,
             'alpha'  : 0.2,   'matomic' : 27.,   'Tref' : 298.,
@@ -38,7 +38,7 @@ if True:
             'yInf'  : (0.0001,   0.005),
             }
     if material == 'copper':
-        path = './data_copper.db'
+        path = './data/data_copper.db'
         parameter_bounds = {
             'theta' : (1e-3, 0.1),
             'p'     : (9e-3, 10.),
@@ -58,7 +58,7 @@ if True:
             'y1'     : 0.0245, 'y2'      : 0.33,
             }
     if material == 'Ti64':
-        path = './data_Ti64.db'
+        path = './data/data_Ti64.db'
         starting_consts = {
             'alpha'  : 0.2,
             'y1'     : 0.0245,
@@ -91,16 +91,16 @@ if __name__ == '__main__':
     elif rank == 0:
         model = pt.PTMaster(
             comm,
-            temperature_ladder = 1.3 ** array(range(size - 1)),
+            temperature_ladder = 1.1 ** array(range(size - 1)),
             path       = path,
             bounds     = parameter_bounds,
             constants  = starting_consts,
             model_args = {'flow_stress_model'   : 'PTW', 'shear_modulus_model' : 'Stein'},
             )
         model.sample(40000, 5)
-        model.write_to_disk('res_ti64_clst.db', 20001, 5)
-        model.plot_accept_probability('res_ti64_clst_accept.png', 20000)
-        model.plot_swap_probability('res_ti64_clst_swapped.png', 20000 // 5)
+        model.write_to_disk('./results/Ti64/res_ti64_clst.db', 20000, 5)
+        model.plot_accept_probability('./results/Ti64/res_ti64_clst_accept.png', 20000)
+        model.plot_swap_probability('./results/Ti64/res_ti64_clst_swapped.png', 20000 // 5)
         model.complete()
 
 # EOF

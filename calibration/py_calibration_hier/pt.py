@@ -69,6 +69,9 @@ class PTChain(object):
         """ advance the sampler 1 iteration """
         raise NotImplementedError
 
+    def complete(self):
+        pass
+
 class PTSlave(object):
     def set_temperature(self, temperature):
         self.chain.set_temperature(temperature)
