@@ -272,7 +272,7 @@ class Chain(Transformer, pt.PTChain):
 
     @property
     def curr_substates(self):
-        return [subchain.get_substate() for subchain in self.subchains]
+        return tuple(subchain.get_substate() for subchain in self.subchains)
 
     @staticmethod
     def clean_delta_theta(deltas, thetas, i):
