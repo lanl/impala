@@ -672,8 +672,8 @@ class Chain(Transformer, pt.PTChain):
         meta_insert = self.insert_stmt.format('meta', 'table_name, cluster_id, prefix', '?,?,?')
         curs.execute(meta_create)
         meta_list = [
-            (subchain.table_name, delta_id)
-            for subchain, delta_id in zip(self.subchains, delta_list, self.subchain_prefix_list)
+            (subchain.table_name, delta_id, prefix)
+            for subchain, delta_id, prefix in zip(self.subchains, delta_list, self.subchain_prefix_list)
             ]
         curs.executemany(meta_insert, meta_list)
 
@@ -749,10 +749,13 @@ class Chain(Transformer, pt.PTChain):
         return
 
 class ResultBase(object):
-    def plot_calibrated(self):
+    def plot_calibrated(self, path):
         pass
 
-    def __init__(self, parent, subchain_samples, experiment, constants, model_args):
+    def load_data(self, cursor, prefix):
+        pass
+
+    def __init__(self, cursor, prefix, parent, experiment, constants, model_args):
         """
         experiment       : model experiment (As defined by experiment.py)
         cluster_samples  : samples of phi (theta in real space) relevant to observation's cluster
@@ -762,46 +765,41 @@ class ResultBase(object):
         model_args       : dictionary of physical models used when model was calibrated
         """
         self.parent           = parent
+        self.pool             = self.parent.pool # expose multiprocessing.pool, only build once.
         self.experiment       = experiment
-        self.subchain_samples = subchain_samples
         self.constants        = constants
         self.model_args       = model_args
+        self.load_data(cursor, prefix)
         return
 
 class ResultSHPB(ResultBase):
-    def plot_calibrated(self, path, smax = None):
+    def load_data(self, cursor, prefix):
+        sigma2 = np.array(
+            [x[0] for x in cursor.execute(' SELECT * FROM {}_sigma2; '.format(prefix))]
+            )
+        # self.samples = Bunch(
+        #     cluster_phi = self.parent.samples.
+        #     sigma2 = sigma2,
+        # )
+        return
+
+    def calibrated_curve_summary(self, parameter_set, predictive = False, quantiles = (0.05, 0.5, 0.95)):
+        args = zip(repeat(self.experiment.tuple), parameter_set.tolist(),
+                    repeat(self.constants), repeat(self.model_args))
+        res = self.pool.map(predict_wrapper, args)
+        strain = res[0][0]
+        stress = np.vstack([r[1] for r in res])
+        stress_summary = np.quantile(stress, quantiles, axis = 0)
+        return strain, stress_summary
+
+    def plot_calibrated(self, path, smax = None, predictive = False):
         ul_alpha = 0.6; m_alpha = 0.95; linewidth = 0.4
-        # Start computing calibrated curves
-        nsamp = self.cluster_samples.shape[0]
-        pool = Pool(POOL_SIZE)
-        # Curves calibrated to observation/cluster
-        args_cluster = zip(
-            repeat(self.experiment.tuple),
-            self.cluster_samples.tolist(),
-            repeat(self.constants),
-            repeat(self.model_args),
-            )
-        res_cluster  = pool.map(predict_wrapper, args_cluster)
-        # Curves calibrated to hierarchical mean
-        args_hier    = zip(
-            repeat(self.experiment.tuple),
-            self.hier_samples.tolist(),
-            repeat(self.constants),
-            repeat(self.model_args),
-            )
-        res_hier     = pool.map(predict_wrapper, args_hier)
-        # Extract curve results
-        strain = res_cluster[0][0]
-        stress_cluster = np.vstack([res[1] for res in res_cluster])
-        stress_hier    = np.vstack([res[1] for res in res_hier])
-        #sigma2s        = self.subchain_samples.sigma2
-        # Compute curve summaries, generate posterior predictive
-        err = normal.rvs(scale = np.sd(sigma2s), size = (sigma2s.shape[0], 100))
-        stress_cluster_summary = np.quantile(res_cluster + err, (0.05, 0.5, 0.95), axis = 0)
-        stress_hier_summary    = np.quantile(res_hier    + err, (0.05, 0.5, 0.95), axis = 0)
+
+        strain, stress_cluster_summary = self.calibrated_curve_summary(self.samples.cluster_phi, predictive)
+        strain, stress_hier_summary    = self.calibrated_curve_summary(self.samples.hier_phi, predictive)
 
         ul_line_args = {'alpha' : 0.60, 'linestype' : '-', 'linewidth' : 0.4}
-        me_line_args  = {'alpha' : 0.95, 'linestyle' : '-', 'linewidth' : 0.4}
+        me_line_args = {'alpha' : 0.95, 'linestyle' : '-', 'linewidth' : 0.4}
 
         plt.plot(strain, stress_cluster_summary[0], color = 'blue', **ul_line_args)
         plt.plot(strain, stress_cluster_summary[1], color = 'blue', **me_line_args)
@@ -816,10 +814,10 @@ class ResultSHPB(ResultBase):
             pass
         else:
             smax = max(
-                    stress_cluster_summary.max(),
-                    strain_cluster_summary.max(),
-                    self.experiment.Y.max()
-                    )
+                stress_cluster_summary.max(),
+                strain_cluster_summary.max(),
+                self.experiment.Y.max()
+                )
         plt.ylim((0., smax))
         if os.path.exists(path):
             os.remove(path)
@@ -852,7 +850,7 @@ class ResultSummary(Transformer):
         temp   = np.array(list(cursor.execute(' SELECT * FROM phis; ')))
         phis   = [temp[np.where(temp.T[0] == i)[0], 2:] for i in range(ns)]
 
-        samples = Bunch(
+        self.samples = Bunch(
             theta  = thetas,
             phi    = phis,
             delta  = delta,
@@ -862,6 +860,8 @@ class ResultSummary(Transformer):
             alpha  = alpha,
             nclust = nclust,
             )
+
+        meta_o = dict(list(cursor.execute(' SELECT * FROM meta; ')))
 
         bounds = None
         model = MaterialModel(**models)
@@ -881,14 +881,7 @@ class ResultSummary(Transformer):
 
         return cls(samples, bounds, constant_vec, models, experiments)
 
-    @classmethod
-    def from_chain(cls, chain, nburn, thin):
-        theta = chain.samples.theta[nburn::thin]
-        Sigma = chain.samples.Sigma[nburn::thin]
-        theta0 = chain.samples.theta0[nburn::thin]
-        delta = chain.samples.delta[nburn::thin]
-
-    def plot_clustplot(self, path, figsize = (5,6), dpi = 300):
+    def plot_clustplot(self, path, ordering = None, title = None, figsize = (5,6), dpi = 300):
         delta = self.chain_samples.delta
         nsamp, ndat = delta.shape
         clust_mat_sum = np.zeros((ndat, ndat))
@@ -897,21 +890,52 @@ class ResultSummary(Transformer):
             for j in range(ndat):
                 clust_mat[j, delta[i,j]] = 1
             clust_mat_sum += clust_mat @ clust_mat.T
+        if ordering:
+            clust_mat_sum = clust_mat_sum.T[ordering].T[ordering]
         clust_mat_prb = clust_mat_sum / delta.shape[0]
         fig = plt.figure(figsize = figsize)
         plt.matshow(clust_mat_prb)
         plt.colorbar()
+        if title:
+            plt.title(title)
         plt.savefig(path, dpi = dpi)
         plt.close()
         return
 
-    def __init__(self, chain_samples, bounds, constants, model_args, experiments):
-        self.chain_samples = chain_samples
-        # self.subchain_samples = subchain_samples
-        self.bounds        = bounds
-        self.constants_vec = constants
-        self.model_args    = model_args
-        self.experiments   = experiments
+    def plot_calibrated(self, basepath):
+        for result in self.results:
+            result.plot_calibrated(basepath)
+        return
+
+    def assemble_results(self):
+        exp_dict = {experiment.table_name : experiment for experiment in experiments}
+        phi0     = self.chain_samples.phi0
+        theta0   = self.chain_samples.theta0
+        thetas   = self.chain_samples.thetas
+        phis     = self.chain_samples.phis
+        deltas   = self.chain_samples.deltas
+
+    def __init__(self, path_inputs, path_results):
+        iconn = sql.connect(path_inputs)
+        oconn = sql.connect(path_results)
+        icursor = iconn.cursor()
+        ocursor = oconn.cursor()
+
+        tables = list(icursor.execute(' SELECT type, table_name FROM meta; '))
+        self.models = dict(ocursor.execute(' select * FROM models; '))
+        constants = dict(ocursor.execute(' SELECT * FROM constants; '))
+        experiments = [
+            Experiment[type](icursor, table_name, self.models)
+            for type, table_name in tables
+            ]
+        constant_list = self.experiments[0].model.get_constant_list()
+        self.constant_vec = np.array([constants[key] for key in constant_list])
+        for experiment in experiments:
+            experiment.model.initialize_constants(self.constant_vec)
+
+
+
+
         return
 
 
