@@ -15,7 +15,7 @@ from itertools import combinations, chain
 from scipy.special import comb
 from datetime import datetime
 from collections import namedtuple
-# import ipdb #ipdb.set_trace()
+import ipdb #ipdb.set_trace()
 from pathos.multiprocessing import ProcessingPool as Pool
 import dill
 
@@ -153,6 +153,8 @@ class BassData:
         self.xx = normalize(self.xx_orig, self.bounds)
         return
 
+Samples = namedtuple('Samples', 's2 lam tau nbasis nbasis_models n_int signs vs knots beta')
+Sample = namedtuple('Sample', 's2 lam tau nbasis nbasis_models n_int signs vs knots beta')
 class BassState:
     def log_post(self): # needs updating
         lp = (
@@ -339,6 +341,9 @@ class BassState:
 
         a_s2 = self.prior.g1 + self.data.n/2
         b_s2 = self.prior.g2 + .5*(self.data.ssy - np.dot(self.bhat.T,self.Xty[0:self.nc])/(1+self.tau))
+        if b_s2 < 0:
+            self.prior.g2 = self.prior.g2 + 1.e-10
+            b_s2 = self.prior.g2 + .5*(self.data.ssy - np.dot(self.bhat.T,self.Xty[0:self.nc])/(1+self.tau))
         self.s2 = 1/np.random.gamma(a_s2,1/b_s2,size=1)
 
         self.beta = self.bhat/(1+self.tau) + np.dot(self.R_inv_t,np.random.normal(size=self.nc)) * sqrt(self.s2/(1+self.tau))
@@ -384,7 +389,7 @@ class BassState:
         self.bhat = np.mean(data.y)
         self.qf = pow(sqrt(data.n) * np.mean(data.y), 2)
         self.count = np.zeros(3)
-        self.cmod = False
+        self.cmod = False # has the state changed since the last write (i.e., has a birth, death, or change been accepted)?
         return
 
 
@@ -405,8 +410,7 @@ class BassModel:
         vs = np.zeros([nstore,self.prior.maxBasis,self.prior.maxInt],dtype=int)
         knots = np.zeros([nstore,self.prior.maxBasis,self.prior.maxInt])
         beta = np.zeros([nstore,self.prior.maxBasis+1])
-        out = namedtuple('out', 's2 lam tau nbasis nbasis_models n_int signs vs knots beta')
-        self.samples = out(s2, lam, tau, nbasis, nbasis_models, n_int, signs, vs, knots, beta)
+        self.samples = Samples(s2, lam, tau, nbasis, nbasis_models, n_int, signs, vs, knots, beta)
         self.k = 0
         self.k_mod = -1
         self.model_lookup = np.zeros(nstore,dtype=int)
@@ -481,15 +485,18 @@ class BassModel:
 
     def predict(self, X, mcmc_use = None, nugget=False):
         Xs = normalize(X, self.data.bounds)
-        #ipdb.set_trace()
-        if mcmc_use == None:
+        if np.any(mcmc_use == None):
             mcmc_use = np.array(range(self.nstore))
         out = np.zeros([len(mcmc_use),len(Xs)])
         models = self.model_lookup[mcmc_use]
         umodels = set(models)
+        k = 0
+        #ipdb.set_trace()
         for j in umodels:
             mcmc_use_j = mcmc_use[np.ix_(models == j)]
-            out[mcmc_use_j,:] = np.dot(self.samples.beta[mcmc_use_j,0:(self.samples.nbasis_models[j]+1)],self.makeBasisMatrix(j,Xs).T)
+            nn = len(mcmc_use_j)
+            out[range(k,nn),:] = np.dot(self.samples.beta[mcmc_use_j,0:(self.samples.nbasis_models[j]+1)],self.makeBasisMatrix(j,Xs).T)
+            k = k + nn
         if nugget:
             out = out + np.random.normal(size=[len(Xs),len(mcmc_use)],scale=np.sqrt(self.samples.s2[mcmc_use])).T
         return out
@@ -577,13 +584,17 @@ class BassBasis:
 
         plt.show()
 
+
+
 def bassPCA(xx, y, npc=None, percVar=99.9, ncores=1, center=True, scale=False, **kwargs):
+    
     y_mean = 0
     y_sd = 1
     if center:
         y_mean = np.mean(y, axis=0)
     if scale:
         y_sd = np.std(y, axis=0)
+        y_sd[y_sd==0] = 1
     y_scale = np.apply_along_axis(lambda row: (row-y_mean)/y_sd, 1, y)
     decomp = np.linalg.svd(y_scale.T)
 
@@ -601,6 +612,51 @@ def bassPCA(xx, y, npc=None, percVar=99.9, ncores=1, center=True, scale=False, *
     trunc_error = np.dot(basis,newy) - y_scale.T
 
     return BassBasis(xx, y, basis, newy, y_mean, y_sd, trunc_error, ncores, **kwargs)
+
+def warp(x, y, lmarks, ref_lmarks, xgrid_aligned):
+    x_warp = np.interp(x, lmarks, ref_lmarks)
+    return np.interp(xgrid_aligned, x_warp, y)
+
+def unwarp(xaligned, yaligned, ref_lmarks, lmarks, xgrid):
+    xaligned_unwarp = np.interp(xaligned, ref_lmarks, lmarks)
+    return np.interp(xgrid, xaligned_unwarp, yaligned)
+
+def bassPCAwarp(xx, x, y, lmarks, npc=None, percVar=99.9, ncores=1, center=True, scale=False, **kwargs):
+    
+    nlmarks = len(lmarks[0])
+    nx = len(x[0])
+    ref_lmarks = np.mean(lmarks, axis=0)
+    xgrid_aligned = np.linspace(ref_lmarks[0], ref_lmarks[nlmarks-1], nx)# assume lmarks include start and end points
+    xgrid = np.linspace(x.min(), x.max(), nx)
+    
+    #ipdb.set_trace()
+    
+    N = xx.shape[0]
+    for i in range(N):
+        y[i,:] = warp(x[i,:], y[i,:], lmarks[i,:], ref_lmarks, xgrid_aligned)
+    
+    #ipdb.set_trace()
+    
+    mod_yaligned = bassPCA(xx, y, npc, percVar, ncores, center, scale, **kwargs)
+    mod_lmarks = bassPCA(xx, lmarks, npc, percVar, ncores, center, scale, **kwargs)
+    
+    return mod_yaligned, mod_lmarks, xgrid_aligned, ref_lmarks, xgrid
+
+def predict_warp(wmod, X, mcmc_use = None, nugget=False):
+    y_pred = wmod[0].predict(X, mcmc_use, nugget)
+    lmarks_pred = wmod[1].predict(X, mcmc_use, nugget)
+    nx = len(wmod[4])
+    #ipdb.set_trace()
+    
+    x_pred = np.zeros(y_pred.shape)
+    for i in range(y_pred.shape[0]):
+        for j in range(y_pred.shape[1]):
+            x_pred[i,j,:] = np.linspace(lmarks_pred[i,j,0], lmarks_pred[i,j,-1], nx)
+            y_pred[i,j,:] = unwarp(wmod[2], y_pred[i,j,:], wmod[3], lmarks_pred[i,j,:], x_pred[i,j,:])
+            #y_pred[i,j,:] = unwarp(wmod[2], y_pred[i,j,:], wmod[3], lmarks_pred[i,j,:], wmod[4])
+    
+    return x_pred, y_pred
+    
 
 ######################################################
 ## test it out
@@ -620,6 +676,7 @@ if __name__ == '__main__':
         y = f(x) + np.random.normal(size=n)
 
         mod = bass(x,y,nmcmc=10000,nburn=9000)
+        pred = mod.predict(xx,mcmc_use=np.array([1,100]),nugget=True)
 
         #mod.plot()
 
@@ -632,8 +689,6 @@ if __name__ == '__main__':
           return out
 
 
-
-
         tt = np.linspace(0,1,50)
         n = 500
         p = 9
@@ -643,18 +698,58 @@ if __name__ == '__main__':
         y = np.apply_along_axis(f2, 1, x) #+ e.reshape(n,len(tt))
 
         modf = bassPCA(x,y,ncores=2,percVar=99.99)
-        modf.plot()
+        #modf.plot()
 
-        pred = modf.predict(xx,nugget=True)
+        pred = modf.predict(xx,mcmc_use=np.array([1,100]),nugget=True)
 
-        ind = 11
-        plt.plot(pred[:,ind,:].T)
-        plt.plot(f2(xx[ind,]),'bo')
+        #ind = 11
+        #plt.plot(pred[:,ind,:].T)
+        #plt.plot(f2(xx[ind,]),'bo')
 
-        plt.plot(np.apply_along_axis(f2, 1, xx), np.mean(pred,axis=0))
-        abline(1,0)
+        #plt.plot(np.apply_along_axis(f2, 1, xx), np.mean(pred,axis=0))
+        #abline(1,0)
 
 
+    if False:
+        
+        def f2(x):
+          tt = np.linspace(0,x[0],50)
+          out = 10. * np.sin(pi * tt * x[1]) + 20. * (x[2] - .5)**2 + 10 * x[3] + 5. * x[4]
+          return tt, out
+
+
+        n = 500
+        p = 9
+        x = np.random.rand(n,p)
+        xx = np.random.rand(1000,p)
+        #e = np.random.normal(size=n*len(tt))
+        y = np.apply_along_axis(f2, 1, x) #+ e.reshape(n,len(tt))
+        
+        tt = np.zeros([n,50])
+        y = np.zeros([n,50])
+        for i in range(n):
+            out = f2(x[i,:])
+            tt[i,:] = out[0]
+            y[i,:] = out[1]
+
+        lmarks = np.zeros([n,2])
+        lmarks[:,1] = x[:,0]
+        modf = bassPCAwarp(x,tt,y,lmarks,ncores=1,percVar=99.99)
+        
+        import time
+        start = time.process_time()
+        xuse = xx[100,:].reshape([1,9])
+        pred = predict_warp(modf, xuse, mcmc_use=np.array([0]),nugget=True)
+        print(time.process_time() - start)
+
+
+        pred = predict_warp(modf, xx, mcmc_use=np.array([0]),nugget=True)
+        for ii in range(23):
+            plt.plot(pred[0][0,ii,:],pred[1][0,ii,:])
+            plt.plot(f2(xx[ii,:])[0],f2(xx[ii,:])[1],linestyle="--")
+
+
+# for calibration, just predict the aligned and the landmarks, then compare those to the aligned experiment and experiment landmarks.
 
         #profiler.print_stats()
         #profiler.dump_stats("/Users/dfrancom/Desktop/profiler_stats.txt")
