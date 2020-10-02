@@ -23,6 +23,8 @@ meta_create = """CREATE TABLE meta (
     emax REAL,
     pname TEXT,
     fname TEXT,
+    sim_input REAL,
+    sim_output REAL,
     table_name TEXT
     );
 """
@@ -32,6 +34,7 @@ shpb_meta_insert = """ INSERT INTO
         values (?,?,?,?,?,?,?);
         """
 shpb_data_insert = """ INSERT INTO {}(strain, stress) values (?,?); """
+pca_meta_insert = """ INSERT INTO meta(type, table_name, sim_input, sim_output) values (?,?,?,?); """
 
 def load_Ti64_shpb(curs):
     global ti64_curr_id
@@ -115,7 +118,7 @@ def load_Ti64():
     connection.close()
     return
 
-def load_copper_shpb(curs):
+def load_copper_shpb(curs, conn):
     global copper_curr_id
     shpb_emax = 0
 
@@ -159,11 +162,34 @@ def load_copper_shpb(curs):
             )
     return
 
-def load_copper_tc(curs):
+def load_copper_pca(curs, conn):
     global copper_curr_id
+
+    xps = []
+    xps.append({
+        'realY' : './copper/outputs_real_fp.csv',
+        'simX' : './copper/inputs_sim_fp_ptw.csv',
+        'simY' : './copper/outputs_sim_fp_ptw.csv'
+        })
+    for xp in xps:
+        copper_curr_id += 1
+        table_name = 'data_{}'.format(copper_curr_id)
+        emu_iname = 'pca_input_{}'.format(copper_curr_id)
+        emu_oname = 'pca_output_{}'.format(copper_curr_id)
+
+        real = pd.read_csv(xp['realY']) # first row
+        simi = pd.read_csv(xp['simX']) # simulated x
+        simo = pd.read_csv(xp['simY']) # simulated Y
+
+        real.to_sql(table_name, conn)
+        simi.to_sql(emu_iname, conn)
+        simo.to_sql(emu_oname, conn)
+        curs.execute(pca_meta_insert, ('pca', table_name, emu_iname, emu_oname))
+
+    conn.commit()
     return
 
-def load_copper_fp(curs):
+def load_copper_wpca(curs, conn):
     global copper_curr_id
     return
 
@@ -179,9 +205,9 @@ def load_copper():
     cursor.execute(meta_create)
     connection.commit()
 
-    load_copper_shpb(cursor)
-    load_copper_tc(cursor)
-    load_copper_fp(cursor)
+    load_copper_shpb(cursor, connection)
+    load_copper_pca(cursor, connection)
+    load_copper_wpca(cursor, connection)
 
     connection.commit()
     connection.close()
@@ -257,8 +283,8 @@ def load_Al5083():
     return
 
 if __name__ == '__main__':
-    load_Ti64()
+    # load_Ti64()
     load_copper()
-    load_Al5083()
+    # load_Al5083()
 
 # EOF

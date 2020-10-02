@@ -57,7 +57,8 @@ class Chain(Transformer, pt.PTChain):
 
     def log_posterior_theta(self, theta, substates):
         phi = self.unnormalize(self.invprobit(theta))
-        args = zip(self.exp_tuples, repeat(phi), repeat(self.constant_vec), repeat(self.model_args))
+        args = zip(self.exp_tuples, repeat(phi), repeat(self.constant_vec),
+                    repeat(self.model_args), self.curr_substates)
         sses = self.pool.map(sse_wrapper, args)
         llks = np.array([
             subchain.log_posterior_theta(sse, substate)
@@ -70,7 +71,8 @@ class Chain(Transformer, pt.PTChain):
 
     def log_posterior_state(self, state):
         phi = self.unnormalize(self.invprobit(state.theta))
-        args = zip(self.exp_tuples, repeat(phi), repeat(self.constant_vec), repeat(self.model_args))
+        args = zip(self.exp_tuples, repeat(phi), repeat(self.constant_vec),
+                    repeat(self.model_args), state.substates)
         sses = self.pool.map(sse_wrapper, args)
         llks = np.array([
             subchain.log_posterior_substate(sse, substate)
@@ -109,7 +111,8 @@ class Chain(Transformer, pt.PTChain):
         self.samples.accepted[self.curr_iter] = accepted
 
         phi  = self.unnormalize(self.invprobit(self.curr_theta))
-        args = zip(self.exp_tuples, repeat(phi), repeat(self.constant_vec), repeat(self.model_args))
+        args = zip(self.exp_tuples, repeat(phi), repeat(self.constant_vec),
+                                repeat(self.model_args), self.curr_substates)
         sses = self.pool.map(sse_wrapper, args)
         for sse, subchain in zip(sses, self.subchains):
             subchain.iter_sample(sse)
@@ -212,9 +215,10 @@ class Chain(Transformer, pt.PTChain):
         self.constant_vec = np.array([constants[key] for key in self.constant_list])
         self.model.initialize_constants(self.constant_vec)
         tables = list(cursor.execute(' SELECT type, table_name FROM meta; '))
+        tables = [(i, table[0], table[1]) for i, table in enumerate(tables)]
         self.subchains = [
-            SubChain[type](Experiment[type](cursor, table_name, model_args))
-            for type, table_name in tables
+            SubChain[type](self, Experiment[type](cursor, table_name, model_args), i)
+            for i, type, table_name in tables
             ]
         self.exp_tuples = [subchain.experiment.tuple for subchain in self.subchains]
         self.set_temperature(temperature)

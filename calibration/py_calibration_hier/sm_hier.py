@@ -81,7 +81,7 @@ class SubChainSHPB(SubChainHierBase):
 
     def log_posterior_theta(self, theta, sigma2, theta0, SigInv):
         phi = self.unnormalize(self.invprobit(theta))
-        sse = smdp.sse_shpb(self.experiment.tuple, phi, self.constant_vec, self.model_args)
+        sse = smdp.sse_shpb(self.experiment.tuple, phi, self.constant_vec, self.model_args, self.get_substate())
         # (scaled) sum squared error
         ssse = sse / sigma2
         sssd = (theta - theta0).T @ SigInv @ (theta - theta0)
@@ -132,7 +132,7 @@ class SubChainSHPB(SubChainHierBase):
 
         theta_new, accepted = self.sample_theta(theta, sigma2, theta0, SigInv)
         phi = self.unnormalize(self.invprobit(theta_new))
-        sse = smdp.sse_shpb(self.experiment.tuple, phi, self.constant_vec, self.model_args)
+        sse = smdp.sse_shpb(self.experiment.tuple, phi, self.constant_vec, self.model_args, self.get_substate())
         self.samples.theta[self.curr_iter] = theta_new
         self.samples.accepted[self.curr_iter] = accepted
         self.samples.sigma2[self.curr_iter] = self.sample_sigma2(sse)
@@ -180,18 +180,20 @@ class SubChainSHPB(SubChainHierBase):
         cursor.executemany(phi_insert, phi.tolist())
         return
 
-    def __init__(self, experiment, constant_vec, bounds):
+    def __init__(self, parent, experiment, index, constant_vec, bounds):
+        self.parent     = parent
         self.experiment = experiment
-        self.bounds = bounds
+        self.index      = index
+        self.bounds     = bounds
         self.table_name = self.experiment.table_name
-        self.priors = PriorsSHPB(25, 1.e-6)
-        self.N = self.experiment.X.shape[0]
-        self.model = self.experiment.model
+        self.priors     = PriorsSHPB(25, 1.e-6)
+        self.N          = self.experiment.X.shape[0]
+        self.model      = self.experiment.model
         self.model.initialize_constants(constant_vec)
         self.model_args = self.model.report_models_used()
-        self.constant_vec = constant_vec
+        self.constant_vec   = constant_vec
         self.parameter_list = self.model.get_parameter_list()
-        self.d = len(self.parameter_list)
+        self.d          = len(self.parameter_list)
         return
 
 class SubChainEmulated(SubChainHierBase):
@@ -404,13 +406,16 @@ class Chain(Transformer, pt.PTChain):
         conn = sql.connect(path)
         cursor = conn.cursor()
         tables = list(cursor.execute(' SELECT type, table_name FROM meta;'))
+        tables = [(i, table[0], table[1]) for i, table in enumerate(tables)]
         self.subchains = [
             SubChain[type](
+                self,
                 Experiment[type](cursor, table_name, model_args),
+                i,
                 self.constant_vec,
                 self.bounds,
                 )
-            for type, table_name in tables
+            for i, type, table_name in tables
             ]
         self.set_temperature(temperature)
         self.N = len(self.subchains)
