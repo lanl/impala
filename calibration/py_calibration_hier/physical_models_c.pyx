@@ -249,21 +249,21 @@ cdef class JCYieldStress(BaseModel):
 
 cdef class PTWYieldStress(BaseModel):
     """ Preston Tonks Wallace Yield Stress Model """
-    parameter_list = ['theta','p','s0','sInf','kappa','gamma','y0','yInf']
-    constant_list  = ['beta','matomic', 'y1','y2']
+    parameter_list = ['theta0','p','s0','sInf','kappa','gamma','y0','yInf','y1','y2','beta']
+    constant_list  = ['matomic']
 
-    cdef double theta, p, s0, sInf, kappa, gamma, y0, yInf, y1, y2
-    cdef double beta, matomic
+    cdef double theta, p, s0, sInf, kappa, gamma, y0, yInf, y1, y2, beta
+    cdef double matomic
 
     cpdef dict report_parameters(self):
-        return {'theta' : self.theta, 'p'     : self.p,     's0'    : self.s0,
+        return {'theta0' : self.theta, 'p'     : self.p,     's0'    : self.s0,
                 'sInf'  : self.sInf,  'kappa' : self.kappa, 'gamma' : self.gamma,
-                'y0'    : self.y0,    'yInf'  : self.yInf,
+                'y0'    : self.y0,    'yInf'  : self.yInf,  'y1'    : self.y1,
+                'y2'    : self.y2,    'beta'  : self.beta,
                 }
 
     cpdef dict report_constants(self):
-        return {'beta' : self.beta, 'matomic' : self.matomic,
-                'y1'   : self.y1,   'y2'      : self.y2      }
+        return {'matomic' : self.matomic}
 
     cpdef void update_parameters(self, double[:] input):
         self.theta = input[0]
@@ -274,19 +274,20 @@ cdef class PTWYieldStress(BaseModel):
         self.gamma = input[5]
         self.y0    = input[6]
         self.yInf  = input[7]
+        self.y1    = input[8]
+        self.y2    = input[9]
+        self.beta  = input[10]
         return
 
     cpdef void initialize_constants(self, double[:] input):
-        self.beta    = input[0]
-        self.matomic = input[1]
-        self.y1      = input[2]
-        self.y2      = input[3]
+        # self.beta    = input[0]
+        self.matomic = input[0]
         return
 
     cpdef bint check_constraints(self):
-        if ((self.sInf > self.s0) or (self.yInf > self.y0)   or
-            (self.y0   > self.s0) or (self.yInf > self.sInf) or
-            (self.y1   < self.s0) or (self.y2   < self.beta)):
+        if (self.sInf > self.s0) or (self.yInf > self.y0) or \
+            (self.y0 > self.s0) or (self.yInf > self.sInf) or \
+            (self.y1 < self.s0) or (self.y2   < self.beta):
             return False
         else:
             return True
@@ -605,17 +606,8 @@ cdef class MaterialModel:
             self.melt_model.check_constraints()    and \
             self.density_model.check_constraints():
             return True
-
         else:
             return False
-        # checked = [
-        #     self.flow_stress.check_constraints(),
-        #     self.specific_heat.check_constraints(),
-        #     self.shear_modulus.check_constraints(),
-        #     self.melt_model.check_constraints(),
-        #     self.density_model.check_constraints(),
-        #     ]
-        # return all(checked)
 
     def __init__(
             self,

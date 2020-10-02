@@ -26,6 +26,7 @@ import os
 from experiment import Experiment, Transformer, cholesky_inversion
 from physical_models_c import MaterialModel
 from pointcloud import localcov
+import pickledBass as pb
 import pt
 
 POOL_SIZE = 8
@@ -46,7 +47,7 @@ class Bunch(object):
         self.__dict__.update(**kwargs)
         return
 
-def predict_shpb(exp_tuple, parameters, constants, model_args):
+def predict_shpb(exp_tuple, parameters, constants, model_args, substate):
     """ Form the prediction output for a SHPB experiment """
     model = MaterialModel(**model_args)
     model.set_history_variables(exp_tuple.emax, exp_tuple.edot, 100)
@@ -55,7 +56,17 @@ def predict_shpb(exp_tuple, parameters, constants, model_args):
     model.initialize_state(exp_tuple.temp)
     return (model.compute_state_history()[:,1:3]).T
 
-def sse_shpb(exp_tuple, parameters, constants, model_args):
+def predict_pca(exp_tuple, parameters, constants, model_args, substate):
+    phi_zeta = np.append(parameters, substate.zeta).reshape(1,-1)
+    preds = pb.predictPCA(phi_zeta, exp_tuple.samples, exp_tuple.tbasis,
+                            exp_tuple.ysd, exp_tuple.ymean, exp_tuple.bounds)
+    return preds.reshape(-1)
+
+
+def predict_wpca(exp_tuple, parameters, constants, model_args, substate):
+    pass
+
+def sse_shpb(exp_tuple, parameters, constants, model_args, substate):
     """
     Computes sum-squared-error for a given experiment, for quasi-statics and shpb's.
     exp_tuple  : relevant experiment data wrapped in a tuple. (x, y, emax, edot, temp)
@@ -64,13 +75,7 @@ def sse_shpb(exp_tuple, parameters, constants, model_args):
     model_args : dict (defines what physical models are used)
     """
     # Build model, predict stress at given strain values
-    res = predict_shpb(exp_tuple, parameters, constants, model_args)
-    # model = MaterialModel(**model_args)
-    # model.set_history_variables(exp_tuple.emax, exp_tuple.edot, 100)
-    # model.initialize_constants(constants)
-    # model.update_parameters(np.array(parameters))
-    # model.initialize_state(exp_tuple.temp)
-    # res = (model.compute_state_history()[:, 1:3]).T
+    res = predict_shpb(exp_tuple, parameters, constants, model_args, substate)
     if np.isnan(res).any():
         return 1.e9
     est_curve = interp1d(res[0], res[1], kind = 'cubic')
@@ -79,20 +84,24 @@ def sse_shpb(exp_tuple, parameters, constants, model_args):
     diffs = exp_tuple.Y - preds
     return diffs @ diffs
 
-def sse_flyer(exp_tuple, parameters, constants, model_args):
-    raise NotImplementedError
+def sse_pca(exp_tuple, parameters, constants, model_args, substate):
+    preds = predict_pca(exp_tuple, parameters, constants, model_args, substate)
+    diffs = (exp_tuple.Y - preds).reshape(-1)
+    return diffs @ diffs
 
-def sse_taylor(exp_tuple, parameters, constants, model_args):
-    raise NotImplementedError
+def sse_wpca(exp_tuple, parameters, constants, model_args, substate):
+    pass
 
 sse = {
     'shpb' : sse_shpb,
-    'taylor' : sse_taylor,
-    'flyer' : sse_flyer,
+    'pca'  : sse_pca,
+    'wpca' : sse_wpca,
     }
 
 predict = {
     'shpb' : predict_shpb,
+    'pca'  : predict_pca,
+    'wpca' : predict_wpca,
     }
 
 # sse_wrapper
@@ -100,6 +109,8 @@ predict = {
 #  pool against a row of a given iterator.  I.e., pool.map(sse_wrapper, arg_iterable)
 
 def predict_wrapper(args):
+    """ Provides a wrapper around the sse dictionary so that we can invoke the particular predict
+    type relevant to the data, all at the same time. """
     return predict[args[0].type](*args)
 
 def sse_wrapper(args):
@@ -111,7 +122,7 @@ def sse_wrapper(args):
 #  Each SubChain object is built towards sampling a particular type, and whatever error structure
 #  is associated with that type.
 
-class SubChainBase(object):
+class SubChainBase(Transformer):
     """ Base object for subchains to inherit from.  Method signatures set here MUST be overwritten,
     as the Chain object expects them. """
     samples = None
@@ -160,6 +171,7 @@ class SamplesSHPB(object):
         return
 
 class SubChainSHPB(SubChainBase):
+    """ Subchain class for SHPB """
     samples = None
     experiment = None
     N = None
@@ -169,52 +181,187 @@ class SubChainSHPB(SubChainBase):
         return self.samples.sigma2[self.curr_iter].copy()
 
     def get_substate(self):
+        """ Get current state of subchain """
         return SubstateSHPB(self.curr_sigma2)
 
     def set_substate(self, substate):
+        """ Set current state of subchain """
         self.samples.sigma2[self.curr_iter] = substate.sigma2
 
     def log_posterior_theta(self, sse, substate):
+        """ Compute log-posterior for theta given SSE, sigma2 """
         return -0.5 * sse * self.inv_temper_temp / substate.sigma2
 
     def log_posterior_substate(self, sse, substate):
+        """ Compute log-posterior for substate (that is, theta + sigma2) """
         lpt = self.log_posterior_theta(sse, substate)
         lpp = -((self.N * self.inv_temper_temp + self.priors.a + 1) * log(substate.sigma2)
                     + self.priors.b / substate.sigma2)
         return lpt + lpp
 
     def sample_sigma2(self, sse):
+        """ Given sse, generate sigma2 """
         aa = self.N * self.inv_temper_temp + self.priors.a
         bb = sse * self.inv_temper_temp + self.priors.b
         return invgamma.rvs(aa, scale = bb)
 
     def iter_sample(self, sse):
+        """ Advance the sampler one iteration """
         self.curr_iter += 1
         self.samples.sigma2[self.curr_iter] = self.sample_sigma2(sse)
         return
 
     def initialize_sampler(self, ns):
+        """ Initialize the sampler. Set initial values """
         self.samples = SamplesSHPB(ns)
         self.samples.sigma2[0] = invgamma.rvs(self.priors.a, scale = self.priors.b)
         self.curr_iter = 0
         return
 
     def write_to_disk(self, cursor, prefix, nburn, thin):
+        """ Write Subchain samples to disk """
         sigma2_create = self.create_stmt.format('{}_sigma2'.format(prefix), 'sigma2 REAL')
         sigma2_insert = self.insert_stmt.format('{}_sigma2'.format(prefix), 'sigma2', '?')
         cursor.execute(sigma2_create)
         cursor.executemany(sigma2_insert, [(x,) for x in self.samples.sigma2[nburn::thin].tolist()])
         return
 
-    def __init__(self, experiment):
+    def __init__(self, parent, experiment, index):
+        self.parent     = parent
         self.experiment = experiment
+        self.index      = index
         self.table_name = self.experiment.table_name
-        self.priors = PriorsSHPB(25, 1e-6)
-        self.N = self.experiment.X.shape[0]
+        self.priors     = PriorsSHPB(25, 1e-6)
+        self.N          = self.experiment.X.shape[0]
         return
 
+class SamplesPCA(object):
+    sigma2 = None
+    eta = None
+
+    def __init__(self, ns, d):
+        self.sigma2 = np.empty(ns + 1)
+        self.eta    = np.empty((ns + 1, d))
+        return
+
+PriorsPCA = namedtuple('PriorsPCA', 'a b')
+SubstatePCA = namedtuple('SubstatePCA','eta zeta sigma2')
+class SubChainPCA(SubChainBase):
+    @property
+    def curr_eta(self):
+        """ eta is the additional variables on probit scale """
+        return self.samples.eta[self.curr_iter].copy()
+
+    @property
+    def curr_zeta(self):
+        """ zeta is eta, transformed back to real scale """
+        return self.unnormalize(self.invprobit(self.curr_theta))
+
+    @property
+    def curr_sigma2(self):
+        return self.samples.sigma2[self.curr_iter].copy()
+
+    @property
+    def curr_theta(self):
+        return self.parent.curr_thetas[self.parent.curr_delta[self.index]].copy()
+
+    @property
+    def curr_phi(self):
+        return self.parent.unnormalize(self.invprobit(self.curr_theta))
+
+    def get_substate(self):
+        return SubstatePCA(self.curr_eta, self.curr_zeta, self.curr_sigma2)
+
+    def set_substate(self, substate):
+        self.samples.sigma2[self.curr_iter] = substate.sigma2
+        self.samples.eta[self.curr_iter] = substate.eta
+        return
+
+    def log_posterior_theta(self, sse, substate):
+        return - 0.5 * sse * self.inv_temper_temp / substate.sigma2
+
+    def log_posterior_eta(self, eta, theta, sigma2):
+        phi  = self.parent.unnormalize(self.invprobit(theta))
+        zeta = self.unnormalize(self.invprobit(eta))
+        t    = self.experiment.tuple
+        sse  = sse_pca(np.append(phi, zeta), t.samples, t.tbasis, t.ysd, t.ymean, t.bounds)
+        ldj  = self.invprobitlogjac(eta)
+        return - 0.5 * sse * self.inv_temper_temp / sigma2 + ldj
+
+    def log_posterior_substate(self, sse, substate):
+        lpt = self.log_posterior_theta(sse, substate)
+        lpp = -((self.N * self.inv_temper_temp + self.priors.a + 1) * log(substate.sigma2)
+                    + self.priors.b / substate.sigma2)
+        ldj = self.invprobitlogjac(substate.eta)
+        return lpt + lpp + ldj
+
+    def sample_eta(self, curr_eta, theta, sigma2):
+        curr_cov = self.localcov(curr_eta)
+        prop_eta = cholesky(curr_cov) @ normal.rvs(size = self.d) + curr_eta
+        prop_cov = self.localcov(prop_eta)
+
+        curr_lp = self.log_posterior_eta(curr_eta, theta, sigma2)
+        prop_lp = self.log_posterior_eta(prop_eta, theta, sigma2)
+
+        if self.d > 1:
+            cp_ld = mvnormal(mean = curr_eta, cov = curr_cov).logpdf(prop_eta)
+            pc_ld = mvnormal(mean = prop_eta, cov = prop_cov).logpdf(curr_eta)
+        elif self.d == 0:
+            cp_ld = normal(mean = curr_eta, cov = curr_cov).logpdf(prop_eta)
+            pc_ld = normal(mean = prop_eta, cov = prop_cov).logpdf(curr_eta)
+
+        log_alpha = prop_lp + pc_ld - curr_lp - cp_ld
+        if log(uniform.rvs()) < log_alpha:
+            return prop_eta
+        else:
+            return curr_eta
+        pass
+
+    def sample_sigma2(self, sse):
+        aa = self.N * self.inv_temper_temp + self.priors.a
+        bb = sse * self.inv_temper_temp + self.priors.b
+        return invgamma.rvs(aa, scale = bb)
+
+    def initialize_sampler(ns):
+        self.samples = SamplesPCA(ns, self.d)
+        self.samples.eta[0] = 0
+        self.samples.sigma2[0] = invgamma.rvs(self.priors.a, scale = self.priors.b)
+        self.curr_iter = 0
+        return
+
+    def iter_sample(self):
+        sigma2 = self.curr_sigma2
+        eta    = self.curr_eta
+        theta  = self.curr_phi
+        exptp  = self.experiment.tuple
+
+        self.curr_iter += 1
+
+        self.samples.eta[self.curr_iter] = self.sample_eta(eta, theta, sigma2)
+        sse = sse_pca(exptp, phi, None, None, SubStatePCA(self.curr_eta, self.curr_zeta, sigma2))
+        self.samples.sigma2[self.curr_iter] = self.sample_sigma2(sse)
+        return
+
+    def __init__(self, parent, experiment, index):
+        self.experiment = experiment
+        self.parent = parent
+        self.index = index
+        self.check_constraints = self.experiment.check_constraints
+        self.eta_cols = self.experiment.eta_cols
+        self.d = len(self.eta_cols)
+        self.priors = PriorsPCA(0.1, 0.1)
+        pass
+
+class SamplesWPCA(object):
+    pass
+
+class SubChainWPCA(object):
+    pass
+
 SubChain = {
-    'shpb' : SubChainSHPB
+    'shpb' : SubChainSHPB,
+    'pca'  : SubChainPCA,
+    'wpca' : SubChainWPCA,
     }
 
 # Defining Chain
@@ -246,9 +393,10 @@ class Chain(Transformer, pt.PTChain):
     """ Chain object.  This object implements the parallel tempering  """
     samples = None
     N = None
-    r0 = 1.
-    nu = 50
-    psi0 = 1e-4
+    # Configuration regarding localcov:
+    r0 = 1.     # base radius
+    nu = 50     # prior degrees of freedom
+    psi0 = 1e-4 # prior diagonal magnitude
 
     @property
     def curr_Sigma(self):
@@ -276,6 +424,9 @@ class Chain(Transformer, pt.PTChain):
 
     @staticmethod
     def clean_delta_theta(deltas, thetas, i):
+        """ drops index i from the delta list.  If index i was a singleton (only obsv in cluster),
+        then shift all deltas higher down by 1.  keep doing this until there's no empty clusters
+        in the stack. """
         assert(deltas.max() + 1 == thetas.shape[0])
         _delta = np.delete(deltas, i)
         _theta = thetas[np.array([j for j in range(_delta.max() + 1) if j in set(_delta)])]
@@ -288,24 +439,32 @@ class Chain(Transformer, pt.PTChain):
         return _delta, _theta
 
     def sample_delta_i(self, deltas, thetas, theta0, Sigma, alpha, i):
+        """ Sample cluster membership index """
         assert(deltas.max() + 1 == thetas.shape[0])
+        # Check cluster membership without observation i
         _delta, _theta = self.clean_delta_theta(deltas, thetas, i)
         _dmax  = _delta.max()
+        # Compute number of observations within each cluster
         nj     = np.array([(_delta == j).sum() for j in range(_dmax + 1 + self.m)])
+        # Compute prior probability of membership in each cluster (nj or alpha / m)
         lj     = nj + (nj == 0) * alpha / self.m
+        # Generate new thetas for m possible new clusters
         th_new = self.sample_theta_new(theta0, Sigma, self.m)
         th_stack = np.vstack((_theta, th_new))
         phi_stack   = self.unnormalize(self.invprobit(th_stack))
         assert(th_stack.shape[0] == lj.shape[0])
+        # compute SSE's under each cluster (extant or non-extant)
         args = zip(
                 repeat(self.subchains[i].experiment.tuple),
                 phi_stack.tolist(),
                 repeat(self.constants_vec),
                 repeat(self.model_args),
+                repeat(self.subchains[i].get_substate())
                 )
         sses   = np.array(list(self.pool.map(sse_wrapper, args)))
         # sses   = np.array(list(map(sse_wrapper, args)))
         substate = self.subchains[i].get_substate()
+        # Get log-posterior given
         lps    = np.array([self.subchains[i].log_posterior_theta(sse, substate) for sse in sses])
         lps[np.isnan(lps)] = - np.inf
         lps -= lps.max() # normalizing the log-posteriors so at least some of the sse's
@@ -349,9 +508,11 @@ class Chain(Transformer, pt.PTChain):
     def log_posterior_theta_j(self, theta_j, cluster_j, theta0, SigInv):
         phi_j = self.unnormalize(self.invprobit(theta_j))
         clust_exp_tuples = [self.subchains[i].experiment.tuple for i in cluster_j]
+        clust_substates = [self.subchains[i].get_substate() for i in cluster_j]
         args  = zip(
                 clust_exp_tuples,           repeat(phi_j),
                 repeat(self.constants_vec), repeat(self.model_args),
+                clust_substates,
                 )
         sses  = np.array(list(self.pool.map(sse_wrapper, args)))
         # sses   = np.array(list(map(sse_wrapper, args)))
@@ -452,8 +613,10 @@ class Chain(Transformer, pt.PTChain):
 
     def sample_subchains(self, thetas, deltas):
         exp_tuples = [self.subchains[i].experiment.tuple for i in range(self.N)]
+        substates  = [self.subchains[i].get_substate() for i in range(self.N)]
         phis = self.unnormalize(self.invprobit(thetas[deltas]))
-        args = zip(exp_tuples, phis.tolist(), repeat(self.constants_vec), repeat(self.model_args))
+        args = zip(exp_tuples, phis.tolist(), repeat(self.constants_vec),
+                    repeat(self.model_args), substates)
         sses = np.array(list(self.pool.map(sse_wrapper, args)))
         # sses = np.array(list(map(sse_wrapper, args)))
         for sse, subchain in zip(sses, self.subchains):
@@ -516,8 +679,11 @@ class Chain(Transformer, pt.PTChain):
         init_normal = normal(0, scale = 0.2)
         for i in range(self.N):
             theta_try = init_normal.rvs(size = self.d)
+            # fail = 0
             while not self.check_constraints(theta_try):
                 theta_try = init_normal.rvs(size = self.d)
+                # fail += 1
+                # print('\rfail: {}'.format(fail), end = '')
             theta_start[i] = theta_try
             self.subchains[i].initialize_sampler(ns)
 
@@ -563,9 +729,11 @@ class Chain(Transformer, pt.PTChain):
         SigInv = self.pd_matrix_inversion(state.Sigma)
         # Set up the arguments to sse_wrapper
         exp_tuples = [subchain.experiment.tuple for subchain in self.subchains]
+        substates  = [subchain.get_substate() for subchain in self.subchains]
         thetas = state.thetas[state.delta]
         phis   = self.unnormalize(self.invprobit(thetas))
-        args   = zip(exp_tuples, phis, repeat(self.constants_vec), repeat(self.model_args))
+        args   = zip(exp_tuples, phis, repeat(self.constants_vec),
+                        repeat(self.model_args), substates)
         # farm calculating sse's out to the pool
         sses   = np.array(list(self.pool.map(sse_wrapper, args)))
         # sses   = np.array(list(map(sse_wrapper, args)))
@@ -672,8 +840,8 @@ class Chain(Transformer, pt.PTChain):
         meta_insert = self.insert_stmt.format('meta', 'table_name, cluster_id, prefix', '?,?,?')
         curs.execute(meta_create)
         meta_list = [
-            (subchain.table_name, delta_id)
-            for subchain, delta_id in zip(self.subchains, delta_list, self.subchain_prefix_list)
+            (subchain.table_name, delta_id, prefix)
+            for subchain, delta_id, prefix in zip(self.subchains, delta_list, self.subchain_prefix_list)
             ]
         curs.executemany(meta_insert, meta_list)
 
@@ -728,9 +896,10 @@ class Chain(Transformer, pt.PTChain):
         self.constants_vec = np.array([constants[key] for key in self.constant_list])
         self.model.initialize_constants(self.constants_vec)
         tables = list(cursor.execute(" SELECT type, table_name FROM meta; "))
+        tables = [(i, table[0], table[1]) for i, table in enumerate(tables)]
         self.subchains = [
-            SubChain[type](Experiment[type](cursor, table_name, model_args))
-            for type, table_name in tables
+            SubChain[type](self, Experiment[type](conn, cursor, table_name, model_args), i)
+            for i, type, table_name in tables
             ]
         self.set_temperature(temperature)
         self.N = len(self.subchains)
@@ -749,10 +918,13 @@ class Chain(Transformer, pt.PTChain):
         return
 
 class ResultBase(object):
-    def plot_calibrated(self):
+    def plot_calibrated(self, path):
         pass
 
-    def __init__(self, parent, subchain_samples, experiment, constants, model_args):
+    def load_data(self, cursor, prefix):
+        pass
+
+    def __init__(self, cursor, prefix, samples, experiment, constants, model_args, pool):
         """
         experiment       : model experiment (As defined by experiment.py)
         cluster_samples  : samples of phi (theta in real space) relevant to observation's cluster
@@ -761,47 +933,43 @@ class ResultBase(object):
         constants        : vector of constants that were supplied when model was calibrated
         model_args       : dictionary of physical models used when model was calibrated
         """
-        self.parent           = parent
+        self.samples          = samples
+        self.pool             = pool # expose multiprocessing.pool, only build once.
         self.experiment       = experiment
-        self.subchain_samples = subchain_samples
         self.constants        = constants
         self.model_args       = model_args
+        self.load_data(cursor, prefix)
         return
 
 class ResultSHPB(ResultBase):
-    def plot_calibrated(self, path, smax = None):
-        ul_alpha = 0.6; m_alpha = 0.95; linewidth = 0.4
-        # Start computing calibrated curves
-        nsamp = self.cluster_samples.shape[0]
-        pool = Pool(POOL_SIZE)
-        # Curves calibrated to observation/cluster
-        args_cluster = zip(
-            repeat(self.experiment.tuple),
-            self.cluster_samples.tolist(),
-            repeat(self.constants),
-            repeat(self.model_args),
-            )
-        res_cluster  = pool.map(predict_wrapper, args_cluster)
-        # Curves calibrated to hierarchical mean
-        args_hier    = zip(
-            repeat(self.experiment.tuple),
-            self.hier_samples.tolist(),
-            repeat(self.constants),
-            repeat(self.model_args),
-            )
-        res_hier     = pool.map(predict_wrapper, args_hier)
-        # Extract curve results
-        strain = res_cluster[0][0]
-        stress_cluster = np.vstack([res[1] for res in res_cluster])
-        stress_hier    = np.vstack([res[1] for res in res_hier])
-        #sigma2s        = self.subchain_samples.sigma2
-        # Compute curve summaries, generate posterior predictive
-        err = normal.rvs(scale = np.sd(sigma2s), size = (sigma2s.shape[0], 100))
-        stress_cluster_summary = np.quantile(res_cluster + err, (0.05, 0.5, 0.95), axis = 0)
-        stress_hier_summary    = np.quantile(res_hier    + err, (0.05, 0.5, 0.95), axis = 0)
+    # def load_data(self, cursor, prefix):
+    #     sigma2 = np.array(
+    #         [x[0] for x in cursor.execute(' SELECT * FROM {}_sigma2; '.format(prefix))]
+    #         )
+    #     # self.samples = Bunch(
+    #     #     cluster_phi = self.parent.samples.
+    #     #     sigma2 = sigma2,
+    #     # )
+    #     return
 
-        ul_line_args = {'alpha' : 0.60, 'linestype' : '-', 'linewidth' : 0.4}
-        me_line_args  = {'alpha' : 0.95, 'linestyle' : '-', 'linewidth' : 0.4}
+    def calibrated_curve_summary(self, parameters, predictive = False, quantiles = (0.05, 0.5, 0.95)):
+        # This should be fixed such as to provide the substate.  Still, not provided yet.
+        args = zip(repeat(self.experiment.tuple), parameters.tolist(),
+                    repeat(self.constants), repeat(self.model_args), repeat(None))
+        res = self.pool.map(predict_wrapper, args)
+        strain = res[0][0]
+        stress = np.vstack([r[1] for r in res])
+        stress_summary = np.quantile(stress, quantiles, axis = 0)
+        return strain, stress_summary
+
+    def plot_calibrated(self, path, smax = None, predictive = False):
+        ul_alpha = 0.6; m_alpha = 0.95; linewidth = 0.4
+
+        strain, stress_cluster_summary = self.calibrated_curve_summary(self.samples.phi, predictive)
+        strain, stress_hier_summary    = self.calibrated_curve_summary(self.samples.phi0, predictive)
+
+        ul_line_args = {'alpha' : 0.60, 'linestyle' : '-', 'linewidth' : 0.4}
+        me_line_args = {'alpha' : 0.95, 'linestyle' : '-', 'linewidth' : 0.4}
 
         plt.plot(strain, stress_cluster_summary[0], color = 'blue', **ul_line_args)
         plt.plot(strain, stress_cluster_summary[1], color = 'blue', **me_line_args)
@@ -816,10 +984,10 @@ class ResultSHPB(ResultBase):
             pass
         else:
             smax = max(
-                    stress_cluster_summary.max(),
-                    strain_cluster_summary.max(),
-                    self.experiment.Y.max()
-                    )
+                stress_cluster_summary.max(),
+                stress_hier_summary.max(),
+                self.experiment.Y.max()
+                )
         plt.ylim((0., smax))
         if os.path.exists(path):
             os.remove(path)
@@ -827,69 +995,67 @@ class ResultSHPB(ResultBase):
         plt.clf()
         return
 
-class ResultSummary(Transformer):
-    @classmethod
-    def from_path(cls, path_results, path_inputs):
-        """ from the path, forms a Samples objects that represents samples from the model chain """
-        conn_i = sql.connect(path_inputs)
-        conn_o = sql.connect(path_results)
+Result = {
+    'shpb' : ResultSHPB,
+    }
 
-        cursor = conn_o.cursor()
-        lookup = dict(list(cursor.execute(' SELECT source_name, cluster_id FROM meta; ')))
-        models = dict(list(cursor.execute(' SELECT model_type, model_name FROM models; ')))
-        temp   = np.array(list(cursor.execute(' SELECT alpha, nclust FROM alpha; ')))
-        alpha  = temp[:,0]
-        nclust = temp[:,1]
-        delta  = np.array(list(cursor.execute(' SELECT * FROM delta; ')))
-        N      = delta.shape[1]
-        constants = dict(list(cursor.execute(' SELECT constant, value FROM constants; ')))
-        theta0 = np.array(list(cursor.execute(' SELECT * FROM theta0; ')))
-        phi0   = np.array(list(cursor.execute(' SELECT * FROM phi0; ')))
-        ns, d  = theta0.shape
-        Sigma  = np.array(list(cursor.execute(' SELECT * FROM Sigma; '))).reshape(ns,d,d)
-        temp   = np.array(list(cursor.execute(' SELECT * FROM thetas; ')))
-        thetas = [temp[np.where(temp.T[0] == i)[0], 2:] for i in range(ns)]
-        temp   = np.array(list(cursor.execute(' SELECT * FROM phis; ')))
-        phis   = [temp[np.where(temp.T[0] == i)[0], 2:] for i in range(ns)]
+class ResultSummaryBase(Transformer):
+    def plot_pairwise(self, path, title = None, figsize = (5,6), dpi = 300):
+        def off_diag(x, y, **kwargs):
+            plt.scatter(x, y, **kwargs)
+            ax = plt.gca()
+            ax.set_xlim(0,1)
+            ax.set_ylim(0,1)
+            return
 
-        samples = Bunch(
-            theta  = thetas,
-            phi    = phis,
-            delta  = delta,
-            theta0 = theta0,
-            phi0   = phi0,
-            Sigma  = Sigma,
-            alpha  = alpha,
-            nclust = nclust,
-            )
+        def on_diag(x, **kwargs):
+            sea.distplot(x, bins = 20, kde = False, rug = True, **kwargs)
+            ax = plt.gca()
+            ax.set_xlim(0,1)
+            return
 
-        bounds = None
-        model = MaterialModel(**models)
-        const_order = model.get_constant_list()
-        constant_vec = np.array([constants[x] for x in const_order])
-        param_order = model.get_parameter_list()
+        def uniquify(df_columns):
+            seen = set()
+            for item in df_columns:
+                fudge = 1
+                newitem = item
 
-        cursor = conn_i.cursor()
-        tables = list(cursor.execute(' SELECT type, table_name FROM meta; '))
-        experiments = [
-            Experiment[type](cursor, table_name, models)
-            for type, table_name in tables
-            ]
+                while newitem in seen:
+                    fudge += 1
+                    newitem = "{}_{}".format(item, fudge)
 
-        conn_i.close()
-        conn_o.close()
+                yield newitem
+                seen.add(newitem)
 
-        return cls(samples, bounds, constant_vec, models, experiments)
+        d = sample_parameters.shape[1]
+        df = pd.DataFrame(sample_parameters, columns = self.parameter_order)
+        df.columns = list(uniquify(df.columns))
+        g = sea.PairGrid(df)
+        g = g.map_offdiag(off_diag, s = 1)
+        g = g.map_ondiag(on_diag)
 
-    @classmethod
-    def from_chain(cls, chain, nburn, thin):
-        theta = chain.samples.theta[nburn::thin]
-        Sigma = chain.samples.Sigma[nburn::thin]
-        theta0 = chain.samples.theta0[nburn::thin]
-        delta = chain.samples.delta[nburn::thin]
+        for i in range(d):
+            g.axes[i,i].annotate(self.parameter_order[i], xy = (0.05, 0.9))
+        for ax in g.axes.flatten():
+            ax.set_ylabel('')
+            ax.set_xlabel('')
 
-    def plot_clustplot(self, path, figsize = (5,6), dpi = 300):
-        delta = self.chain_samples.delta
+        plt.savefig(path)
+        return
+
+    def plot_calibrated(self, basepath):
+        for result in self.results:
+            result.plot_calibrated(
+                os.path.join(basepath, '{}.png'.format(result.experiment.table_name))
+                )
+        return
+
+    def __init__(self, path_inputs, path_results):
+        pass
+
+class ResultSummary(ResultSummaryBase):
+    def plot_clustplot(self, path, ordering = None, title = None, figsize = (5,6), dpi = 300):
+        delta = self.samples.delta
         nsamp, ndat = delta.shape
         clust_mat_sum = np.zeros((ndat, ndat))
         for i in range(nsamp):
@@ -897,21 +1063,91 @@ class ResultSummary(Transformer):
             for j in range(ndat):
                 clust_mat[j, delta[i,j]] = 1
             clust_mat_sum += clust_mat @ clust_mat.T
+        if ordering:
+            clust_mat_sum = clust_mat_sum.T[ordering].T[ordering]
         clust_mat_prb = clust_mat_sum / delta.shape[0]
         fig = plt.figure(figsize = figsize)
         plt.matshow(clust_mat_prb)
         plt.colorbar()
+        if title:
+            plt.title(title)
         plt.savefig(path, dpi = dpi)
         plt.close()
         return
 
-    def __init__(self, chain_samples, bounds, constants, model_args, experiments):
-        self.chain_samples = chain_samples
-        # self.subchain_samples = subchain_samples
-        self.bounds        = bounds
-        self.constants_vec = constants
-        self.model_args    = model_args
-        self.experiments   = experiments
+    def cluster_by_strainrate(self, basepath):
+        edots = [experiment.edot for experiment in self.experiments]
+        idx = list(range(len(edots)))
+        ordering = [x for _, x in sorted(zip(edots, idx))]
+        self.plot_clustplot(os.path.join(basepath, 'cluster_strain.png'), ordering, 'Strain Rate')
+        return
+
+    def cluster_by_temperature(self, basepath):
+        temps = [experiment.temp for experiment in self.experiments]
+        idx = list(range(len(temps)))
+        ordering = [x for _, x in sorted(zip(temps, idx))]
+        self.plot_clustplot(os.path.join(basepath, 'cluster_temp.png'), ordering, 'Temperature')
+        return
+
+    def __init__(self, path_inputs, path_results):
+        self.pool = Pool(POOL_SIZE)
+
+        iconn = sql.connect(path_inputs)
+        oconn = sql.connect(path_results)
+        icursor = iconn.cursor()
+        ocursor = oconn.cursor()
+
+        tables = list(icursor.execute(' SELECT type, table_name FROM meta; '))
+        self.models = dict(ocursor.execute(' select * FROM models; '))
+        constants = dict(ocursor.execute(' SELECT * FROM constants; '))
+        self.experiments = [
+            Experiment[type](icursor, table_name, self.models)
+            for type, table_name in tables
+            ]
+        constant_list = self.experiments[0].model.get_constant_list()
+        self.constant_vec = np.array([constants[key] for key in constant_list])
+        for experiment in self.experiments:
+            experiment.model.initialize_constants(self.constant_vec)
+
+        meta   = list(ocursor.execute(' SELECT table_name, cluster_id, prefix FROM meta; '))
+        temp   = np.array(list(ocursor.execute(' SELECT alpha, nclust FROM alpha; ')))
+        alpha  = temp[:,0]
+        nclust = temp[:,1]
+        delta  = np.array(list(ocursor.execute(' SELECT * FROM delta; ')))
+        N      = delta.shape[1]
+        constants = dict(list(ocursor.execute(' SELECT constant, value FROM constants; ')))
+        theta0 = np.array(list(ocursor.execute(' SELECT * FROM theta0; ')))
+        phi0   = np.array(list(ocursor.execute(' SELECT * FROM phi0; ')))
+        ns, d  = theta0.shape
+        Sigma  = np.array(list(ocursor.execute(' SELECT * FROM Sigma; '))).reshape(ns,d,d)
+        temp   = np.array(list(ocursor.execute(' SELECT * FROM thetas; ')))
+        thetas = [temp[np.where(temp.T[0] == i)[0], 2:] for i in range(ns)]
+        temp   = np.array(list(ocursor.execute(' SELECT * FROM phis; ')))
+        phis   = [temp[np.where(temp.T[0] == i)[0], 2:] for i in range(ns)]
+
+        self.samples = Bunch(
+            alpha  = alpha,  delta = delta,
+            theta0 = theta0, phi0  = phi0,
+            thetas = thetas, phis  = phis,
+            Sigma  = Sigma,  meta  = meta,
+            )
+        theta_by_exp = [np.array(th[d] for th, d in zip(thetas, delta.T[i])) for i in range(N)]
+        phi_by_exp   = [np.array(ph[d] for ph, d in zip(phis,   delta.T[i])) for i in range(N)]
+
+        self.results = [
+            Result[experiment.tuple.type](
+                ocursor,
+                None,
+                Bunch(theta = theta, phi = phi, theta0 = theta0, phi0 = phi0, Sigma = Sigma),
+                experiment,
+                self.constant_vec,
+                self.models,
+                self.pool,
+                )
+            for experiment, theta, phi in zip(self.experiments, theta_by_exp, phi_by_exp)
+            ]
+        iconn.close()
+        oconn.close()
         return
 
 

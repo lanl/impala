@@ -10,6 +10,7 @@ np.seterr(under = 'ignore')
 import pandas as pd
 import sqlite3 as sql
 import os
+import pickledBass as pb
 
 @ft.lru_cache(maxsize = 128)
 def cholesky_inversion(Sigma_as_tuple):
@@ -86,7 +87,7 @@ class Experiment_SHPB(object):
         return (ydiff * ydiff).sum()
 
     def check_constraints(self, param):
-        self.model.update_parameters(param)        
+        self.model.update_parameters(param)
         return self.model.check_constraints()
 
     def load_data(self, cursor, table_name):
@@ -101,25 +102,113 @@ class Experiment_SHPB(object):
         self.model.initialize(params, consts, T = self.temp)
         return
 
-    def __init__(self, cursor, table_name, model_args):
+    def initialize_constants(self, constant_vec):
+        self.model.initialize_constants(constant_vec)
+        return
+
+    def __init__(self, conn, cursor, table_name, model_args):
         self.load_data(cursor, table_name)
         self.table_name = table_name
         self.model = MaterialModel(**model_args)
         self.tuple = SHPBTuple(self.X, self.Y, self.temp, self.edot, self.emax, 'shpb')
         return
 
-# TCTuple = namedtuple('TCTuple', fill this in)
-class Experiment_TC(object):
-    pass
+PCATuple = namedtuple('PCATuple', 'Y ymean ysd tbasis bounds samples') # fill this in)
+class Experiment_PCA(object):
+    """ Experiment involving the BASS PCA based emulator """
+    X     = None  # Observed Strains
+    Y     = None  # Observed Flow Stresses
+    Xemu  = None
+    Yemu  = None
+    model = None  # materialModel
+    tuple = None  # namedtuple, describing the experiment
+    table_name = None # what did this data come from?
+    parameter_list = None
 
-# FPTuple = namedtuple('FPTuple', fill this in)
-class Experiment_FP(object):
+    data_query = " SELECT * FROM {}; "
+    meta_query = " SELECT sim_input, sim_output FROM meta where table_name = '{}'; "
+    emui_query = " SELECT * FROM {}; "
+    emuo_query = " SELECT * FROM {}; "
+
+    @property
+    def tuple(self):
+        mcmc_use = np.random.choice(range(self.n_emcmc))
+        samples = []
+        for ipc in range(self.emodel.nbasis):
+            bm = self.emodel.bm_list[ipc]
+            model_use = bm.model_lookup[mcmc_use]
+            nbasis    = bm.samples.nbasis[mcmc_use]
+            samples.append(
+                pb.Sample(
+                    bm.samples.s2[mcmc_use],
+                    nbasis,
+                    bm.samples.n_int[model_use, :],
+                    bm.samples.signs[model_use, 0 : nbasis, :],
+                    bm.samples.vs[model_use, 0 : nbasis, :],
+                    bm.samples.knots[model_use, 0 : nbasis, :],
+                    bm.samples.beta[mcmc_use, 0 : (nbasis + 1)],
+                    )
+                )
+        return PCATuple(self.Y, self.emodel.y_mean, self.emodel.y_sd, self.emodel.basis.T,
+                            self.emodel.bm_list[0].data.bounds, samples)
+
+    @property
+    def parameter_list(self):
+        return self.model.get_parameter_list()
+
+    def predict(self, param, x_new):
+        tuple = self.tuple
+        preds = pb.predictPCA(param, tuple.samples. tuple.tbasis, tuple.ysd, tuple.ymean, tuple.bounds)
+        return
+
+    def sse(self, param):
+        pass
+
+    def check_constraints(self, param):
+        self.model.update_parameters(param)
+        return self.model.check_constraints()
+
+    def initialize_constants(self, constant_vec):
+        self.model.initialize_constants(constant_vec)
+        return
+
+    def load_data(self, conn, cursor, table_name):
+        emu_inputs, emu_outputs = list(cursor.execute(self.meta_query.format(table_name)))[0]
+        # temp = np.array(list(cursor.execute(self.data_query.format(table_name))))
+        self.Y = pd.read_sql(self.data_query.format(table_name), conn).values
+        Xe = pd.read_sql(self.emui_query.format(emu_inputs), conn)
+        Ye = pd.read_sql(self.emuo_query.format(emu_outputs), conn)
+        cols = set([x for x in Xe.columns.values.tolist() if x != 'index'])
+        param_list_lower = [x.lower() for x in self.parameter_list]
+        self.eta_cols = list(cols.difference(set(param_list_lower)))
+        self.Xemu = Xe.reindex(columns = param_list_lower + self.eta_cols).values
+        self.bounds = np.vstack((
+            Xe[self.eta_cols].values.min(axis = 0),
+            Xe[self.eta_cols].values.max(axis = 0)
+            )).T
+        buffer = (self.bounds.T[1] - self.bounds.T[0]) * 0.05
+        self.bounds.T[1] += buffer
+        self.bounds.T[0] -= buffer
+        self.Yemu = Ye.values
+        return
+
+    def __init__(self, conn, cursor, table_name, model_args):
+        self.table_name = table_name
+        self.model = MaterialModel(**model_args)
+        self.load_data(conn, cursor, table_name)
+        self.emodel = pb.bassPCA(self.Xemu, self.Yemu, ncores = 8, percVar = 99.99)
+        self.n_emcmc = len(self.emodel.bm_list[0].samples.nbasis)
+        return
+
+WPCATuple = namedtuple('WPCATuple', 'X Y')
+class Experiment_WPCA(object):
+    """ Experiment involving warping the BASS PCA Emulator """
     pass
 
 Experiment = {
     'shpb' : Experiment_SHPB,
-    'tc'   : Experiment_TC,
-    'fp'   : Experiment_FP,
+    'pca'  : Experiment_PCA,
+    'wpca' : Experiment_WPCA,
     }
 
 # EOF
