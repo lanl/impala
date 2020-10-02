@@ -679,11 +679,11 @@ class Chain(Transformer, pt.PTChain):
         init_normal = normal(0, scale = 0.2)
         for i in range(self.N):
             theta_try = init_normal.rvs(size = self.d)
-            fail = 0
+            # fail = 0
             while not self.check_constraints(theta_try):
                 theta_try = init_normal.rvs(size = self.d)
-                fail += 1
-                print('\rfail: {}'.format(fail), end = '')
+                # fail += 1
+                # print('\rfail: {}'.format(fail), end = '')
             theta_start[i] = theta_try
             self.subchains[i].initialize_sampler(ns)
 
