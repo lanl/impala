@@ -106,7 +106,8 @@ class Experiment_SHPB(object):
         self.model.initialize_constants(constant_vec)
         return
 
-    def __init__(self, conn, cursor, table_name, model_args):
+    def __init__(self, conn, table_name, model_args):
+        cursor = conn.cursor()
         self.load_data(cursor, table_name)
         self.table_name = table_name
         self.model = MaterialModel(**model_args)
@@ -172,7 +173,8 @@ class Experiment_PCA(object):
         self.model.initialize_constants(constant_vec)
         return
 
-    def load_data(self, conn, cursor, table_name):
+    def load_data(self, conn, table_name):
+        cursor = conn.cursor()
         emu_inputs, emu_outputs = list(cursor.execute(self.meta_query.format(table_name)))[0]
         # temp = np.array(list(cursor.execute(self.data_query.format(table_name))))
         self.Y = pd.read_sql(self.data_query.format(table_name), conn).values
@@ -192,7 +194,7 @@ class Experiment_PCA(object):
         self.Yemu = Ye.values
         return
 
-    def __init__(self, conn, cursor, table_name, model_args):
+    def __init__(self, conn, table_name, model_args):
         self.table_name = table_name
         self.model = MaterialModel(**model_args)
         self.load_data(conn, cursor, table_name)

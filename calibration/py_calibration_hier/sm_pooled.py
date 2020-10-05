@@ -20,7 +20,24 @@ from physical_models_c import MaterialModel
 from pointcloud import localcov
 import pt
 import sm_dpcluster as smdp
-from sm_dpcluster import SubChain, sse_wrapper
+
+class SubChainSHPB(smdp.SubChainSHPB):
+    pass
+
+class SubChainPCA(smdp.SubChainPCA):
+    @property
+    def curr_theta(self):
+        return self.parent.curr_theta
+    pass
+
+class SubChainWPCA(smdp.SubChainWPCA):
+    pass
+
+SubChain = {
+    'shpb' : SubChainSHPB,
+    'pca'  : SubChainPCA,
+    'wpca' : SubChainWPCA,
+    }
 
 POOL_SIZE = 8
 
@@ -59,7 +76,7 @@ class Chain(Transformer, pt.PTChain):
         phi = self.unnormalize(self.invprobit(theta))
         args = zip(self.exp_tuples, repeat(phi), repeat(self.constant_vec),
                     repeat(self.model_args), self.curr_substates)
-        sses = self.pool.map(sse_wrapper, args)
+        sses = self.pool.map(smdp.sse_wrapper, args)
         llks = np.array([
             subchain.log_posterior_theta(sse, substate)
             for sse, substate, subchain in zip(sses, substates, self.subchains)
@@ -73,7 +90,7 @@ class Chain(Transformer, pt.PTChain):
         phi = self.unnormalize(self.invprobit(state.theta))
         args = zip(self.exp_tuples, repeat(phi), repeat(self.constant_vec),
                     repeat(self.model_args), state.substates)
-        sses = self.pool.map(sse_wrapper, args)
+        sses = self.pool.map(smdp.sse_wrapper, args)
         llks = np.array([
             subchain.log_posterior_substate(sse, substate)
             for sse, substate, subchain in zip(sses, state.substates, self.subchains)
@@ -113,7 +130,7 @@ class Chain(Transformer, pt.PTChain):
         phi  = self.unnormalize(self.invprobit(self.curr_theta))
         args = zip(self.exp_tuples, repeat(phi), repeat(self.constant_vec),
                                 repeat(self.model_args), self.curr_substates)
-        sses = self.pool.map(sse_wrapper, args)
+        sses = self.pool.map(smdp.sse_wrapper, args)
         for sse, subchain in zip(sses, self.subchains):
             subchain.iter_sample(sse)
         return
@@ -217,7 +234,7 @@ class Chain(Transformer, pt.PTChain):
         tables = list(cursor.execute(' SELECT type, table_name FROM meta; '))
         tables = [(i, table[0], table[1]) for i, table in enumerate(tables)]
         self.subchains = [
-            SubChain[type](self, Experiment[type](cursor, table_name, model_args), i)
+            SubChain[type](self, Experiment[type](conn, table_name, model_args), i)
             for i, type, table_name in tables
             ]
         self.exp_tuples = [subchain.experiment.tuple for subchain in self.subchains]

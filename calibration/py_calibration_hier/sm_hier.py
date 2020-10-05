@@ -405,12 +405,12 @@ class Chain(Transformer, pt.PTChain):
         self.model.initialize_constants(self.constant_vec)
         conn = sql.connect(path)
         cursor = conn.cursor()
-        tables = list(cursor.execute(' SELECT type, table_name FROM meta;'))
+        tables = list(cursor.execute(' SELECT type, table_name FROM meta; '))
         tables = [(i, table[0], table[1]) for i, table in enumerate(tables)]
         self.subchains = [
             SubChain[type](
                 self,
-                Experiment[type](cursor, table_name, model_args),
+                Experiment[type](conn, table_name, model_args),
                 i,
                 self.constant_vec,
                 self.bounds,
