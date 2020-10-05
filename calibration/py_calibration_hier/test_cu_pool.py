@@ -2,18 +2,18 @@ import numpy as np
 import time
 from numpy import array, float64
 np.seterr(under = 'ignore')
-from mpi4py import MPI
+#from mpi4py import MPI
 
 import sm_pooled as sm
-# import pt
-import pt_mpi as pt
+import pt
+#import pt_mpi as pt
 pt.MPI_MESSAGE_SIZE = 2**13
 sm.POOL_SIZE = 8
 
 
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
-size = comm.Get_size()
+#comm = MPI.COMM_WORLD
+rank = 0#comm.Get_rank()
+size = 5#comm.Get_size()
 
 material = 'copper'
 
@@ -40,7 +40,7 @@ if True:
     if material == 'copper':
         path = './data/data_copper.db'
         parameter_bounds = {
-            'theta' : (1e-3, 0.1),
+            'theta0' : (1e-3, 0.1),
             'p'     : (9e-3, 10.),
             's0'    : (3e-3, 0.05),
             'sInf'  : (1e-3, 0.05),
@@ -49,12 +49,13 @@ if True:
             'kappa' : (1e-6, 1.0),
             'gamma' : (1e-6, 0.1),
             'vel'   : (3e-2, 0.03),
+            'y1'    : (.01,.03),
+            'y2'    : (.2,.4),
             }
         starting_consts = {
             'alpha'  : 0.2,    'matomic' : 63.546, 'Tref' : 298.,
             'Tmelt0' : 1358.,  'rho0'    : 8.96,   'Cv0'  : 0.385e-5,
             'G0'     : 0.70,   'chi'     : 0.95,   'beta' : 0.33,
-            'y1'     : 0.0245, 'y2'      : 0.33,
             }
     if material == 'Ti64':
         path = './data/data_Ti64.db'
@@ -84,12 +85,12 @@ if True:
 
 if __name__ == '__main__':
     if rank > 0:
-        chain = pt.PTSlave(comm = comm, statmodel = sm.Chain)
+        chain = pt.PTSlave(sm.Chain)
         chain.watch()
 
     elif rank == 0:
         model = pt.PTMaster(
-            comm,
+            sm.Chain,
             temperature_ladder = 1.2 ** array(range(size - 1)),
             path       = path,
             bounds     = parameter_bounds,

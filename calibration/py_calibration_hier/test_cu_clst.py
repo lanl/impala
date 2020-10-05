@@ -4,7 +4,7 @@ from numpy import array, float64
 np.seterr(under = 'ignore')
 from mpi4py import MPI
 
-import sm_hier as sm
+import sm_dpcluster as sm
 # import pt
 import pt_mpi as pt
 pt.MPI_MESSAGE_SIZE = 2**13
