@@ -168,7 +168,7 @@ def load_copper_pca(curs, conn):
     xps = []
     xps.append({
         'realY' : './copper/outputs_real_fp.csv',
-        'simX' : './copper/inputs_sim_fp_ptw.csv',
+        'simX' : './copper/inputs_sim_fp_ptw.txt',
         'simY' : './copper/outputs_sim_fp_ptw.csv'
         })
     for xp in xps:
@@ -178,7 +178,7 @@ def load_copper_pca(curs, conn):
         emu_oname = 'pca_output_{}'.format(copper_curr_id)
 
         real = pd.read_csv(xp['realY']) # first row
-        simi = pd.read_csv(xp['simX']) # simulated x
+        simi = pd.read_csv(xp['simX'],sep=" ") # simulated x
         simo = pd.read_csv(xp['simY']) # simulated Y
 
         real.to_sql(table_name, conn)
