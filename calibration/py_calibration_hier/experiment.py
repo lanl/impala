@@ -11,6 +11,9 @@ import pandas as pd
 import sqlite3 as sql
 import os
 import pickledBass as pb
+import ipdb #ipdb.set_trace()
+
+POOL_SIZE = 8
 
 @ft.lru_cache(maxsize = 128)
 def cholesky_inversion(Sigma_as_tuple):
@@ -114,7 +117,7 @@ class Experiment_SHPB(object):
         self.tuple = SHPBTuple(self.X, self.Y, self.temp, self.edot, self.emax, 'shpb')
         return
 
-PCATuple = namedtuple('PCATuple', 'Y ymean ysd tbasis bounds samples') # fill this in)
+PCATuple = namedtuple('PCATuple', 'Y ymean ysd tbasis bounds samples type') # fill this in)
 class Experiment_PCA(object):
     """ Experiment involving the BASS PCA based emulator """
     X     = None  # Observed Strains
@@ -151,7 +154,7 @@ class Experiment_PCA(object):
                     )
                 )
         return PCATuple(self.Y, self.emodel.y_mean, self.emodel.y_sd, self.emodel.basis.T,
-                            self.emodel.bm_list[0].data.bounds, samples)
+                            self.emodel.bm_list[0].data.bounds, samples, 'pca')
 
     @property
     def parameter_list(self):
@@ -197,8 +200,9 @@ class Experiment_PCA(object):
     def __init__(self, conn, table_name, model_args):
         self.table_name = table_name
         self.model = MaterialModel(**model_args)
-        self.load_data(conn, cursor, table_name)
-        self.emodel = pb.bassPCA(self.Xemu, self.Yemu, ncores = 8, percVar = 99.99)
+        self.load_data(conn, table_name)
+        #ipdb.set_trace()
+        self.emodel = pb.bassPCA(self.Xemu, self.Yemu, ncores = POOL_SIZE, percVar = 99.99)
         self.n_emcmc = len(self.emodel.bm_list[0].samples.nbasis)
         return
 
