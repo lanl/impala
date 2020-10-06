@@ -7,13 +7,13 @@ np.seterr(under = 'ignore')
 import sm_pooled as sm
 import pt
 #import pt_mpi as pt
-pt.MPI_MESSAGE_SIZE = 2**13
-sm.POOL_SIZE = 8
+#pt.MPI_MESSAGE_SIZE = 2**13
+sm.POOL_SIZE = 2
 
 
 #comm = MPI.COMM_WORLD
 rank = 0#comm.Get_rank()
-size = 5#comm.Get_size()
+size = 8#comm.Get_size()
 
 material = 'copper'
 
@@ -49,13 +49,15 @@ if True:
             'kappa' : (1e-6, 1.0),
             'gamma' : (1e-6, 0.1),
             'vel'   : (3e-2, 0.03),
-            'y1'    : (.01,.03),
-            'y2'    : (.2,.4),
+            'y1'    : (.02,.020001),
+            'y2'    : (.3,.30001),
+            'beta'  : (.13,.130001),
+            'vel'   : (0.03, 0.032),
             }
         starting_consts = {
             'alpha'  : 0.2,    'matomic' : 63.546, 'Tref' : 298.,
             'Tmelt0' : 1358.,  'rho0'    : 8.96,   'Cv0'  : 0.385e-5,
-            'G0'     : 0.70,   'chi'     : 0.95,   'beta' : 0.33,
+            'G0'     : 0.70,   'chi'     : 0.95,
             }
     if material == 'Ti64':
         path = './data/data_Ti64.db'
@@ -90,17 +92,17 @@ if __name__ == '__main__':
 
     elif rank == 0:
         model = pt.PTMaster(
-            sm.Chain,
+            statmodel=sm.Chain,
             temperature_ladder = 1.2 ** array(range(size - 1)),
             path       = path,
             bounds     = parameter_bounds,
             constants  = starting_consts,
             model_args = {'flow_stress_model'   : 'PTW', 'shear_modulus_model' : 'Simple'},
             )
-        model.sample(4000, 1)
-        model.write_to_disk('./results/copper/res_cu_pool.db', 2000, 1)
-        model.plot_accept_probability('./results/copper/res_cu_pool_accept.png', 2000)
-        model.plot_swap_probability('./results/copper/res_cu_pool_swapped.png', 2000 // 1)
+        model.sample(40000, 1)
+        model.write_to_disk('./results/copper/res_cu_pool.db', 20000, 1)
+        model.plot_accept_probability('./results/copper/res_cu_pool_accept.png', 20000)
+        model.plot_swap_probability('./results/copper/res_cu_pool_swapped.png', 20000 // 1)
         model.complete()
 
 # EOF
