@@ -9,7 +9,7 @@ User-Definable Constants: POOL_SIZE (size of multiprocessing pool that gets spaw
 from scipy.stats import invgamma, invwishart, uniform, beta, gamma
 from scipy.stats import multivariate_normal as mvnormal, norm as normal
 from scipy.interpolate import interp1d
-from numpy.linalg import multi_dot, slogdet
+from numpy.linalg import multi_dot, slogdet, cholesky
 from numpy.random import choice
 import numpy as np
 np.seterr(under = 'ignore')
@@ -18,7 +18,7 @@ from collections import namedtuple
 from itertools import repeat
 from functools import lru_cache
 from multiprocessing import Pool
-from math import exp, log
+from math import exp, log, prod
 import matplotlib.pyplot as plt
 import sqlite3 as sql
 import os
@@ -28,6 +28,7 @@ from physical_models_c import MaterialModel
 from pointcloud import localcov
 import pickledBass as pb
 import pt
+import ipdb #ipdb.set_trace()
 
 POOL_SIZE = 8
 
@@ -57,6 +58,7 @@ def predict_shpb(exp_tuple, parameters, constants, model_args, substate):
     return (model.compute_state_history()[:,1:3]).T
 
 def predict_pca(exp_tuple, parameters, constants, model_args, substate):
+    #ipdb.set_trace()
     phi_zeta = np.append(parameters, substate.zeta).reshape(1,-1)
     preds = pb.predictPCA(phi_zeta, exp_tuple.samples, exp_tuple.tbasis,
                             exp_tuple.ysd, exp_tuple.ymean, exp_tuple.bounds)
@@ -85,6 +87,7 @@ def sse_shpb(exp_tuple, parameters, constants, model_args, substate):
     return diffs @ diffs
 
 def sse_pca(exp_tuple, parameters, constants, model_args, substate):
+    #ipdb.set_trace()
     preds = predict_pca(exp_tuple, parameters, constants, model_args, substate)
     diffs = (exp_tuple.Y - preds).reshape(-1)
     return diffs @ diffs
@@ -116,6 +119,7 @@ def predict_wrapper(args):
 def sse_wrapper(args):
     """ Provides a wrapper around the sse dictionary so that we can invoke the particular SSE
     type relevant to the data, all at the same time. """
+    #ipdb.set_trace()
     return sse[args[0].type](*args)
 
 # Defining SubChains
@@ -255,7 +259,8 @@ class SubChainPCA(SubChainBase):
     @property
     def curr_zeta(self):
         """ zeta is eta, transformed back to real scale """
-        return self.unnormalize(self.invprobit(self.curr_theta))
+        #ipdb.set_trace()
+        return self.unnormalize(self.invprobit(self.curr_eta))
 
     @property
     def curr_sigma2(self):
@@ -284,21 +289,24 @@ class SubChainPCA(SubChainBase):
         phi  = self.parent.unnormalize(self.invprobit(theta))
         zeta = self.unnormalize(self.invprobit(eta))
         t    = self.experiment.tuple
-        sse  = sse_pca(np.append(phi, zeta), t.samples, t.tbasis, t.ysd, t.ymean, t.bounds)
+        #ipdb.set_trace()
+        #sse  = sse_pca(np.append(phi, zeta), t.samples, t.tbasis, t.ysd, t.ymean, t.bounds)
+        sse = sse_pca(t, phi, None, None, self.get_substate()) # zeta gets pulled from substate
         ldj  = self.invprobitlogjac(eta)
         return - 0.5 * sse * self.inv_temper_temp / sigma2 + ldj
 
     def log_posterior_substate(self, sse, substate):
         lpt = self.log_posterior_theta(sse, substate)
-        lpp = -((self.N * self.inv_temper_temp + self.priors.a + 1) * log(substate.sigma2)
+        lpp = -((prod(self.experiment.Y.shape) * self.inv_temper_temp + self.priors.a + 1) * log(substate.sigma2)
                     + self.priors.b / substate.sigma2)
         ldj = self.invprobitlogjac(substate.eta)
         return lpt + lpp + ldj
 
+
     def sample_eta(self, curr_eta, theta, sigma2):
-        curr_cov = self.localcov(curr_eta)
+        curr_cov = self.parent.localcov(curr_eta)
         prop_eta = cholesky(curr_cov) @ normal.rvs(size = self.d) + curr_eta
-        prop_cov = self.localcov(prop_eta)
+        prop_cov = self.parent.localcov(prop_eta)
 
         curr_lp = self.log_posterior_eta(curr_eta, theta, sigma2)
         prop_lp = self.log_posterior_eta(prop_eta, theta, sigma2)
@@ -306,9 +314,9 @@ class SubChainPCA(SubChainBase):
         if self.d > 1:
             cp_ld = mvnormal(mean = curr_eta, cov = curr_cov).logpdf(prop_eta)
             pc_ld = mvnormal(mean = prop_eta, cov = prop_cov).logpdf(curr_eta)
-        elif self.d == 0:
-            cp_ld = normal(mean = curr_eta, cov = curr_cov).logpdf(prop_eta)
-            pc_ld = normal(mean = prop_eta, cov = prop_cov).logpdf(curr_eta)
+        elif self.d == 1:
+            cp_ld = normal(loc = curr_eta, scale = curr_cov).logpdf(prop_eta)
+            pc_ld = normal(loc = prop_eta, scale = prop_cov).logpdf(curr_eta)
 
         log_alpha = prop_lp + pc_ld - curr_lp - cp_ld
         if log(uniform.rvs()) < log_alpha:
@@ -318,18 +326,18 @@ class SubChainPCA(SubChainBase):
         pass
 
     def sample_sigma2(self, sse):
-        aa = self.N * self.inv_temper_temp + self.priors.a
+        aa = prod(self.experiment.Y.shape) * self.inv_temper_temp + self.priors.a
         bb = sse * self.inv_temper_temp + self.priors.b
         return invgamma.rvs(aa, scale = bb)
 
-    def initialize_sampler(ns):
+    def initialize_sampler(self, ns):
         self.samples = SamplesPCA(ns, self.d)
         self.samples.eta[0] = 0
         self.samples.sigma2[0] = invgamma.rvs(self.priors.a, scale = self.priors.b)
         self.curr_iter = 0
         return
 
-    def iter_sample(self):
+    def iter_sample(self, sse):
         sigma2 = self.curr_sigma2
         eta    = self.curr_eta
         theta  = self.curr_phi
@@ -337,9 +345,19 @@ class SubChainPCA(SubChainBase):
 
         self.curr_iter += 1
 
+        #ipdb.set_trace()
         self.samples.eta[self.curr_iter] = self.sample_eta(eta, theta, sigma2)
-        sse = sse_pca(exptp, phi, None, None, SubStatePCA(self.curr_eta, self.curr_zeta, sigma2))
+        
+        #sse = sse_pca(exptp, phi, None, None, SubStatePCA(self.curr_eta, self.curr_zeta, sigma2))
         self.samples.sigma2[self.curr_iter] = self.sample_sigma2(sse)
+        return
+
+    def write_to_disk(self, cursor, prefix, nburn, thin):
+        """ Write Subchain samples to disk """
+        sigma2_create = self.create_stmt.format('{}_sigma2'.format(prefix), 'sigma2 REAL')
+        sigma2_insert = self.insert_stmt.format('{}_sigma2'.format(prefix), 'sigma2', '?')
+        cursor.execute(sigma2_create)
+        cursor.executemany(sigma2_insert, [(x,) for x in self.samples.sigma2[nburn::thin].tolist()])
         return
 
     def __init__(self, parent, experiment, index):
@@ -349,7 +367,9 @@ class SubChainPCA(SubChainBase):
         self.check_constraints = self.experiment.check_constraints
         self.eta_cols = self.experiment.eta_cols
         self.d = len(self.eta_cols)
+        #ipdb.set_trace()
         self.priors = PriorsPCA(0.1, 0.1)
+        self.bounds = self.experiment.bounds
         pass
 
 class SamplesWPCA(object):
