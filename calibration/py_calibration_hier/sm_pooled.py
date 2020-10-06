@@ -20,6 +20,7 @@ from physical_models_c import MaterialModel
 from pointcloud import localcov
 import pt
 import sm_dpcluster as smdp
+import ipdb #ipdb.set_trace()
 
 class SubChainSHPB(smdp.SubChainSHPB):
     pass
@@ -77,6 +78,8 @@ class Chain(Transformer, pt.PTChain):
         args = zip(self.exp_tuples, repeat(phi), repeat(self.constant_vec),
                     repeat(self.model_args), self.curr_substates)
         sses = self.pool.map(smdp.sse_wrapper, args)
+        #ipdb.set_trace()
+        #sses = map(smdp.sse_wrapper, args)
         llks = np.array([
             subchain.log_posterior_theta(sse, substate)
             for sse, substate, subchain in zip(sses, substates, self.subchains)
@@ -131,6 +134,7 @@ class Chain(Transformer, pt.PTChain):
         args = zip(self.exp_tuples, repeat(phi), repeat(self.constant_vec),
                                 repeat(self.model_args), self.curr_substates)
         sses = self.pool.map(smdp.sse_wrapper, args)
+        #sses = map(smdp.sse_wrapper, args)
         for sse, subchain in zip(sses, self.subchains):
             subchain.iter_sample(sse)
         return
@@ -147,6 +151,11 @@ class Chain(Transformer, pt.PTChain):
     def initialize_sampler(self, ns):
         self.samples = ChainSamples(self.d, ns)
         self.samples.theta[0] = 0.
+        good = self.check_constraints(self.samples.theta[0])
+        while not good:
+            self.samples.theta[0] = np.random.normal(0.,1.,self.d)
+            good = self.check_constraints(self.samples.theta[0])
+        #ipdb.set_trace()
         for subchain in self.subchains:
             subchain.initialize_sampler(ns)
         self.curr_iter = 0
@@ -237,6 +246,7 @@ class Chain(Transformer, pt.PTChain):
             SubChain[type](self, Experiment[type](conn, table_name, model_args), i)
             for i, type, table_name in tables
             ]
+        #ipdb.set_trace()
         self.exp_tuples = [subchain.experiment.tuple for subchain in self.subchains]
         self.set_temperature(temperature)
         self.N = len(self.subchains)
