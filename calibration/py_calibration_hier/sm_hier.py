@@ -11,7 +11,7 @@ from collections import namedtuple
 from itertools import repeat
 from functools import lru_cache
 from multiprocessing import Pool
-from math import exp, log, prod
+from math import exp, log
 import sqlite3 as sql
 import os
 # Custom Modules
@@ -353,7 +353,7 @@ class SubChainPCA(SubChainHierBase):
         zeta_create = self.create_stmt.format('{}_zeta'.format(prefix), addl_create_list)
         zeta_insert = self.insert_stmt.format('{}_zeta'.format(prefix), *addl_insert_tple)
         cursor.execute(eta_create)
-        cursor.executemany(eta_insert, eta.tolist.())
+        cursor.executemany(eta_insert, eta.tolist())
         cursor.execute(zeta_create)
         cursor.executemany(zeta_insert, zeta.tolist())
         return
@@ -365,7 +365,7 @@ class SubChainPCA(SubChainHierBase):
         self.bounds = bounds
         self.table_name = self.experiment.table_name
         self.priors = priorsPCA(25, 1.e-6)
-        self.N = prod(self.experiment.Y.shape[0])
+        self.N = self.experiment.Y.shape[0]
         self.model = self.experiment.model
         self.model.initialize_constants(constant_vec)
         self.model_args = self.model.report_models_used()
