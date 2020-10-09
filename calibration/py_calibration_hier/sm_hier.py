@@ -22,7 +22,6 @@ import pt
 
 import sm_dpcluster as smdp
 
-
 class SubChainHierBase(smdp.SubChainBase, Transformer):
     """ In the hierarchical model, sampling of theta_i (for observation i) has been moved into
     subchain i... therefore the covariance estimation for theta_i must happen in subchain_i """
@@ -73,6 +72,7 @@ class SubChainSHPB(SubChainHierBase):
     def set_substate(self, substate):
         self.samples.sigma2[self.curr_iter] = substate.sigma2
         self.samples.theta[self.curr_iter] = substate.theta
+        return
 
     def sample_sigma2(self, sse):
         aa = self.N * self.inv_temper_temp + self.priors.a
@@ -128,11 +128,10 @@ class SubChainSHPB(SubChainHierBase):
     def iter_sample(self, theta0, SigInv):
         sigma2 = self.curr_sigma2
         theta  = self.curr_theta
-        self.curr_iter += 1
-
         theta_new, accepted = self.sample_theta(theta, sigma2, theta0, SigInv)
         phi = self.unnormalize(self.invprobit(theta_new))
         sse = smdp.sse_shpb(self.experiment.tuple, phi, self.constant_vec, self.model_args, self.get_substate())
+        self.curr_iter += 1
         self.samples.theta[self.curr_iter] = theta_new
         self.samples.accepted[self.curr_iter] = accepted
         self.samples.sigma2[self.curr_iter] = self.sample_sigma2(sse)
@@ -196,11 +195,191 @@ class SubChainSHPB(SubChainHierBase):
         self.d          = len(self.parameter_list)
         return
 
-class SubChainEmulated(SubChainHierBase):
-    pass
+PriorsPCA = namedtuple('PriorsPCA', 'a b')
+SubstatePCA = namedtuple('SubstatePCA', 'theta phi eta zeta sigma2')
+class SamplesPCA(object):
+    sigma2 = None
+    theta  = None
+    accepted = None
+
+    def __init__(self, D, ns):
+        self.sigma2    = np.empty(ns + 1)
+        self.theta_eta = np.empty((ns + 1, D))
+        self.accepted  = np.empty(ns + 1)
+
+class SubChainPCA(SubChainHierBase):
+    @property
+    def curr_sigma2(self):
+        return self.samples.sigma2[self.curr_iter].copy()
+
+    @property
+    def curr_theta_eta(self):
+        return self.samples.theta_eta[self.curr_iter].copy()
+
+    @property
+    def curr_theta(self):
+        return self.samples.theta_eta[self.curr_iter][:self.d].copy()
+
+    @property
+    def curr_eta(self):
+        return self.samples.theta_eta[self.curr_iter][self.d:].copy()
+
+    @property
+    def curr_accepted(self):
+        return self.samples.accepted[self.curr_iter].copy()
+
+    def localcov(self, target):
+        # localized covariance matrix
+        return localcov(self.samples.theta_eta[:self.curr_iter],
+                            target, self.radius, self.nu, self.psi0)
+
+    def get_substate(self):
+        phi_zeta = self.unnormalize(self.invprobit(self.curr_theta_eta))
+        return SubstatePCA(self.curr_theta, phi_zeta[:self.d], self.curr_eta,
+                                                phi_zeta[self.d:], self.curr_sigma2)
+
+    def set_substate(self, substate):
+        self.samples.sigma2[self.curr_iter] = substate.sigma2
+        self.samples.theta_eta[self.curr_iter] = np.append(substate.theta, substate.eta)
+        return
+
+    def sample_sigma2(self, sse):
+        aa = self.N * self.inv_temper_temp + self.priors.a
+        bb = sse * self.inv_temper_temp + self.priors.b
+        return invgamma.rvs(aa, scale = bb)
+
+    def log_posterior_theta_eta(self, theta_eta, sigma2, theta0, SigInv):
+        phi_zeta = self.unnormalize(self.invprobit(theta_eta))
+        prospective_substate = SubstatePCA(None, None, None, phi_zeta[self.d:], None)
+        sse = smdp.sse_pca(self.experiment.tuple, phi_zeta[:self.d], self.constant_vec,
+                            self.model_args, prospective_substate)
+        ssse = sse / sigma2
+        sssd = (theta_eta[:self.d] - theta0).T @ SigInv @ (theta_eta[:self.d] - theta0)
+        ldj  = self.invprobitlogjac(theta_eta)
+        lp   = (
+            - 0.5 * self.inv_temper_temp * ssse
+            - 0.5 * self.inv_temper_temp * sssd
+            + ldj
+            )
+        return lp
+
+    def log_posterior_substate(self, theta0, SigInv, substate):
+        theta_eta = np.append(substate.theta, substate.eta)
+        lpt = self.log_posterior_theta_eta(theta_eta, substate.sigma2, theta0, SigInv)
+        lpp = -((self.N * self.inv_temper_temp + self.priors.a + 1) * log(substate.sigma2)
+                + self.priors.b / substate.sigma2)
+        return lpt + lpp
+
+    def check_constraints(theta_eta):
+        phi_zeta = self.unnormalize(self.invprobit(theta_eta))
+        self.model.update_parameters(phi_zeta[:self.d])
+        return self.model.check_constraints()
+
+    def sample_theta_eta(self, curr_theta_eta, sigma2, theta0, SigInv):
+        curr_cov = self.localcov(curr_theta_eta)
+        prop_theta_eta = curr_theta_eta + cholesky(curr_cov) @ normal.rvs(size = self.D)
+        if not self.check_constraints(prop_theta_eta):
+            return curr_theta_eta, False
+        prop_cov = self.localcov(prop_theta_eta)
+
+        curr_logd = self.log_posterior_theta_eta(curr_theta_eta, sigma2, theta0, SigInv)
+        prop_logd = self.log_posterior_theta_eta(prop_theta_eta, sigma2, theta0, SigInv)
+
+        cp_ld = mvnormal(mean = curr_theta, cov = curr_cov).logpdf(prop_theta)
+        pc_ld = mvnormal(mean = prop_theta, cov = prop_cov).logpdf(curr_theta)
+
+        log_alpha = prop_logd + pc_ld - curr_logd - cp_ld
+        if log(uniform.rvs()) < log_alpha:
+            return prop_theta, True
+        else:
+            return curr_theta, False
+
+    def iter_sample(self, theta0, SigInv):
+        sigma2 = self.curr_sigma2
+        theta_eta = self.curr_theta_eta
+        theta_eta_new, accepted = self.sample_theta_eta(theta_eta, sigma2, theta0, SigInv)
+        phi_zeta = self.unnormalize(self.invprobit(theta_eta_new))
+        prospective_substate = SubstatePCA(None, None, None, phi_zeta[self.d:], None)
+        sse = smdp.sse_pca(self.experiment.tuple, phi_zeta[:self.d], self.constant_vec,
+                            self.model_args, prospective_substate)
+        self.curr_iter += 1
+        self.samples.theta_eta[self.curr_iter] = theta_eta_new
+        self.samples.accepted[self.curr_iter] = accepted
+        self.samples.sigma2[self.curr_iter] = self.sample_sigma2(sse)
+        return
+
+    def initialize_sampler(self, ns):
+        self.curr_iter = 0
+        self.samples = SamplesPCA(self.D, ns)
+        gen = normal(scale = 0.2)
+        theta_eta_try = gen.rvs(size = self.D)
+        while not self.check_constraints(theta_eta_try):
+            theta_eta_try = gen.rvs(size = self.D)
+        self.samples.theta_eta[0] = theta_eta_try
+        self.samples.sigma2[0] = invgamma(self.priors.a, scale = self.priors.b).rvs()
+        self.samples.accepted[0] = 0
+        return
+
+    def write_to_disk(self, cursor, prefix, nburn, thin):
+        # Write Sigma2 to disk
+        sigma2_create = self.create_stmt.format('{}_sigma2'.format(prefix), 'sigma2 REAL')
+        sigma2_insert = self.insert_stmt.format('{}_sigma2'.format(prefix), 'sigma2', '?')
+        cursor.execute(sigma2_create)
+        cursor.executemany(sigma2_insert, [(x,) for x in self.samples.sigma2[nburn::thin].tolist()])
+        # Parse out theta and eta (and associated)
+        theta_eta = self.samples.theta_eta[nburn::thin]
+        phi_zeta  = self.unnormalize(self.invprobit(theta_eta))
+        theta     = theta_eta.T[:self.d].T
+        phi       = phi_zeta.T[:self.d].T
+        eta       = theta_eta.T[self.d:].T
+        zeta      = phi_zeta.T[self.d:].T
+        # Set up column names
+        param_create_list = ','.join([x + ' REAL' for x in self.parameter_list])
+        param_insert_tple = (','.join(self.parameter_list), ','.join(['?'] * self.d))
+        # Write theta and phi to disk
+        theta_create = self.create_stmt.format('{}_theta'.format(prefix), param_create_list)
+        theta_insert = self.insert_stmt.format('{}_theta'.format(prefix), *param_insert_tple)
+        phi_create   = self.create_stmt.format('{}_phi'.format(prefix), param_create_list)
+        phi_insert   = self.insert_stmt.format('{}_phi'.format(prefix), *param_insert_tple)
+        cursor.execute(theta_create)
+        cursor.executemany(theta_insert, theta.tolist())
+        cursor.execute(phi_create)
+        cursor.executemany(phi_insert, phi.tolist())
+        # write zeta and eta to disk
+        addl_create_list = ','.join([x + ' REAL' for x in self.eta_cols])
+        addl_insert_tple = (','.join(self.eta_cols), ','.join(['?'] * len(self.eta_cols)))
+        eta_create = self.create_stmt.format('{}_eta'.format(prefix), addl_create_list)
+        eta_insert = self.insert_stmt.format('{}_eta'.format(prefix), *addl_insert_tple)
+        zeta_create = self.create_stmt.format('{}_zeta'.format(prefix), addl_create_list)
+        zeta_insert = self.insert_stmt.format('{}_zeta'.format(prefix), *addl_insert_tple)
+        cursor.execute(eta_create)
+        cursor.executemany(eta_insert, eta.tolist())
+        cursor.execute(zeta_create)
+        cursor.executemany(zeta_insert, zeta.tolist())
+        return
+
+    def __init__(self, parent, experiment, index, constant_vec, bounds):
+        self.parent = parent
+        self.experiment = experiment
+        self.index = index
+        self.bounds = bounds
+        self.table_name = self.experiment.table_name
+        self.priors = priorsPCA(25, 1.e-6)
+        self.N = self.experiment.Y.shape[0]
+        self.model = self.experiment.model
+        self.model.initialize_constants(constant_vec)
+        self.model_args = self.model.report_models_used()
+        self.constant_vec = constant_vec
+        self.parameter_list = self.model.get_parameter_list
+        self.d = len(self.parameter_list) # length of theta
+        self.eta_cols = self.experiment.eta_cols
+        self.D = self.experiment.Xemu.shape[1] # length of theta + eta
+        self.bounds = np.vstack(bounds, self.experiment.bounds)
+        return
 
 SubChain = {
     'shpb' : SubChainSHPB,
+    'pca'  : SubChainPCA,
     }
 
 PriorsChain = namedtuple('PriorsChain', 'psi nu mu Sinv')
