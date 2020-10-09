@@ -367,7 +367,7 @@ class SubChainPCA(SubChainBase):
         self.check_constraints = self.experiment.check_constraints
         self.eta_cols = self.experiment.eta_cols
         self.d = len(self.eta_cols)
-        #ipdb.set_trace()
+        self.table_name = self.experiment.table_name
         self.priors = PriorsPCA(0.1, 0.1)
         self.bounds = self.experiment.bounds
         pass
@@ -616,8 +616,13 @@ class Chain(Transformer, pt.PTChain):
 
     def sample_Sigma(self, theta, theta0):
         N = theta.shape[0]
+        p = theta.shape[1]
         diff = theta - theta0
-        C = np.array([np.outer(diff[i], diff[i]) for i in range(N)]).sum(axis = 0)
+
+        C = np.zeros([p, p])
+        for i in range(N):
+            C = C + np.outer(diff[i], diff[i])
+        # C = np.array([np.outer(diff[i], diff[i]) for i in range(N)]).sum(axis = 0)
         psi0 = self.priors.psi + C * self.inv_temper_temp
         nu0  = self.priors.nu  + N * self.inv_temper_temp
         return invwishart.rvs(df = nu0, scale = psi0)
@@ -696,14 +701,14 @@ class Chain(Transformer, pt.PTChain):
         self.samples = ChainSamples(self.N, self.d, ns)
         self.samples.delta[0] = range(self.N)
         theta_start = np.empty((self.N, self.d))
-        init_normal = normal(0, scale = 0.2)
+        init_normal = normal(0, scale = 1)
         for i in range(self.N):
             theta_try = init_normal.rvs(size = self.d)
-            # fail = 0
+            fail = 0
             while not self.check_constraints(theta_try):
                 theta_try = init_normal.rvs(size = self.d)
-                # fail += 1
-                # print('\rfail: {}'.format(fail), end = '')
+                fail += 1
+                print('\rfail: {}'.format(fail), end = '')
             theta_start[i] = theta_try
             self.subchains[i].initialize_sampler(ns)
 
@@ -713,7 +718,7 @@ class Chain(Transformer, pt.PTChain):
         while not self.check_constraints(theta_try):
             theta_try = init_normal.rvs(size = self.d)
         self.samples.theta0[0] = theta_try
-        self.samples.Sigma[0] = self.sample_Sigma(self.samples.theta0[0], self.samples.theta[0])
+        self.samples.Sigma[0] = self.sample_Sigma(self.samples.theta[0], self.samples.theta0[0])
         self.samples.alpha[0] = 5.
         self.curr_iter = 0
         self.samples.accepted[0] = 0.
