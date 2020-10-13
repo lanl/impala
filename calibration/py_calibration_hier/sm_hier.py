@@ -148,7 +148,7 @@ class SubChainSHPB(SubChainHierBase):
     def initialize_sampler(self, ns):
         self.curr_iter = 0
         self.samples = SamplesSHPB(self.d, ns)
-        gen = normal(scale = 0.2)
+        gen = normal(scale = 1.)
         theta_try = gen.rvs(size = self.d)
         while not self.check_constraints(theta_try):
             theta_try = gen.rvs(size = self.d)
@@ -270,7 +270,7 @@ class SubChainPCA(SubChainHierBase):
                 + self.priors.b / substate.sigma2)
         return lpt + lpp
 
-    def check_constraints(theta_eta):
+    def check_constraints(self, theta_eta):
         phi_zeta = self.unnormalize(self.invprobit(theta_eta))
         self.model.update_parameters(phi_zeta[:self.d])
         return self.model.check_constraints()
@@ -285,14 +285,14 @@ class SubChainPCA(SubChainHierBase):
         curr_logd = self.log_posterior_theta_eta(curr_theta_eta, sigma2, theta0, SigInv)
         prop_logd = self.log_posterior_theta_eta(prop_theta_eta, sigma2, theta0, SigInv)
 
-        cp_ld = mvnormal(mean = curr_theta, cov = curr_cov).logpdf(prop_theta)
-        pc_ld = mvnormal(mean = prop_theta, cov = prop_cov).logpdf(curr_theta)
+        cp_ld = mvnormal(mean = curr_theta_eta, cov = curr_cov).logpdf(prop_theta_eta)
+        pc_ld = mvnormal(mean = prop_theta_eta, cov = prop_cov).logpdf(curr_theta_eta)
 
         log_alpha = prop_logd + pc_ld - curr_logd - cp_ld
         if log(uniform.rvs()) < log_alpha:
-            return prop_theta, True
+            return prop_theta_eta, True
         else:
-            return curr_theta, False
+            return curr_theta_eta, False
 
     def iter_sample(self, theta0, SigInv):
         sigma2 = self.curr_sigma2
@@ -311,7 +311,7 @@ class SubChainPCA(SubChainHierBase):
     def initialize_sampler(self, ns):
         self.curr_iter = 0
         self.samples = SamplesPCA(self.D, ns)
-        gen = normal(scale = 0.2)
+        gen = normal(scale = 1.)
         theta_eta_try = gen.rvs(size = self.D)
         while not self.check_constraints(theta_eta_try):
             theta_eta_try = gen.rvs(size = self.D)
@@ -334,8 +334,8 @@ class SubChainPCA(SubChainHierBase):
         eta       = theta_eta.T[self.d:].T
         zeta      = phi_zeta.T[self.d:].T
         # Set up column names
-        param_create_list = ','.join([x + ' REAL' for x in self.parameter_list])
-        param_insert_tple = (','.join(self.parameter_list), ','.join(['?'] * self.d))
+        param_create_list = ','.join([x + ' REAL' for x in self.parameter_list()])
+        param_insert_tple = (','.join(self.parameter_list()), ','.join(['?'] * self.d))
         # Write theta and phi to disk
         theta_create = self.create_stmt.format('{}_theta'.format(prefix), param_create_list)
         theta_insert = self.insert_stmt.format('{}_theta'.format(prefix), *param_insert_tple)
@@ -364,17 +364,17 @@ class SubChainPCA(SubChainHierBase):
         self.index = index
         self.bounds = bounds
         self.table_name = self.experiment.table_name
-        self.priors = priorsPCA(25, 1.e-6)
+        self.priors = PriorsPCA(25, 1.e-6)
         self.N = self.experiment.Y.shape[0]
         self.model = self.experiment.model
         self.model.initialize_constants(constant_vec)
         self.model_args = self.model.report_models_used()
         self.constant_vec = constant_vec
         self.parameter_list = self.model.get_parameter_list
-        self.d = len(self.parameter_list) # length of theta
+        self.d = len(self.parameter_list()) # length of theta
         self.eta_cols = self.experiment.eta_cols
         self.D = self.experiment.Xemu.shape[1] # length of theta + eta
-        self.bounds = np.vstack(bounds, self.experiment.bounds)
+        self.bounds = np.vstack((bounds, self.experiment.bounds))
         return
 
 SubChain = {
@@ -476,7 +476,7 @@ class Chain(Transformer, pt.PTChain):
 
         self.samples = ChainSamples(self.d, ns)
 
-        gen = normal(scale = 0.1)
+        gen = normal(scale = 1.)
         theta_try = gen.rvs(size = self.d)
         while not self.check_constraints(theta_try):
             theta_try = gen.rvs(size = self.d)
