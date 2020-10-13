@@ -99,10 +99,10 @@ if __name__ == '__main__':
             constants  = starting_consts,
             model_args = {'flow_stress_model'   : 'PTW', 'shear_modulus_model' : 'Simple'},
             )
-        model.sample(40000, 1)
-        model.write_to_disk('./results/copper/res_cu_pool.db', 20000, 1)
-        model.plot_accept_probability('./results/copper/res_cu_pool_accept.png', 20000)
-        model.plot_swap_probability('./results/copper/res_cu_pool_swapped.png', 20000 // 1)
+        model.sample(400, 1)
+        model.write_to_disk('./results/copper/res_cu_pool.db', 200, 1)
+        model.plot_accept_probability('./results/copper/res_cu_pool_accept.png', 200)
+        model.plot_swap_probability('./results/copper/res_cu_pool_swapped.png', 200// 1)
         model.complete()
 
 # EOF

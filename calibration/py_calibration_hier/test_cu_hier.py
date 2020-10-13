@@ -2,18 +2,18 @@ import numpy as np
 import time
 from numpy import array, float64
 np.seterr(under = 'ignore')
-from mpi4py import MPI
+#from mpi4py import MPI
 
 import sm_hier as sm
-# import pt
-import pt_mpi as pt
-pt.MPI_MESSAGE_SIZE = 2**13
-sm.POOL_SIZE = 8
+import pt
+#import pt_mpi as pt
+#pt.MPI_MESSAGE_SIZE = 2**13
+sm.POOL_SIZE = 2
 
 
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
-size = comm.Get_size()
+#comm = MPI.COMM_WORLD
+rank = 0#comm.Get_rank()
+size = 2#comm.Get_size()
 
 material = 'copper'
 
@@ -40,7 +40,7 @@ if True:
     if material == 'copper':
         path = './data/data_copper.db'
         parameter_bounds = {
-            'theta' : (1e-3, 0.1),
+            'theta0' : (1e-3, 0.1),
             'p'     : (9e-3, 10.),
             's0'    : (3e-3, 0.05),
             'sInf'  : (1e-3, 0.05),
@@ -49,12 +49,15 @@ if True:
             'kappa' : (1e-6, 1.0),
             'gamma' : (1e-6, 0.1),
             'vel'   : (3e-2, 0.03),
+            'y1'    : (.02,.020001),
+            'y2'    : (.3,.30001),
+            'beta'  : (.13,.130001),
+            'vel'   : (0.03, 0.032),
             }
         starting_consts = {
             'alpha'  : 0.2,    'matomic' : 63.546, 'Tref' : 298.,
             'Tmelt0' : 1358.,  'rho0'    : 8.96,   'Cv0'  : 0.385e-5,
-            'G0'     : 0.70,   'chi'     : 0.95,   'beta' : 0.33,
-            'y1'     : 0.0245, 'y2'      : 0.33,
+            'G0'     : 0.70,   'chi'     : 0.95,
             }
     if material == 'Ti64':
         path = './data/data_Ti64.db'
@@ -84,22 +87,23 @@ if True:
 
 if __name__ == '__main__':
     if rank > 0:
-        chain = pt.PTSlave(comm = comm, statmodel = sm.Chain)
+        chain = pt.PTSlave(sm.Chain)
         chain.watch()
 
     elif rank == 0:
         model = pt.PTMaster(
-            comm,
+            statmodel=sm.Chain,
             temperature_ladder = 1.2 ** array(range(size - 1)),
             path       = path,
             bounds     = parameter_bounds,
             constants  = starting_consts,
             model_args = {'flow_stress_model'   : 'PTW', 'shear_modulus_model' : 'Simple'},
             )
-        model.sample(4000, 1)
-        model.write_to_disk('./results/copper/res_cu_hier.db', 2000, 1)
-        model.plot_accept_probability('./results/copper/res_cu_hier_accept.png', 2000)
-        model.plot_swap_probability('./results/copper/res_cu_hier_swapped.png', 2000 // 1)
+        model.sample(400, 1)
+        model.write_to_disk('./results/copper/res_cu_hier.db', 200, 1)
+        model.plot_accept_probability('./results/copper/res_cu_hier_accept.png', 200)
+        model.plot_swap_probability('./results/copper/res_cu_hier_swapped.png', 200// 1)
         model.complete()
+
 
 # EOF
