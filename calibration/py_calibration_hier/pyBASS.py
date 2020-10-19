@@ -495,7 +495,7 @@ class BassModel:
         for j in umodels:
             mcmc_use_j = mcmc_use[np.ix_(models == j)]
             nn = len(mcmc_use_j)
-            out[range(k,nn),:] = np.dot(self.samples.beta[mcmc_use_j,0:(self.samples.nbasis_models[j]+1)],self.makeBasisMatrix(j,Xs).T)
+            out[range(k,nn+k),:] = np.dot(self.samples.beta[mcmc_use_j,0:(self.samples.nbasis_models[j]+1)],self.makeBasisMatrix(j,Xs).T)
             k = k + nn
         if nugget:
             out = out + np.random.normal(size=[len(Xs),len(mcmc_use)],scale=np.sqrt(self.samples.s2[mcmc_use])).T
