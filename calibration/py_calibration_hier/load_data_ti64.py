@@ -96,39 +96,61 @@ def load_Ti64_pca(curs, conn):
 
     xps = []
 
-
+    ########################################################################
     ## read in flyers
     simi = pd.read_csv(sim_path_base + 'Ti64_Flyer_TrainingSets/Ti64.design.ptw.1000.txt', sep=" ")  # simulated x, same for all flyers
 
 
-    # Church2002_Fig2-300k-591m_s-12mm
-    real = pd.read_csv(obs_path_base + 'FlyerPlate/Church2002/Church2002_Fig2-300k-591m_s-12mm.csv',skiprows = range(0,25))
-
-    sim_path = sim_path_base + 'Ti64_Flyer_TrainingSets/Ti64_Church2002_Manganin_591_612/Results/'
-    files = glob.glob(os.path.join(sim_path, 'Ti64*'))
-
-    xx = np.linspace(1.8, 3., 200)
-    simo = np.zeros([simi.shape[0], len(xx)]) # simulated Y matrix
-    k = 0
-    for file in files:
-        data = pd.read_csv(file)
-        simo[k,:] = np.interp(xx,data['Time'],data['Sigma(1)'])
-        k += 1
-
-    xps.append({'real': real, 'simi': simi, 'simo': pd.DataFrame(simo), 'fname': sim_path})
+    # # Ti64_Dandekar2000_VISAR_847_398
+    # real = pd.read_csv(obs_path_base + 'FlyerPlate/Dandekar2000/Dandekar2000_Fig2-300K-398m_s-Ti64.csv',skiprows = range(0,25))
+    #
+    # sim_path = sim_path_base + 'Ti64_Flyer_TrainingSets/Ti64_Dandekar2000_VISAR_847_398/Results/'
+    # files = glob.glob(os.path.join(os.path.expanduser(sim_path), 'Ti64*'))
+    #
+    # xx = real['Time (us)'] #np.linspace(1.8, 3., 200)
+    # simo = np.zeros([simi.shape[0], len(xx)]) # simulated Y matrix
+    # k = 0
+    # for file in files:
+    #     data = pd.read_csv(file)
+    #     simo[k,:] = np.interp(xx,data['Time'],data['velocity'])
+    #     k += 1
+    #
+    # xps.append({'real': real[' velocity (m/s)']/1000, # divide by 1000 for unit conversion (m/s -> ?)
+    #             'simi': simi,
+    #             'simo': pd.DataFrame(simo),
+    #             'fname': sim_path})
 
 
     ##
 
-
-
-
-
-
-
+    ########################################################################
     ## read in taylors
+    simi = pd.read_csv(sim_path_base + 'TaylorTi64_Full/Ti64.design.ptw.1000.txt', sep=" ")
+
+    # Test                     |      Deformed length (y-coordinate, cm)
+    # Yu2011_T1        |      2.4493
+    # Yu2011_T2        |      2.4095
+    # Yu2011_T3        |      2.3901
+    # Yu2011_T4        |      2.3702
+
+    # taylor_yu2011_T1
+    real = np.array([2.4493, 2.4095, 2.3901, 2.3702])
+    simo = np.zeros([simi.shape[0], len(real)])
+    jj = 0
+    for exp in range(4):
+        sim_path = sim_path_base + 'TaylorTi64_Full/taylor_yu2011_T' + str(exp+1) + '/Results/'
+        files = glob.glob(os.path.join(os.path.expanduser(sim_path), 'taylor*'))
+        for file in files:
+            k = int((file.split('_')[-1]).split('.')[0]) - 1
+            data = pd.read_csv(file)
+            simo[k,jj] = data['y(cm)'].iloc[-1]
+        jj += 1
 
 
+    xps.append({'real': pd.DataFrame(real),
+                'simi': simi,
+                'simo': pd.DataFrame(simo),
+                'fname': sim_path})
 
     ##
 
