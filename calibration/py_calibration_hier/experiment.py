@@ -180,9 +180,9 @@ class Experiment_PCA(object):
         cursor = conn.cursor()
         emu_inputs, emu_outputs = list(cursor.execute(self.meta_query.format(table_name)))[0]
         # temp = np.array(list(cursor.execute(self.data_query.format(table_name))))
-        self.Y = pd.read_sql(self.data_query.format(table_name), conn).values
-        Xe = pd.read_sql(self.emui_query.format(emu_inputs), conn)
-        Ye = pd.read_sql(self.emuo_query.format(emu_outputs), conn)
+        self.Y = pd.read_sql(self.data_query.format(table_name), conn, 'index').values
+        Xe = pd.read_sql(self.emui_query.format(emu_inputs), conn, 'index')
+        Ye = pd.read_sql(self.emuo_query.format(emu_outputs), conn, 'index')
         cols = set([x for x in Xe.columns.values.tolist() if x != 'index'])
         param_list_lower = [x.lower() for x in self.parameter_list]
         self.eta_cols = list(cols.difference(set(param_list_lower)))
