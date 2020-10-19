@@ -20,7 +20,7 @@ from physical_models_c import MaterialModel
 from pointcloud import localcov
 import pt
 import sm_dpcluster as smdp
-import ipdb #ipdb.set_trace()
+#import ipdb #ipdb.set_trace()
 
 class SubChainSHPB(smdp.SubChainSHPB):
     pass

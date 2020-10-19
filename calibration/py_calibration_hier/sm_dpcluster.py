@@ -28,7 +28,7 @@ from physical_models_c import MaterialModel
 from pointcloud import localcov
 import pickledBass as pb
 import pt
-import ipdb #ipdb.set_trace()
+#import ipdb #ipdb.set_trace()
 
 POOL_SIZE = 8
 

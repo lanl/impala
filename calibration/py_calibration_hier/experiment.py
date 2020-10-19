@@ -11,7 +11,7 @@ import pandas as pd
 import sqlite3 as sql
 import os
 import pickledBass as pb
-import ipdb #ipdb.set_trace()
+#import ipdb #ipdb.set_trace()
 
 POOL_SIZE = 8
 
