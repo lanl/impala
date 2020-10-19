@@ -249,21 +249,21 @@ cdef class JCYieldStress(BaseModel):
 
 cdef class PTWYieldStress(BaseModel):
     """ Preston Tonks Wallace Yield Stress Model """
-    parameter_list = ['theta0','p','s0','sInf','kappa','gamma','y0','yInf','y1','y2','beta']
-    constant_list  = ['matomic']
+    parameter_list = ['theta0','p','s0','sInf','kappa','gamma','y0','yInf','y1','y2']
+    constant_list  = ['beta','matomic']
 
-    cdef double theta, p, s0, sInf, kappa, gamma, y0, yInf, y1, y2, beta
-    cdef double matomic
+    cdef double theta, p, s0, sInf, kappa, gamma, y0, yInf, y1, y2
+    cdef double beta, matomic
 
     cpdef dict report_parameters(self):
         return {'theta0' : self.theta, 'p'     : self.p,     's0'    : self.s0,
                 'sInf'  : self.sInf,  'kappa' : self.kappa, 'gamma' : self.gamma,
                 'y0'    : self.y0,    'yInf'  : self.yInf,  'y1'    : self.y1,
-                'y2'    : self.y2,    'beta'  : self.beta,
+                'y2'    : self.y2,
                 }
 
     cpdef dict report_constants(self):
-        return {'matomic' : self.matomic}
+        return {'beta' : self.beta, 'matomic' : self.matomic}
 
     cpdef void update_parameters(self, double[:] input):
         self.theta = input[0]
@@ -276,12 +276,11 @@ cdef class PTWYieldStress(BaseModel):
         self.yInf  = input[7]
         self.y1    = input[8]
         self.y2    = input[9]
-        self.beta  = input[10]
         return
 
     cpdef void initialize_constants(self, double[:] input):
-        # self.beta    = input[0]
-        self.matomic = input[0]
+        self.beta    = input[0]
+        self.matomic = input[1]
         return
 
     cpdef bint check_constraints(self):
