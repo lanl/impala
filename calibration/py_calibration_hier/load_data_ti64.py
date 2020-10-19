@@ -91,8 +91,8 @@ def load_Ti64_shpb(curs):
 def load_Ti64_pca(curs, conn):
     global ti64_curr_id
 
-    sim_path_base = '/Users/dfrancom/Desktop/impala_data/'
-    obs_path_base = '/Users/dfrancom/git/immpala/data/ti-6al-4v/Data/'
+    sim_path_base = '~/impala_data/'
+    obs_path_base = '~/git/immpala/data/ti-6al-4v/Data/'
 
     xps = []
 
