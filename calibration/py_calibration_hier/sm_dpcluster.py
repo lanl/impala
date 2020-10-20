@@ -301,12 +301,20 @@ class SubChainPCA(SubChainBase):
                     + self.priors.b / substate.sigma2)
         ldj = self.invprobitlogjac(substate.eta)
         return lpt + lpp + ldj
-
+    def localcov_eta(self, target):
+        lc = localcov(
+            self.samples.eta[:self.curr_iter],
+            target,
+            self.parent.radius,
+            self.parent.nu,
+            self.parent.psi0,
+            )
+        return lc
 
     def sample_eta(self, curr_eta, theta, sigma2):
-        curr_cov = self.parent.localcov(curr_eta)
+        curr_cov = self.localcov_eta(curr_eta)
         prop_eta = cholesky(curr_cov) @ normal.rvs(size = self.d) + curr_eta
-        prop_cov = self.parent.localcov(prop_eta)
+        prop_cov = self.localcov_eta(prop_eta)
 
         curr_lp = self.log_posterior_eta(curr_eta, theta, sigma2)
         prop_lp = self.log_posterior_eta(prop_eta, theta, sigma2)
