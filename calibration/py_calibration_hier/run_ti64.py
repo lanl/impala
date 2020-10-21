@@ -1,7 +1,7 @@
 ##########################################
 ## stat model parameters
 
-type = 'pool' # cluster, hier, or pool
+type = 'cluster' # cluster, hier, or pool
 ntemps = 1 # number of temperatures if not using MPI
 temperature_ladder_spacing = 1.1
 nmcmc = 40
@@ -56,17 +56,9 @@ model_args = {'flow_stress_model'   : 'PTW', 'shear_modulus_model' : 'Stein'}
 ##########################################
 ##########################################
 import numpy as np
-np.seterr(under = 'ignore')
+#from numpy import float64
+#np.seterr(under = 'ignore')
 
-if use_mpi:
-    from mpi4py import MPI
-    import pt_mpi as pt
-    pt.MPI_MESSAGE_SIZE = 2**15
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    size = comm.Get_size()
-else:
-    import pt
 
 if type == 'cluster':
     import sm_dpcluster as sm
@@ -77,6 +69,15 @@ elif type == 'pool':
 
 sm.POOL_SIZE = ncores
 
+if use_mpi:
+    from mpi4py import MPI
+    import pt_mpi as pt
+    pt.MPI_MESSAGE_SIZE = 2**15
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+else:
+    import pt
 
 if __name__ == '__main__':
 
