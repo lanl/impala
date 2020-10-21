@@ -228,6 +228,7 @@ class Chain(Transformer, pt.PTChain):
 
     def complete(self):
         self.pool.close()
+        self.pool.join()
         return
 
     def __init__(self, path, bounds, constants, model_args, temperature = 1.):
