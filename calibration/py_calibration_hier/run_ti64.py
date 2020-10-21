@@ -95,6 +95,11 @@ if __name__ == '__main__':
                 constants=starting_consts,
                 model_args=model_args,
             )
+            model.sample(nmcmc, nthin)
+            model.write_to_disk(results_path + name + '.db', nburn, nthin)
+            model.plot_accept_probability(results_path + name + '_accept.png', nburn)
+            model.plot_swap_probability(results_path + name + '_swapped.png', nburn // nthin)
+            model.complete()
 
 
     else:
@@ -106,11 +111,10 @@ if __name__ == '__main__':
             constants=starting_consts,
             model_args=model_args,
         )
-
-    model.sample(nmcmc, nthin)
-    model.write_to_disk(results_path + name + '.db', nburn, nthin)
-    model.plot_accept_probability(results_path + name + '_accept.png', nburn)
-    model.plot_swap_probability(results_path + name + '_swapped.png', nburn // nthin)
-    model.complete()
+        model.sample(nmcmc, nthin)
+        model.write_to_disk(results_path + name + '.db', nburn, nthin)
+        model.plot_accept_probability(results_path + name + '_accept.png', nburn)
+        model.plot_swap_probability(results_path + name + '_swapped.png', nburn // nthin)
+        model.complete()
 
 # EOF
