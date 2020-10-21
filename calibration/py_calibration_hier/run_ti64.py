@@ -4,15 +4,15 @@
 type = 'cluster' # cluster, hier, or pool
 ntemps = 1 # number of temperatures if not using MPI
 temperature_ladder_spacing = 1.1
-nmcmc = 20
-nburn = 10
-nthin = 1
+nmcmc = 20000
+nburn = 10000
+nthin = 5
 
 ##########################################
 ## computation parameters
 
-ncores = 2 # in addition to MPI processes
-use_mpi = False
+ncores = 8 # in addition to MPI processes
+use_mpi = True
 
 ##########################################
 ## paths
@@ -86,7 +86,6 @@ if __name__ == '__main__':
         if rank > 0:
             chain = pt.PTSlave(comm=comm, statmodel=sm.Chain)
             chain.watch()
-
         elif rank == 0:
             model = pt.PTMaster(
                 comm,
