@@ -198,11 +198,15 @@ class Experiment_PCA(object):
         return
 
     def __init__(self, conn, table_name, model_args):
+        print('\n')
+        print('Loading data...',end='')
         self.table_name = table_name
         self.model = MaterialModel(**model_args)
         self.load_data(conn, table_name)
-        #ipdb.set_trace()
-        self.emodel = pb.bassPCA(self.Xemu, self.Yemu, ncores = POOL_SIZE, percVar = 99.99)
+        print('DONE', end='')
+        print('\n')
+        self.emodel = pb.bassPCA(self.Xemu, self.Yemu, ncores = POOL_SIZE, percVar = 99.99, verbose=True)
+        print('\n')
         self.n_emcmc = len(self.emodel.bm_list[0].samples.nbasis)
         return
 

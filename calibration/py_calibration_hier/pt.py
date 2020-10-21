@@ -162,16 +162,16 @@ class PTMaster(object):
         self.initialize_sampler(ns)
 
         sampled = 0
-        print('\rSampling {:.1%} Complete'.format(sampled / ns), end = '')
+        print('\rCalibration MCMC {:.1%} Complete'.format(sampled / ns), end = '')
         for _ in range(ns // k):
             self.sample_n(k)
             self.temper_chains()
             sampled += k
-            print('\rSampling {:.1%} Complete'.format(sampled / ns), end = '')
+            print('\rCalibration MCMC {:.1%} Complete'.format(sampled / ns), end = '')
 
         self.sample_n(ns % k)
         sampled += (ns % k)
-        print('\rSampling {:.1%} Complete'.format(sampled / ns))
+        print('\rCalibration MCMC {:.1%} Complete'.format(sampled / ns))
         return
 
     def get_swap_probability(self, nburn = 0):

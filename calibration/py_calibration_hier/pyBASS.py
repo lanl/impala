@@ -6,6 +6,7 @@ Created on Fri Apr  3 14:10:54 2020
 @author: dfrancom
 """
 
+import time
 import numpy as np
 import scipy as sp
 from scipy import stats
@@ -504,7 +505,8 @@ class BassModel:
 
 
 
-def bass(xx, y, nmcmc = 10000, nburn = 9000, thin = 1, w1 = 5, w2 = 5, maxInt = 3, maxBasis = 1000, npart = None, g1 = 0, g2 = 0, s2_lower = 0, h1 = 10, h2 = 10, a_tau = 0.5, b_tau = None):
+def bass(xx, y, nmcmc = 10000, nburn = 9000, thin = 1, w1 = 5, w2 = 5, maxInt = 3, maxBasis = 1000, npart = None, g1 = 0, g2 = 0, s2_lower = 0, h1 = 10, h2 = 10, a_tau = 0.5, b_tau = None, verbose=True):
+    t0 = time.time()
     if b_tau == None:
         b_tau = len(y)/2
     if npart == None:
@@ -517,8 +519,11 @@ def bass(xx, y, nmcmc = 10000, nburn = 9000, thin = 1, w1 = 5, w2 = 5, maxInt = 
         bm.state.update()
         if i > (nburn-1) and ((i - nburn + 1) % thin) == 0:
             bm.writeState()
-        if i % 1000==0:
-            print(str(datetime.now()) + ', nbasis: ' + str(bm.state.nbasis))
+        if verbose and i % 500==0:
+            print('\rBASS MCMC {:.1%} Complete'.format(i / nmcmc), end='')
+            #print(str(datetime.now()) + ', nbasis: ' + str(bm.state.nbasis))
+    t1 = time.time()
+    print('\rBASS MCMC Complete. Time: {:f} seconds.'.format(t1-t0))
     #del bm.writeState # the user should not have access to this
     return bm
 
@@ -610,6 +615,9 @@ def bassPCA(xx, y, npc=None, percVar=99.9, ncores=1, center=True, scale=False, *
     basis = np.dot(decomp[0][:,0:npc],np.diag(decomp[1][0:npc]))
     newy = decomp[2][0:npc,:]
     trunc_error = np.dot(basis,newy) - y_scale.T
+
+    print('\rStarting bassPCA with {:d} components, using {:d} cores.'.format(npc, ncores))
+
 
     return BassBasis(xx, y, basis, newy, y_mean, y_sd, trunc_error, ncores, **kwargs)
 
