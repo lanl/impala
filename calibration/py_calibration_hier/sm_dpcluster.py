@@ -497,6 +497,7 @@ class Chain(Transformer, pt.PTChain):
         lps[np.isnan(lps)] = - np.inf
         lps -= lps.max() # normalizing the log-posteriors so at least some of the sse's
                                  # will produce non-zero posteriors when exponentiated.
+
         unnormalized = np.exp(lps) * lj
         try:
             normalized = unnormalized / unnormalized.sum()
@@ -1029,8 +1030,12 @@ class ResultSHPB(ResultBase):
         plt.clf()
         return
 
+class ResultPCA(ResultBase):
+    pass
+
 Result = {
     'shpb' : ResultSHPB,
+    'pca'  : ResultPCA,
     }
 
 class ResultSummaryBase(Transformer):
@@ -1135,7 +1140,7 @@ class ResultSummary(ResultSummaryBase):
         self.models = dict(ocursor.execute(' select * FROM models; '))
         constants = dict(ocursor.execute(' SELECT * FROM constants; '))
         self.experiments = [
-            Experiment[type](icursor, table_name, self.models)
+            Experiment[type](iconn, table_name, self.models)
             for type, table_name in tables
             ]
         constant_list = self.experiments[0].model.get_constant_list()

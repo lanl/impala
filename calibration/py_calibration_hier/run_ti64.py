@@ -4,9 +4,9 @@
 type = 'cluster' # cluster, hier, or pool
 ntemps = 1 # number of temperatures if not using MPI
 temperature_ladder_spacing = 1.1
-nmcmc = 40
-nburn = 20
-nthin = 5
+nmcmc = 20
+nburn = 10
+nthin = 1
 
 ##########################################
 ## computation parameters
@@ -20,7 +20,7 @@ use_mpi = False
 data_path = './data/data_Ti64.db'
 
 results_path = './results/Ti64/'
-name = 'res_ti64_pool'
+name = 'res_ti64_clst'
 
 ##########################################
 ## physics parameters
@@ -117,5 +117,6 @@ if __name__ == '__main__':
         model.plot_accept_probability(results_path + name + '_accept.png', nburn)
         model.plot_swap_probability(results_path + name + '_swapped.png', nburn // nthin)
         model.complete()
-
+        #tt = sm.ResultSummary(data_path, results_path + name + '.db')
+        #tt.cluster_by_temperature(results_path)
 # EOF
