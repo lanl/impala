@@ -20,7 +20,7 @@ use_mpi = True
 data_path = './data/data_Ti64.db'
 
 results_path = './results/Ti64/'
-name = 'res_ti64_clst'
+name = 'res_ti64_clst18'
 
 ##########################################
 ## physics parameters
@@ -70,6 +70,8 @@ elif type == 'pool':
 sm.POOL_SIZE = ncores
 
 if use_mpi:
+    import mpi4py
+    mpi4py.rc.recv_mprobe = False # https://bitbucket.org/mpi4py/mpi4py/issues/102/unpicklingerror-on-commrecv-after-iprobe
     from mpi4py import MPI
     import pt_mpi as pt
     pt.MPI_MESSAGE_SIZE = 2**15

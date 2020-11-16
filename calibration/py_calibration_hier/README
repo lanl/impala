@@ -1,65 +1,20 @@
---------------------------------
-Statistical calibration of physical models in python
---------------------------------
+##### create an environment with the right stuff (do once)
+salloc -p general
 
-files:
-    -   statistical_models.py
-        - contains the relevant statistical models (metropolis hastings,
-            parallel tempering)
-    -   statistical_models_mpi.py
-        - rewrites statistical models to use MPI
+module load anaconda/Anaconda3.2019.10
+conda create --name impala
+source activate impala
+conda install scipy numpy pandas matplotlib
 
-    -   physical_models.py
-        - rewrite of strength_models.py (original file by DJ Luscher)
-    -   physical_models_c.pyx
-        - rewrite of physical_models for cython
+pip install pathos
+pip install methodtools
+pip install cython
+module load openmpi/2.1.3-gcc_6.4.0
+pip install mpi4py
 
-    -   pointcloud.pyx
-        - implements functions for calculating localized covariance
-            within a point cloud
-
-    -   transport.py
-        - contains transport classes (they hold data in a way customized for
-            for each sub-model)
-
-    -   submodel.py
-        - contains submodel classes (for HB, they use physical_models_c to
-            approximate the stress strain curve, and calculate sse.  for other
-            models, they create gaussian process emulators of simulation
-            results.)
-
-    -   test_mh.py
-        implements the (simple) Metropolis Hastings Model
-
-    -   test_pt.py
-        implements the Parallel Tempering Model
-
-    -   test_pt_mpi.py
-        implements the Parallel Tempering model within an MPI framework
+##### compile cython stuff (do once)
+python setup.py build_ext --inplace # rm the .so files if it doesn’t compile anything
 
 
-
-
-To run on darwin:
-
-# get modules
-    module load openmpi/4.0.0-gcc_8.2.0
-    module load anaconda/Anaconda3
-
-# if you need to create the environment
-   # conda create -n imm_env pip
-
-   source activate imm_env
-
-# Need packages (pip install …)
-   # mpi4py, numpy, pandas, seaborn, matplotlib, GPy, scipy, cython
-
-# build cython files if you have not
-   # python setup.py build_ext --inplace
-
-# need samples and plots directories off home directory
-
-# run it with 9 temperatures (on 10 threads)
-    mpirun -n 10 python ~/git/immpala/py_calibration/test_pt_mpi_cu.py
-
-# plots written to plots directory, samples written to samples directory
+##### edit run_ti64.py and run_ti64.sh, then
+sbatch run_ti64.sh # note, you can run multiple of these at the same time, but change “name” in run_ti64.py so they don’t write over each other

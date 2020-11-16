@@ -11,3 +11,5 @@
 /calibration/**/__pycache__/*
 /calibration/**/build/*
 /calibration/**/*.html
+/calibration/py_calibration_hier/pointcloud.c
+/calibration/py_calibration_hier/physical_models_c.c
