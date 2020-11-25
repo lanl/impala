@@ -20,7 +20,7 @@ use_mpi = True
 data_path = './data/data_Ti64.db'
 
 results_path = './results/Ti64/'
-name = 'res_ti64_clst18'
+name = 'res_ti64_clst20'
 
 ##########################################
 ## physics parameters
