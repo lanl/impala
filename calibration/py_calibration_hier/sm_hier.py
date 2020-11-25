@@ -548,6 +548,15 @@ class Chain(Transformer, pt.PTChain):
         cursor.execute(consts_create)
         cursor.executemany(consts_insert, constants)
 
+        bounds_create = self.create_stmt.format('bounds', 'parameter TEXT, lower REAL, upper REAL')
+        bounds_insert = self.insert_stmt.format('bounds', 'parameter, lower, upper', '?,?,?')
+        cursor.execute(bounds_create)
+        bounds = [
+            (param, bound[0],bound[1])
+            for param, bound in zip(self.parameter_list, self.bounds)
+            ]
+        cursor.executemany(bounds_insert, bounds)
+
         Sigma_cols = [
             'Sigma_{}_{}'.format(i,j)
             for i in range(1, self.d + 1)
