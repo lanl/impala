@@ -4,15 +4,15 @@
 type = 'cluster' # cluster, hier, or pool
 ntemps = 1 # number of temperatures if not using MPI
 temperature_ladder_spacing = 1.1
-nmcmc = 20000
-nburn = 10000
+nmcmc = 200
+nburn = 100
 nthin = 5
 
 ##########################################
 ## computation parameters
 
-ncores = 8 # in addition to MPI processes
-use_mpi = True
+ncores = 1 # in addition to MPI processes
+use_mpi = False
 
 ##########################################
 ## paths
@@ -20,7 +20,11 @@ use_mpi = True
 data_path = './data/data_Ti64.db'
 
 results_path = './results/Ti64/'
+<<<<<<< HEAD
 name = 'res_ti64_clst20'
+=======
+name = 'res_ti64_hier-test'
+>>>>>>> 03acbd4867bd4cf841bef9d7a82ceec624911e11
 
 ##########################################
 ## physics parameters
@@ -53,9 +57,45 @@ model_args = {'flow_stress_model'   : 'PTW', 'shear_modulus_model' : 'Stein'}
 
 
 ##########################################
-##########################################
-##########################################
+## priors
 import numpy as np
+d = 10 # or 11??
+if type == 'cluster':
+    prior = {
+        'shpb_s2_a' : 25,
+        'shpb_s2_b' : 1e-6,
+        'pca_s2_a': 0.1,
+        'pca_s2_b': 0.1,
+        'psi' : np.eye(d) * 0.5,
+        'nu' : d + 2,
+        'mu' : np.zeros(d),
+        'Sinv' : np.eye(d) * 1e-6,
+        'eta_a' : 2.,
+        'eta_b' : 5.,
+    }
+elif type == 'hier':
+    prior = {
+        'shpb_s2_a': 25,
+        'shpb_s2_b': 1e-6,
+        'pca_s2_a': 0.1,
+        'pca_s2_b': 0.1,
+        'psi': np.eye(d) * 0.5,
+        'nu': d + 2,
+        'mu': np.zeros(d),
+        'Sinv': np.eye(d) * 1e-6,
+    }
+elif type == 'pool':
+    prior = {
+        'shpb_s2_a': 25,
+        'shpb_s2_b': 1e-6,
+        'pca_s2_a': 0.1,
+        'pca_s2_b': 0.1,
+    }
+
+##########################################
+##########################################
+##########################################
+
 #from numpy import float64
 #np.seterr(under = 'ignore')
 
@@ -96,6 +136,7 @@ if __name__ == '__main__':
                 bounds=parameter_bounds,
                 constants=starting_consts,
                 model_args=model_args,
+                prior=prior,
             )
             model.sample(nmcmc, nthin)
             model.write_to_disk(results_path + name + '.db', nburn, nthin)
@@ -112,6 +153,7 @@ if __name__ == '__main__':
             bounds=parameter_bounds,
             constants=starting_consts,
             model_args=model_args,
+            prior=prior,
         )
         model.sample(nmcmc, nthin)
         model.write_to_disk(results_path + name + '.db', nburn, nthin)

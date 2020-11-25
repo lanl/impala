@@ -231,7 +231,7 @@ class Chain(Transformer, pt.PTChain):
         self.pool.join()
         return
 
-    def __init__(self, path, bounds, constants, model_args, temperature = 1.):
+    def __init__(self, path, bounds, constants, model_args, prior, temperature = 1.):
         conn = sql.connect(path)
         cursor = conn.cursor()
         self.model = MaterialModel(**model_args)
@@ -244,7 +244,7 @@ class Chain(Transformer, pt.PTChain):
         tables = list(cursor.execute(' SELECT type, table_name FROM meta; '))
         tables = [(i, table[0], table[1]) for i, table in enumerate(tables)]
         self.subchains = [
-            SubChain[type](self, Experiment[type](conn, table_name, model_args), i)
+            SubChain[type](self, Experiment[type](conn, table_name, model_args), i, prior)
             for i, type, table_name in tables
             ]
         #ipdb.set_trace()

@@ -179,13 +179,13 @@ class SubChainSHPB(SubChainHierBase):
         cursor.executemany(phi_insert, phi.tolist())
         return
 
-    def __init__(self, parent, experiment, index, constant_vec, bounds):
+    def __init__(self, parent, experiment, index, constant_vec, bounds, priors):
         self.parent     = parent
         self.experiment = experiment
         self.index      = index
         self.bounds     = bounds
         self.table_name = self.experiment.table_name
-        self.priors     = PriorsSHPB(25, 1.e-6)
+        self.priors     = PriorsSHPB(priors['shpb_s2_a'], priors['shpb_s2_a'])#PriorsSHPB(25, 1.e-6)
         self.N          = self.experiment.X.shape[0]
         self.model      = self.experiment.model
         self.model.initialize_constants(constant_vec)
@@ -358,13 +358,13 @@ class SubChainPCA(SubChainHierBase):
         cursor.executemany(zeta_insert, zeta.tolist())
         return
 
-    def __init__(self, parent, experiment, index, constant_vec, bounds):
+    def __init__(self, parent, experiment, index, constant_vec, bounds, prior):
         self.parent = parent
         self.experiment = experiment
         self.index = index
         self.bounds = bounds
         self.table_name = self.experiment.table_name
-        self.priors = PriorsPCA(25, 1.e-6)
+        self.priors = PriorsPCA(prior['pca_s2_a'], prior['pca_s2_b'])
         self.N = self.experiment.Y.shape[0]
         self.model = self.experiment.model
         self.model.initialize_constants(constant_vec)
@@ -548,6 +548,15 @@ class Chain(Transformer, pt.PTChain):
         cursor.execute(consts_create)
         cursor.executemany(consts_insert, constants)
 
+        bounds_create = self.create_stmt.format('bounds', 'parameter TEXT, lower REAL, upper REAL')
+        bounds_insert = self.insert_stmt.format('bounds', 'parameter, lower, upper', '?,?,?')
+        cursor.execute(bounds_create)
+        bounds = [
+            (param, bound[0],bound[1])
+            for param, bound in zip(self.parameter_list, self.bounds)
+            ]
+        cursor.executemany(bounds_insert, bounds)
+
         Sigma_cols = [
             'Sigma_{}_{}'.format(i,j)
             for i in range(1, self.d + 1)
@@ -574,7 +583,7 @@ class Chain(Transformer, pt.PTChain):
         conn.close()
         return
 
-    def __init__(self, path, bounds, constants, model_args, temperature = 1.):
+    def __init__(self, path, bounds, constants, model_args, prior, temperature = 1.):
         self.model = MaterialModel(**model_args)
         self.model_args = model_args
         self.parameter_list = self.model.get_parameter_list()
@@ -593,6 +602,7 @@ class Chain(Transformer, pt.PTChain):
                 i,
                 self.constant_vec,
                 self.bounds,
+                prior
                 )
             for i, type, table_name in tables
             ]
@@ -601,10 +611,10 @@ class Chain(Transformer, pt.PTChain):
         self.d = len(self.parameter_list)
         self.subchain_prefix_list = ['subchain_{}'.format(i) for i in range(self.N)]
         self.priors = PriorsChain(
-            psi = np.eye(self.d) * 0.5,
-            nu = self.d + 2,
-            mu = np.zeros(self.d),
-            Sinv = np.eye(self.d) * 1e-6,
+            psi = prior['psi'],#np.eye(self.d) * 0.5,
+            nu = prior['nu'],#self.d + 2,
+            mu = prior['mu'],#np.zeros(self.d),
+            Sinv = prior['Sinv'],#np.eye(self.d) * 1e-6,
             )
         return
 
