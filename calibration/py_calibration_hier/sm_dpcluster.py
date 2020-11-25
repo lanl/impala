@@ -230,12 +230,12 @@ class SubChainSHPB(SubChainBase):
         cursor.executemany(sigma2_insert, [(x,) for x in self.samples.sigma2[nburn::thin].tolist()])
         return
 
-    def __init__(self, parent, experiment, index):
+    def __init__(self, parent, experiment, index, prior):
         self.parent     = parent
         self.experiment = experiment
         self.index      = index
         self.table_name = self.experiment.table_name
-        self.priors     = PriorsSHPB(25, 1e-6)
+        self.priors     = PriorsSHPB(prior['shpb_s2_a'], prior['shpb_s2_b'])
         self.N          = self.experiment.X.shape[0]
         return
 
@@ -368,7 +368,7 @@ class SubChainPCA(SubChainBase):
         cursor.executemany(sigma2_insert, [(x,) for x in self.samples.sigma2[nburn::thin].tolist()])
         return
 
-    def __init__(self, parent, experiment, index):
+    def __init__(self, parent, experiment, index, prior):
         self.experiment = experiment
         self.parent = parent
         self.index = index
@@ -376,7 +376,7 @@ class SubChainPCA(SubChainBase):
         self.eta_cols = self.experiment.eta_cols
         self.d = len(self.eta_cols)
         self.table_name = self.experiment.table_name
-        self.priors = PriorsPCA(0.1, 0.1)
+        self.priors = PriorsPCA(prior['pca_s2_a'], prior['pca_s2_b'])
         self.bounds = self.experiment.bounds
         pass
 
@@ -920,7 +920,7 @@ class Chain(Transformer, pt.PTChain):
         self.pool.join()
         return
 
-    def __init__(self, path, bounds, constants, model_args, temperature = 1., m = 20):
+    def __init__(self, path, bounds, constants, model_args, prior, temperature = 1., m = 20):
         conn = sql.connect(path)
         cursor = conn.cursor()
         self.model = MaterialModel(**model_args)
@@ -933,7 +933,7 @@ class Chain(Transformer, pt.PTChain):
         tables = list(cursor.execute(" SELECT type, table_name FROM meta; "))
         tables = [(i, table[0], table[1]) for i, table in enumerate(tables)]
         self.subchains = [
-            SubChain[type](self, Experiment[type](conn, table_name, model_args), i)
+            SubChain[type](self, Experiment[type](conn, table_name, model_args), i, prior)
             for i, type, table_name in tables
             ]
         self.set_temperature(temperature)
@@ -942,12 +942,16 @@ class Chain(Transformer, pt.PTChain):
         self.subchain_prefix_list = ['subchain_{}'.format(i) for i in range(self.N)]
         self.pool = Pool(processes = POOL_SIZE)
         self.priors = PriorsChain(
-            psi = np.eye(self.d) * 0.5,
-            nu = self.d + 2,
-            mu = np.zeros(self.d),
-            Sinv = np.eye(self.d) * 1e-6,
-            eta_a = 2.,
-            eta_b = 5.,
+            #psi = np.eye(self.d) * 0.5,
+            #nu = self.d + 2,
+            #mu = np.zeros(self.d),
+            #Sinv = np.eye(self.d) * 1e-6,
+            psi=prior['psi'],
+            nu=prior['nu'],
+            mu=prior['mu'],
+            Sinv=prior['Sinv'],
+            eta_a = prior['eta_a'],#2.,
+            eta_b = prior['eta_b'],#5.,
             )
         self.m = m
         return
