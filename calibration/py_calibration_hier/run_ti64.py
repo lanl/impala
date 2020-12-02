@@ -55,34 +55,39 @@ model_args = {'flow_stress_model'   : 'PTW', 'shear_modulus_model' : 'Stein'}
 ##########################################
 ## priors
 import numpy as np
-d = 10 # or 11??
+d = 10 # PTW parameters
 if type == 'cluster':
     prior = {
-        'shpb_s2_a' : 25,
-        'shpb_s2_b' : 1e-6,
-        'pca_s2_a': 0.1,
-        'pca_s2_b': 0.1,
-        'psi' : np.eye(d) * 0.5,
-        'nu' : d + 2,
-        'mu' : np.zeros(d),
-        'Sinv' : np.eye(d) * 1e-6,
-        'eta_a' : 2.,
-        'eta_b' : 5.,
+        ## prior for s2 (error variances) for SHPB
+        'shpb_s2_a' : 2, # IG shape
+        'shpb_s2_b' : 1e-6, # IG scale
+        ## prior for s2 (error variances) for everything else (should be scaled)
+        'pca_s2_a': 0.1, # IG shape
+        'pca_s2_b': 0.1, # IG scale
+        ## prior for Sigma (DP base distribution covariance); note that parameters are in probit space
+        'psi' : np.eye(d) * 0.5, # IW scale matrix
+        'nu' : d + 2, # IW degrees of freedom
+        ## prior for theta0 (DP base distribution mean)
+        'mu' : np.zeros(d), # Normal mean
+        'Sinv' : np.eye(d), # Normal precision
+        ## prior for alpha (DP scaling parameter)
+        'eta_a' : 2., # Gamma shape
+        'eta_b' : 5., # Gamma rate
     }
 elif type == 'hier':
     prior = {
-        'shpb_s2_a': 25,
+        'shpb_s2_a': 2,
         'shpb_s2_b': 1e-6,
         'pca_s2_a': 0.1,
         'pca_s2_b': 0.1,
         'psi': np.eye(d) * 0.5,
         'nu': d + 2,
         'mu': np.zeros(d),
-        'Sinv': np.eye(d) * 1e-6,
+        'Sinv': np.eye(d),
     }
 elif type == 'pool':
     prior = {
-        'shpb_s2_a': 25,
+        'shpb_s2_a': 2,
         'shpb_s2_b': 1e-6,
         'pca_s2_a': 0.1,
         'pca_s2_b': 0.1,
