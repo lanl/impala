@@ -52,7 +52,8 @@ class Transformer(object):
     @staticmethod
     def invprobitlogjac(y):
         """ Computes the log jacobian for the inverse probit transformation """
-        return (-0.5 * np.log(2 * pi) - y * y / 2.).sum()
+        #return (-0.5 * np.log(2 * pi) - y * y / 2.).sum()
+        return(0.) # our priors and proposals are all in probit space, so no jacobian is needed??
 
     @staticmethod
     def pd_matrix_inversion(mat):
