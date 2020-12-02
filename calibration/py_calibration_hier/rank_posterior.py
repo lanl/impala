@@ -49,8 +49,7 @@ models = dict(cursor.fetchall())
 ## get bounds, make into a dict like when they are input
 cursor.execute("SELECT * FROM 'bounds';")
 bounds = cursor.fetchall()
-bounds_names = list(map(lambda x: x[0], cursor.description))
-parameter_bounds = {bounds_names[idx] : [bounds[0][idx], bounds[1][idx]] for idx in range(len(bounds_names))}
+parameter_bounds = {bounds[idx][0] : [bounds[idx][1], bounds[idx][2]] for idx in range(len(bounds))}
 
 nmcmc = len(phi0)
 nparams = len(phi0[0])
