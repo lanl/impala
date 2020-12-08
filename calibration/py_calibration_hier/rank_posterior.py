@@ -8,16 +8,18 @@ import scipy.stats as ss
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import interpolate
+import ipdb #ipdb.set_trace()
 
 ## settings of interest
-edot = 10**5 * 1e-6 #10^5/s
-strain = 1.
-temp = 700. # Kelvin
-res_path = './results/Ti64/res_ti64_hier-test.db'
+edot = 40250. * 1e-6 # first term is per second
+strain = 0.6
+temp = 694. # Kelvin
+res_path = './results/Ti64/res_ti64_hier3.db'
 dat_path = './data/data_Ti64.db'
-name = 'res_ti64_hier3'
+name = 'res_ti64_hier3_impalaHorn'
 out_path = './results/Ti64/'
 nexp = 197
+plot = False
 
 ## connect to calibration output
 con = sq.connect(res_path)
@@ -47,9 +49,23 @@ cursor.execute("SELECT * FROM 'models';")
 models = dict(cursor.fetchall())
 
 ## get bounds, make into a dict like when they are input
-cursor.execute("SELECT * FROM 'bounds';")
-bounds = cursor.fetchall()
-parameter_bounds = {bounds[idx][0] : [bounds[idx][1], bounds[idx][2]] for idx in range(len(bounds))}
+#cursor.execute("SELECT * FROM 'bounds';")
+#bounds = cursor.fetchall()
+#parameter_bounds = {bounds[idx][0] : [bounds[idx][1], bounds[idx][2]] for idx in range(len(bounds))}
+
+parameter_bounds = {
+    'theta0' : (0.0001,   0.2),
+    'p'     : (0.0001,   5.),
+    's0'    : (0.0001,   0.05),
+    'sInf'  : (0.0001,   0.05),
+    'kappa' : (0.0001,   0.5),
+    'gamma' : (0.000001, 0.0001),
+    'y0'    : (0.0001,   0.05),
+    'yInf'  : (0.0001,   0.01),
+    'y1'    : (0.001,    0.1),
+    'y2'    : (0.3,      1.),
+    'vel'   : (0.99,     1.01),
+    }
 
 nmcmc = len(phi0)
 nparams = len(phi0[0])
@@ -70,6 +86,10 @@ def getStrength(edot, strain, temp, params, model_args, consts):
     model.initialize_constants(constant_vec)
     model.update_parameters(np.array(param_vec))
     model.initialize_state(temp)
+
+    #if not model.check_constraints():
+    #    ipdb.set_trace()
+
     return model.compute_state_history()[99, 2]
 
 
@@ -103,13 +123,17 @@ for i in range(nmcmc):
     while not cst: # do until sample meets constraints
         th = np.random.multivariate_normal(th0, S, 1) # get a sample
         ph = unnormalize(invprobit(th), bounds)[0] # unstandardize the sample
-        model_temp.update_parameters(ph) # update model parameters so we can check constraints
+        #model_temp.update_parameters(ph) # update model parameters so we can check constraints
+        stress_temp = getStrength(edot, strain, temp, params, models, constants)
+
         cst = model_temp.check_constraints() # check constraints
 
     params = dict(zip(theta0_names,ph)) # make into a dict
 
     phi[i] = ph
     stress[i] = getStrength(edot, strain, temp, params, models, constants)
+    if stress[i] < 0:
+        ipdb.set_trace()
 
 
 out = pd.DataFrame(phi,columns=param_list) # make into a dataframe
@@ -123,231 +147,231 @@ template = "edot(1/s)=" + str(edot/1e-6) + ", strain=" + str(strain) + ", temp(K
 with open(out_path + name + '_postSamplesPTW.csv', 'w') as fp:
     fp.write(template.format(out.to_csv(index=False)))
 
+if plot:
 
+    def getStress(edot, temp, params, model_args, consts):
+        model = MaterialModel(flow_stress_model=model_args['flow_stress_model'],shear_modulus_model=model_args['shear_modulus_model'])
+        model.set_history_variables(0.6, edot, 100)
 
-def getStress(edot, temp, params, model_args, consts):
-    model = MaterialModel(flow_stress_model=model_args['flow_stress_model'],shear_modulus_model=model_args['shear_modulus_model'])
-    model.set_history_variables(0.6, edot, 100)
+        constant_list = model.get_constant_list()
+        param_list = model.get_parameter_list()
+        constant_vec = np.array([consts[key] for key in constant_list])
+        param_vec = np.array([params[key] for key in param_list])
 
-    constant_list = model.get_constant_list()
-    param_list = model.get_parameter_list()
-    constant_vec = np.array([consts[key] for key in constant_list])
-    param_vec = np.array([params[key] for key in param_list])
+        model.initialize_constants(constant_vec)
+        model.update_parameters(np.array(param_vec))
+        model.initialize_state(temp)
+        return model.compute_state_history()[:, 1:3]
 
-    model.initialize_constants(constant_vec)
-    model.update_parameters(np.array(param_vec))
-    model.initialize_state(temp)
-    return model.compute_state_history()[:, 1:3]
+    ## get meta data
+    con = sq.connect(dat_path)
+    cursor = con.cursor()
+    cursor.execute("SELECT * FROM meta;")
+    meta_names = list(map(lambda x: x[0], cursor.description))
+    meta = pd.DataFrame(cursor.fetchall(),columns=meta_names)
 
-## get meta data
-con = sq.connect(dat_path)
-cursor = con.cursor()
-cursor.execute("SELECT * FROM meta;")
-meta_names = list(map(lambda x: x[0], cursor.description))
-meta = pd.DataFrame(cursor.fetchall(),columns=meta_names)
-
-## get SHPB experimental data
-dat_all = []
-for i in range(nexp):
-    ## get first datset
-    cursor.execute("SELECT * FROM data_" + str(i+1) + ";")
-    dat_all.append(cursor.fetchall())
-
-
-
-## get posterior predictive distributions
-con = sq.connect(res_path)
-cursor = con.cursor()
-
-phii = np.empty([nmcmc,nparams,nexp])
-phi_stress = np.empty([nmcmc,100,nexp])
-phi0_stress = np.empty([nmcmc,100,nexp])
-phii_stress = np.empty([nmcmc,100,nexp])
-for j in range(nexp):
-    cursor.execute("SELECT * FROM 'subchain_" + str(j) + "_phi';")
-    phii[:,:,j] = cursor.fetchall()
-    for i in range(nmcmc):
-        params = dict(zip(theta0_names, phi0[i]))  # make into a dict
-        phi0_stress[i,:,j] = getStress(meta.edot[j], meta.temperature[j], params, models, constants)[:,1]
-
-        params = dict(zip(theta0_names, phi[i]))  # make into a dict
-        phi_stress[i,:,j] = getStress(meta.edot[j], meta.temperature[j], params, models, constants)[:,1]
-
-        params = dict(zip(theta0_names, phii[i,:,j]))  # make into a dict
-        phii_stress[i, :, j] = getStress(meta.edot[j], meta.temperature[j], params, models, constants)[:, 1]
-    print(j)
-
-xx = getStress(meta.edot[0], meta.temperature[0], params, models, constants)[:,0]
-
-## get quantiles
-phi_quant = np.quantile(phi_stress, [.025,.975], 0)
-phi0_quant = np.quantile(phi0_stress, [.025,.975], 0)
-phii_quant = np.quantile(phii_stress, [.025,.975], 0)
-
-## get standard deviations
-stdev = np.empty([nmcmc,197])
-for j in range(197):
-    cursor.execute("SELECT * FROM 'subchain_" + str(j) + "_sigma2';")
-    stdev[:,j] = np.sqrt(np.array(cursor.fetchall()).reshape(nmcmc))
-stdev_mean = stdev.mean(0)
-
-## plot SHPB predictions
-ind = np.where(meta.type == 'shpb')[0].tolist()
-
-nx = 9
-ny = 8
-ip = 0
-k = 0
-for i in ind:
-    if ip % (nx*ny) == 0:
-        ip = 0
-        if i>0:
-            plt.savefig(out_path + name + '_postpredSHPB'+str(k)+'.png', bbox_inches='tight')
-        k+=1
-        plt.figure(k, figsize=(20, 15))
-#for i in range(nx*ny):
-    ax1=plt.subplot(ny,nx,ip+1)
-    plt.fill_between(xx, phi_quant[0,:,i], phi_quant[1,:,i],color='lightgrey',label=r'$\theta^*$')
-    plt.fill_between(xx, phi0_quant[0,:,i], phi0_quant[1,:,i],color='lightblue',label=r'$\theta_0$')
-    plt.fill_between(xx, phii_quant[0,:,i], phii_quant[1,:,i],color='lightgreen',label=r'$\theta_i$')
-    plt.scatter(np.array(dat_all[i])[:,0], np.array(dat_all[i])[:,1],color='blue',s=.5,label='y')
-    plt.vlines(x=np.array(dat_all[i])[:,0], ymin=np.array(dat_all[i])[:,1] - 2*stdev_mean[i], ymax=np.array(dat_all[i])[:,1] + 2*stdev_mean[i],color='blue',label='')
-    plt.ylim(0,.027)
-    plt.xlim(0, .6)
-    ax = plt.gca()
-    if ip < ny*nx-nx:
-        ax.axes.xaxis.set_visible(False)
-    if (ip+1) % nx != 1:
-        ax.axes.yaxis.set_visible(False)
-    plt.subplots_adjust(wspace=.05, hspace=.05)
-    plt.annotate(str(round(meta.edot[i]/1e-6,5)) + "/s  " + str(int(meta.temperature[i])) + "K",xy=(0.01, 0.9), xycoords='axes fraction')
-    if (ip+1)==(nx*ny):
-        ax.legend()
-    ip+=1
-    if i == ind[-1]:
-        plt.savefig(out_path + name + '_postpredSHPB'+str(k)+'.png', bbox_inches='tight')
-
-## TODO
-# try different shrinkage levels
-# plots for FP & TC
+    ## get SHPB experimental data
+    dat_all = []
+    for i in range(nexp):
+        ## get first datset
+        cursor.execute("SELECT * FROM data_" + str(i+1) + ";")
+        dat_all.append(cursor.fetchall())
 
 
 
+    ## get posterior predictive distributions
+    con = sq.connect(res_path)
+    cursor = con.cursor()
 
-#sns.set_theme(style="ticks")
-#df = pd.DataFrame(phi0arr)
-#sns.pairplot(df)
-#
-# i=3
-# j=4
-# n=12
-# plt.scatter(phii[:,i,n],phii[:,j,n])
-# oo = contx(phii[:, i,n], phii[:, j,n])
-# plt.contour(oo['X'], oo['Y'], oo['Z'], oo['conts'], colors='blue')
-#
-# phii[:,:,n].mean(axis=0)
-#
-# from sklearn.mixture import GaussianMixture
-# cl = GaussianMixture(2).fit(phii[:,:,n])
-#
-# d1 = (((phii[:,:,n] - cl.means_[0])/bounds[:,1])**2).sum(1)
-# d2 = (((phii[:,:,n] - cl.means_[1])/bounds[:,1])**2).sum(1)
-#
-# bounds
-# c1 = d1 < d2
-#
-# df = pd.DataFrame(phii[:,:,n])
-# df['cat'] = c1
-# sns.pairplot(df,hue = 'cat')
-#
-# df = pd.DataFrame(phii[:,:,n])
-# df.loc[2000] = cl.means_.mean(0)#phii[:,:,n].mean(axis=0)
-# df['cat'] = 1
-# df['cat'][2000] = 2
-# sns.pairplot(df,hue = 'cat')
-#
-# params = dict(zip(theta0_names, cl.means_.mean(0)))  # make into a dict
-# plt.plot(xx,getStress(meta.edot[n], meta.temperature[n], params, models, constants)[:, 1])
-#
-# plt.fill_between(xx, phi_quant[0,:,n], phi_quant[1,:,n],color='lightgrey',label=r'$\theta^*$')
-# plt.fill_between(xx, phi0_quant[0,:,n], phi0_quant[1,:,n],color='lightblue',label=r'$\theta_0$')
-# plt.fill_between(xx, phii_quant[0,:,n], phii_quant[1,:,n],color='lightgreen',label=r'$\theta_i$')
-#
-# cols = ['red','purple']
-# for i in range(2000):
-#     plt.plot(xx,phii_stress[i,:,n],color=cols[int(c1[i])],zorder=1)
-#
-# plt.scatter(np.array(dat_all[n])[:,0], np.array(dat_all[n])[:,1],color='blue',s=1,label='y',zorder=2)
+    phii = np.empty([nmcmc,nparams,nexp])
+    phi_stress = np.empty([nmcmc,100,nexp])
+    phi0_stress = np.empty([nmcmc,100,nexp])
+    phii_stress = np.empty([nmcmc,100,nexp])
+    for j in range(nexp):
+        cursor.execute("SELECT * FROM 'subchain_" + str(j) + "_phi';")
+        phii[:,:,j] = cursor.fetchall()
+        for i in range(nmcmc):
+            params = dict(zip(theta0_names, phi0[i]))  # make into a dict
+            phi0_stress[i,:,j] = getStress(meta.edot[j], meta.temperature[j], params, models, constants)[:,1]
 
-# multimodality is justified with this small of s2.  If we relax the s2 prior, may get fewer modes.  This is an interesting phenomena, where likelihood modes get more peaked as s2 gets small
-# note: also want to fiddle with shrinkage priors...all priors really
+            params = dict(zip(theta0_names, phi[i]))  # make into a dict
+            phi_stress[i,:,j] = getStress(meta.edot[j], meta.temperature[j], params, models, constants)[:,1]
 
+            params = dict(zip(theta0_names, phii[i,:,j]))  # make into a dict
+            phii_stress[i, :, j] = getStress(meta.edot[j], meta.temperature[j], params, models, constants)[:, 1]
+        print(j)
 
+    xx = getStress(meta.edot[0], meta.temperature[0], params, models, constants)[:,0]
 
-## plot parameter pairs plots, 90% contours
+    ## get quantiles
+    phi_quant = np.quantile(phi_stress, [.025,.975], 0)
+    phi0_quant = np.quantile(phi0_stress, [.025,.975], 0)
+    phii_quant = np.quantile(phii_stress, [.025,.975], 0)
 
-def contx(x1,x2,perc=.9): # get contour for percecntile using kde
-    dd = ss.gaussian_kde([x1,x2],bw_method='silverman')
-    X, Y = np.mgrid[min(x1):max(x1):100j, min(x2):max(x2):100j]
-    positions = np.vstack([X.ravel(), Y.ravel()])
-    z = dd(positions)
-    z = z/z.sum()
+    ## get standard deviations
+    stdev = np.empty([nmcmc,197])
+    for j in range(197):
+        cursor.execute("SELECT * FROM 'subchain_" + str(j) + "_sigma2';")
+        stdev[:,j] = np.sqrt(np.array(cursor.fetchall()).reshape(nmcmc))
+    stdev_mean = stdev.mean(0)
 
-    t = np.linspace(0, z.max(), 1000)
-    integral = ((z >= t[:, None, None]) * z).sum(axis=(1,2))
+    ## plot SHPB predictions
+    ind = np.where(meta.type == 'shpb')[0].tolist()
 
-    f = interpolate.interp1d(integral, t)
-    t_contours = f(np.array([perc]))
-    return {'X':X, 'Y':Y, 'Z':z.reshape([100,100]), 'conts':t_contours }
-
-phi0arr = np.array(phi0)
-#nexp = 3
-plt.figure(1, figsize=(15, 15))
-
-for i in range(nparams):
-    for j in range(nparams):
-        if i == j:
-            plt.subplot2grid((nparams, nparams), (i, j))
-
-            for k in range(nexp):
-                sns.distplot(phii[:, i, k], hist=False, kde=True,color='lightgreen')
-
-            sns.distplot(phi0arr[:,i], hist=False, kde=True,color='blue')
-
-            sns.distplot(phi[:, i], hist=False, kde=True,color='grey')
-
-            plt.xlim(bounds[i,0], bounds[i,1])
-            ax = plt.gca()
-            ax.axes.yaxis.set_visible(False)
-            plt.xlabel(theta0_names[i])
-            ax.tick_params(axis='x', which='major', labelsize=8)
-            plt.setp(ax.get_xticklabels(), rotation=30, horizontalalignment='right')
-        if i < j:
-            plt.subplot2grid((nparams, nparams), (i, j))
-
-            for k in range(nexp):
-                oo = contx(phii[:, j, k], phii[:, i, k])
-                plt.contour(oo['X'], oo['Y'], oo['Z'], oo['conts'], colors='lightgreen')
-
-            oo = contx(phi0arr[:,j], phi0arr[:,i])
-            plt.contour(oo['X'], oo['Y'], oo['Z'], oo['conts'],colors = 'blue')
-
-            oo = contx(phi[:,j], phi[:,i])
-            plt.contour(oo['X'], oo['Y'], oo['Z'], oo['conts'],colors='grey')
-
-            plt.xlim(bounds[j, 0], bounds[j, 1])
-            plt.ylim(bounds[i, 0], bounds[i, 1])
-            ax = plt.gca()
+    nx = 9
+    ny = 8
+    ip = 0
+    k = 0
+    for i in ind:
+        if ip % (nx*ny) == 0:
+            ip = 0
+            if i>0:
+                plt.savefig(out_path + name + '_postpredSHPB'+str(k)+'.png', bbox_inches='tight')
+            k+=1
+            plt.figure(k, figsize=(20, 15))
+    #for i in range(nx*ny):
+        ax1=plt.subplot(ny,nx,ip+1)
+        plt.fill_between(xx, phi_quant[0,:,i], phi_quant[1,:,i],color='lightgrey',label=r'$\theta^*$')
+        plt.fill_between(xx, phi0_quant[0,:,i], phi0_quant[1,:,i],color='lightblue',label=r'$\theta_0$')
+        plt.fill_between(xx, phii_quant[0,:,i], phii_quant[1,:,i],color='lightgreen',label=r'$\theta_i$')
+        plt.scatter(np.array(dat_all[i])[:,0], np.array(dat_all[i])[:,1],color='blue',s=.5,label='y')
+        plt.vlines(x=np.array(dat_all[i])[:,0], ymin=np.array(dat_all[i])[:,1] - 2*stdev_mean[i], ymax=np.array(dat_all[i])[:,1] + 2*stdev_mean[i],color='blue',label='')
+        plt.ylim(0,.027)
+        plt.xlim(0, .6)
+        ax = plt.gca()
+        if ip < ny*nx-nx:
             ax.axes.xaxis.set_visible(False)
+        if (ip+1) % nx != 1:
             ax.axes.yaxis.set_visible(False)
-            print(i)
-plt.subplots_adjust(wspace=.05, hspace=.05)
-plt.subplot2grid((nparams, nparams), (2, 0))
-from matplotlib.lines import Line2D
-colors = ['lightgreen','blue','grey']
-lines = [Line2D([0],[0],color=c,linewidth=2) for c in colors]
-labels = [r'$\theta_i$',r'$\theta_0$',r'$\theta^*$']
-plt.legend(lines,labels)
-plt.axis('off')
+        plt.subplots_adjust(wspace=.05, hspace=.05)
+        plt.annotate(str(round(meta.edot[i]/1e-6,5)) + "/s  " + str(int(meta.temperature[i])) + "K",xy=(0.01, 0.9), xycoords='axes fraction')
+        if (ip+1)==(nx*ny):
+            ax.legend()
+        ip+=1
+        if i == ind[-1]:
+            plt.savefig(out_path + name + '_postpredSHPB'+str(k)+'.png', bbox_inches='tight')
 
-plt.savefig(out_path + name + '_postThetas.png', bbox_inches='tight')
+    ## TODO
+    # try different shrinkage levels
+    # plots for FP & TC
+
+
+
+
+    #sns.set_theme(style="ticks")
+    #df = pd.DataFrame(phi0arr)
+    #sns.pairplot(df)
+    #
+    # i=3
+    # j=4
+    # n=12
+    # plt.scatter(phii[:,i,n],phii[:,j,n])
+    # oo = contx(phii[:, i,n], phii[:, j,n])
+    # plt.contour(oo['X'], oo['Y'], oo['Z'], oo['conts'], colors='blue')
+    #
+    # phii[:,:,n].mean(axis=0)
+    #
+    # from sklearn.mixture import GaussianMixture
+    # cl = GaussianMixture(2).fit(phii[:,:,n])
+    #
+    # d1 = (((phii[:,:,n] - cl.means_[0])/bounds[:,1])**2).sum(1)
+    # d2 = (((phii[:,:,n] - cl.means_[1])/bounds[:,1])**2).sum(1)
+    #
+    # bounds
+    # c1 = d1 < d2
+    #
+    # df = pd.DataFrame(phii[:,:,n])
+    # df['cat'] = c1
+    # sns.pairplot(df,hue = 'cat')
+    #
+    # df = pd.DataFrame(phii[:,:,n])
+    # df.loc[2000] = cl.means_.mean(0)#phii[:,:,n].mean(axis=0)
+    # df['cat'] = 1
+    # df['cat'][2000] = 2
+    # sns.pairplot(df,hue = 'cat')
+    #
+    # params = dict(zip(theta0_names, cl.means_.mean(0)))  # make into a dict
+    # plt.plot(xx,getStress(meta.edot[n], meta.temperature[n], params, models, constants)[:, 1])
+    #
+    # plt.fill_between(xx, phi_quant[0,:,n], phi_quant[1,:,n],color='lightgrey',label=r'$\theta^*$')
+    # plt.fill_between(xx, phi0_quant[0,:,n], phi0_quant[1,:,n],color='lightblue',label=r'$\theta_0$')
+    # plt.fill_between(xx, phii_quant[0,:,n], phii_quant[1,:,n],color='lightgreen',label=r'$\theta_i$')
+    #
+    # cols = ['red','purple']
+    # for i in range(2000):
+    #     plt.plot(xx,phii_stress[i,:,n],color=cols[int(c1[i])],zorder=1)
+    #
+    # plt.scatter(np.array(dat_all[n])[:,0], np.array(dat_all[n])[:,1],color='blue',s=1,label='y',zorder=2)
+
+    # multimodality is justified with this small of s2.  If we relax the s2 prior, may get fewer modes.  This is an interesting phenomena, where likelihood modes get more peaked as s2 gets small
+    # note: also want to fiddle with shrinkage priors...all priors really
+
+
+
+    ## plot parameter pairs plots, 90% contours
+
+    def contx(x1,x2,perc=.9): # get contour for percecntile using kde
+        dd = ss.gaussian_kde([x1,x2],bw_method='silverman')
+        X, Y = np.mgrid[min(x1):max(x1):100j, min(x2):max(x2):100j]
+        positions = np.vstack([X.ravel(), Y.ravel()])
+        z = dd(positions)
+        z = z/z.sum()
+
+        t = np.linspace(0, z.max(), 1000)
+        integral = ((z >= t[:, None, None]) * z).sum(axis=(1,2))
+
+        f = interpolate.interp1d(integral, t)
+        t_contours = f(np.array([perc]))
+        return {'X':X, 'Y':Y, 'Z':z.reshape([100,100]), 'conts':t_contours }
+
+    phi0arr = np.array(phi0)
+    #nexp = 3
+    plt.figure(1, figsize=(15, 15))
+
+    for i in range(nparams):
+        for j in range(nparams):
+            if i == j:
+                plt.subplot2grid((nparams, nparams), (i, j))
+
+                for k in range(nexp):
+                    sns.distplot(phii[:, i, k], hist=False, kde=True,color='lightgreen')
+
+                sns.distplot(phi0arr[:,i], hist=False, kde=True,color='blue')
+
+                sns.distplot(phi[:, i], hist=False, kde=True,color='grey')
+
+                plt.xlim(bounds[i,0], bounds[i,1])
+                ax = plt.gca()
+                ax.axes.yaxis.set_visible(False)
+                plt.xlabel(theta0_names[i])
+                ax.tick_params(axis='x', which='major', labelsize=8)
+                plt.setp(ax.get_xticklabels(), rotation=30, horizontalalignment='right')
+            if i < j:
+                plt.subplot2grid((nparams, nparams), (i, j))
+
+                for k in range(nexp):
+                    oo = contx(phii[:, j, k], phii[:, i, k])
+                    plt.contour(oo['X'], oo['Y'], oo['Z'], oo['conts'], colors='lightgreen')
+
+                oo = contx(phi0arr[:,j], phi0arr[:,i])
+                plt.contour(oo['X'], oo['Y'], oo['Z'], oo['conts'],colors = 'blue')
+
+                oo = contx(phi[:,j], phi[:,i])
+                plt.contour(oo['X'], oo['Y'], oo['Z'], oo['conts'],colors='grey')
+
+                plt.xlim(bounds[j, 0], bounds[j, 1])
+                plt.ylim(bounds[i, 0], bounds[i, 1])
+                ax = plt.gca()
+                ax.axes.xaxis.set_visible(False)
+                ax.axes.yaxis.set_visible(False)
+                print(i)
+    plt.subplots_adjust(wspace=.05, hspace=.05)
+    plt.subplot2grid((nparams, nparams), (2, 0))
+    from matplotlib.lines import Line2D
+    colors = ['lightgreen','blue','grey']
+    lines = [Line2D([0],[0],color=c,linewidth=2) for c in colors]
+    labels = [r'$\theta_i$',r'$\theta_0$',r'$\theta^*$']
+    plt.legend(lines,labels)
+    plt.axis('off')
+
+    plt.savefig(out_path + name + '_postThetas.png', bbox_inches='tight')
