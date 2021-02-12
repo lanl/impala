@@ -205,6 +205,15 @@ class Chain(Transformer, pt.PTChain):
         cursor.execute(consts_create)
         cursor.executemany(consts_insert, constants)
 
+        bounds_create = self.create_stmt.format('bounds', 'parameter TEXT, lower REAL, upper REAL')
+        bounds_insert = self.insert_stmt.format('bounds', 'parameter, lower, upper', '?,?,?')
+        cursor.execute(bounds_create)
+        bounds = [
+            (param, bound[0],bound[1])
+            for param, bound in zip(self.parameter_list, self.bounds)
+            ]
+        cursor.executemany(bounds_insert, bounds)
+
         for prefix, subchain in zip(self.subchain_prefix_list, self.subchains):
             subchain.write_to_disk(cursor, prefix, nburn, thin)
 

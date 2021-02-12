@@ -526,6 +526,7 @@ class Chain(Transformer, pt.PTChain):
         Sigma     = self.samples.Sigma[nburn::thin]
         models    = list(self.model.report_models_used().items())
         constants = list(self.model.report_constants().items())
+        #priors    = self.priors
 
         param_create_list = ','.join([x + ' REAL' for x in self.parameter_list])
         param_insert_tple = (','.join(self.parameter_list), ','.join(['?'] * self.d))

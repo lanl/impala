@@ -1,11 +1,11 @@
 ##########################################
 ## stat model parameters
 
-type = 'cluster' # cluster, hier, or pool
+type = 'hier' # cluster, hier, or pool
 ntemps = 1 # number of temperatures if not using MPI
 temperature_ladder_spacing = 1.1
-nmcmc = 200
-nburn = 100
+nmcmc = 20
+nburn = 10
 nthin = 5
 
 ##########################################
@@ -20,11 +20,8 @@ use_mpi = False
 data_path = './data/data_Ti64.db'
 
 results_path = './results/Ti64/'
-<<<<<<< HEAD
-name = 'res_ti64_clst20'
-=======
 name = 'res_ti64_hier-test'
->>>>>>> 03acbd4867bd4cf841bef9d7a82ceec624911e11
+
 
 ##########################################
 ## physics parameters

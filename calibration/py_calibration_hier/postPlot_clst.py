@@ -14,13 +14,12 @@ import ipdb #ipdb.set_trace()
 edot = 40250. * 1e-6 # first term is per second
 strain = 0.6
 temp = 694. # Kelvin
-res_path = './results/Ti64/ti64_hier_temperTest2.db'
+res_path = './results/Ti64/res_ti64_clst4.db'
 dat_path = './data/data_Ti64.db'
-name = 'ti64_hier_temperTest2'
+name = 'res_ti64_clst4'
 out_path = './results/Ti64/'
 nexp = 197
 plot = True
-write = False
 
 ## connect to calibration output
 con = sq.connect(res_path)
@@ -72,29 +71,6 @@ nmcmc = len(phi0)
 nparams = len(phi0[0])
 
 
-
-def getStrength(edot, strain, temp, params, model_args, consts):
-    # get stress at given strain, edot, temp, and params
-    model = MaterialModel(flow_stress_model=model_args['flow_stress_model'],shear_modulus_model=model_args['shear_modulus_model'])
-    model.set_history_variables(strain, edot, 100)
-
-    # ensure correct ordering
-    constant_list = model.get_constant_list()
-    param_list = model.get_parameter_list()
-    constant_vec = np.array([consts[key] for key in constant_list])
-    param_vec = np.array([params[key] for key in param_list])
-
-    model.initialize_constants(constant_vec)
-    model.update_parameters(np.array(param_vec))
-    model.initialize_state(temp)
-
-    #if not model.check_constraints():
-    #    ipdb.set_trace()
-
-    return model.compute_state_history()[99, 2]
-
-
-
 def unnormalize(z,bounds):
     """ Transform 0-1 scale to real scale """
     return z * (bounds[:, 1] - bounds[:, 0]) + bounds[:, 0]
@@ -108,56 +84,6 @@ def invprobit(y):
 
 
 
-
-# temporary model setup
-model_temp = MaterialModel(flow_stress_model=models['flow_stress_model'],shear_modulus_model=models['shear_modulus_model'])
-param_list = model_temp.get_parameter_list()
-bounds = np.array([parameter_bounds[key] for key in param_list]) # order bounds correctly
-
-## get phi, stress
-phi = np.empty([nmcmc,nparams]) # store parameter samples here (including Sigma uncertainty)
-stress = np.zeros(nmcmc) # store stress here
-for i in range(nmcmc):
-    th0 = theta0[i]
-    S = np.array(Sigma[i]).reshape(nparams,nparams)
-    cst = False
-    while not cst: # do until sample meets constraints
-        th = np.random.multivariate_normal(th0, S, 1) # get a sample
-        ph = unnormalize(invprobit(th), bounds)[0] # unstandardize the sample
-        #model_temp.update_parameters(ph) # update model parameters so we can check constraints
-        stress_temp = getStrength(edot, strain, temp, dict(zip(theta0_names,ph)), models, constants)
-        cst = stress_temp > 0.0
-        #cst = model_temp.check_constraints() # check constraints
-
-    params = dict(zip(theta0_names,ph)) # make into a dict
-
-    phi[i] = ph
-    stress[i] = getStrength(edot, strain, temp, params, models, constants)
-    if stress[i] < 0:
-        ipdb.set_trace()
-
-
-out = pd.DataFrame(phi,columns=param_list) # make into a dataframe
-out['stress'] = stress # append
-out['rank'] = ss.rankdata(stress) # append
-
-import time
-
-t0 = time.time()
-for i in range(2000):
-    stress_temp = getStrength(edot, strain, temp, dict(zip(theta0_names,ph)), models, constants)
-t1 = time.time()
-
-total = t1-t0
-
-
-
-## write to file
-template = "edot(1/s)=" + str(edot/1e-6) + ", strain=" + str(strain) + ", temp(K)=" + str(temp) + "\n{}"
-
-if write:
-    with open(out_path + name + '_postSamplesPTW.csv', 'w') as fp:
-        fp.write(template.format(out.to_csv(index=False)))
 
 if plot:
 
@@ -195,14 +121,45 @@ if plot:
     con = sq.connect(res_path)
     cursor = con.cursor()
 
+
+    cursor.execute("SELECT * FROM 'phis';")
+    phis = cursor.fetchall()
+    phis_names = list(map(lambda x: x[0], cursor.description))
+    phis_arr = np.array(phis)
+    phis_df = pd.DataFrame(phis_arr, columns = phis_names)
+
+    cursor.execute("SELECT * FROM 'delta';")
+    delta = cursor.fetchall()
+    delta_names = list(map(lambda x: x[0], cursor.description))
+
+    model_temp = MaterialModel(flow_stress_model=models['flow_stress_model'],
+                               shear_modulus_model=models['shear_modulus_model'])
+    param_list = model_temp.get_parameter_list()
+    bounds = np.array([parameter_bounds[key] for key in param_list])  # order bounds correctly
+
+    phi = np.empty([nmcmc, nparams])  # store parameter samples here (including Sigma uncertainty)
+    for i in range(nmcmc):
+        th0 = theta0[i]
+        S = np.array(Sigma[i]).reshape(nparams, nparams)
+        cst = False
+        while not cst:  # do until sample meets constraints
+            th = np.random.multivariate_normal(th0, S, 1)  # get a sample
+            ph = unnormalize(invprobit(th), bounds)[0]  # unstandardize the sample
+            model_temp.update_parameters(ph) # update model parameters so we can check constraints
+            cst = model_temp.check_constraints()  # check constraints
+
+        params = dict(zip(theta0_names, ph))  # make into a dict
+        phi[i] = ph
+
+
     phii = np.empty([nmcmc,nparams,nexp])
     phi_stress = np.empty([nmcmc,100,nexp])
     phi0_stress = np.empty([nmcmc,100,nexp])
     phii_stress = np.empty([nmcmc,100,nexp])
     for j in range(nexp):
-        cursor.execute("SELECT * FROM 'subchain_" + str(j) + "_phi';")
-        phii[:,:,j] = cursor.fetchall()
         for i in range(nmcmc):
+            ind = (phis_df[(phis_df['iteration'] == i) & (phis_df['cluster'] == delta[i][j])].index.tolist())
+            phii[i,:,j] = phis_arr[ind[0],[x+2 for x in list(range(nparams))]]
             params = dict(zip(theta0_names, phi0[i]))  # make into a dict
             phi0_stress[i,:,j] = getStress(meta.edot[j], meta.temperature[j], params, models, constants)[:,1]
 
