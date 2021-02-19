@@ -75,7 +75,8 @@ for j in range(len(subi)):
     t1 = time.time()
     time_old[j] = t1-t0
 
-    np.max(np.abs(out_old-out))
+    if np.max(np.abs(out_old-out)) > 1e-15:
+        raise ValueError('mismatch')
 
 
     time_old/time_vec
@@ -101,7 +102,8 @@ for j in range(len(subi)):
     t1 = time.time()
     time_c[j] = t1-t0
 
-    np.max(np.abs(out-out_c))
+    if np.max(np.abs(out_c - out)) > 1e-15:
+        raise ValueError('mismatch')
 
 time_c/time_vec
 time_old/time_c

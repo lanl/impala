@@ -152,6 +152,7 @@ class PTW_Yield_Stress(BaseModel):
     params = ['theta','p','s0','sInf','kappa','gamma','y0','yInf','y1', 'y2']
     consts = ['beta', 'matomic', 'chi']
 
+    #@profile
     def value(self, edot):
         """
         function used to define PTW flow stress model
@@ -195,7 +196,9 @@ class PTW_Yield_Stress(BaseModel):
         argErf = mp.kappa * t_hom * np.log( mp.gamma * xiDot / edot )
 
         saturation1 = mp.s0 - ( mp.s0 - mp.sInf ) * erf( argErf )
-        saturation2 = mp.s0 * np.power( edot / mp.gamma / xiDot , mp.beta )
+        #saturation2 = mp.s0 * np.power( edot / mp.gamma / xiDot , mp.beta )
+        #saturation2 = mp.s0 * (edot / mp.gamma / xiDot)**mp.beta
+        saturation2 = mp.s0 * np.exp(mp.beta*np.log(edot / mp.gamma / xiDot))
         #if saturation1 > saturation2:
         #    tau_s=saturation1 # thermal activation regime
         #else:
@@ -207,8 +210,11 @@ class PTW_Yield_Stress(BaseModel):
         tau_s[np.where(sat_cond)] = saturation1[sat_cond]
 
         ayield = mp.y0 - ( mp.y0 - mp.yInf ) * erf( argErf )
-        byield = mp.y1 * np.power( mp.gamma * xiDot / edot , -mp.y2 )
-        cyield = mp.s0 * np.power( mp.gamma * xiDot / edot , -mp.beta)
+        #byield = mp.y1 * np.power( mp.gamma * xiDot / edot , -mp.y2 )
+        #cyield = mp.s0 * np.power( mp.gamma * xiDot / edot , -mp.beta)
+
+        byield = mp.y1 * np.exp( -mp.y2*np.log(mp.gamma * xiDot / edot ))
+        cyield = mp.s0 * np.exp( -mp.beta*np.log(mp.gamma * xiDot / edot ))
 
         #if byield < cyield:
         #    dyield = byield    # intermediate regime
