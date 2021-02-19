@@ -1,10 +1,11 @@
 
 import sqlite3 as sq
 import numpy as np
-from physical_models_c import MaterialModel
+#from physical_models_c import MaterialModel
+#from physical_models_old import MaterialModel
 from scipy.special import erf, erfinv
 from math import ceil, sqrt, pi, log
-import ipdb #ipdb.set_trace()
+#import ipdb #ipdb.set_trace()
 
 ## settings of interest
 edot = 40250. * 1e-6 # first term is per second
@@ -36,7 +37,7 @@ cursor.execute("SELECT * FROM 'models';")
 models = dict(cursor.fetchall())
 
 parameter_bounds = {
-    'theta0' : (0.0001,   0.2),
+    'theta' : (0.0001,   0.2),
     'p'     : (0.0001,   5.),
     's0'    : (0.0001,   0.05),
     'sInf'  : (0.0001,   0.05),
@@ -78,14 +79,53 @@ def getStrength(edot, strain, temp, params, model_args, consts):
 
 
 # temporary model setup
-model_temp = MaterialModel(flow_stress_model=models['flow_stress_model'],shear_modulus_model=models['shear_modulus_model'])
-param_list = model_temp.get_parameter_list()
-bounds = np.array([parameter_bounds[key] for key in param_list]) # order bounds correctly
+#import physical_models_old as pm
+import physical_models_vec as pm
 
-ph = phi0[0]
-stress_temp = getStrength(edot, strain, temp, dict(zip(phi0_names,ph)), models, constants)
+sh = pm.generate_strain_history(.6, np.repeat(edot,2000), 100)
+model= pm.MaterialModel(flow_stress_model=pm.PTW_Yield_Stress)
+
+phi0_names[0]='theta'
+# ensure correct ordering
+constant_list = model.parameters.consts
+param_list = model.parameters.params
 
 import time
+t0 = time.time()
+parmat = np.array(phi0)#np.vstack((np.array(phi0),np.array(phi0),np.array(phi0)))
+parameter_matrix = dict((phi0_names[i], parmat[:,i]) for i in range(parmat.shape[1]))
+model.initialize(parameter_matrix,constants)
+model.initialize_state(T=np.repeat(temp,parmat.shape[0]),stress=np.repeat(0.,parmat.shape[0]),strain=np.repeat(0.,parmat.shape[0]))
+out = model.compute_state_history(sh)
+t1 = time.time()
+t1-t0
+
+out[:,2,100]
+
+def getStress(params):
+    parameters = dict(zip(phi0_names,params))
+    param_vec = np.array([parameters[key] for key in param_list])
+
+    model.set_history_variables(strain, edot, 100)
+    model.initialize(parameters,constants)
+    model.update_parameters(np.array(param_vec))
+    model.initialize_state(temp)
+    out = model.compute_state_history(sh)
+    return out
+
+aa = getStress(phi0[0])
+from matplotlib import pyplot as plt
+plt.plot(aa[:,1],aa[:,2])
+
+bounds = np.array([parameter_bounds[key] for key in param_list]) # order bounds correctly
+
+import time
+
+t0 = time.time()
+for i in range(2000):
+    aa = getStress(phi0[0])
+t1 = time.time()
+t1-t0
 
 t0 = time.time()
 for i in range(2000):
@@ -97,74 +137,99 @@ total = t1-t0
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 import numpy as np
-from scipy import special
-y0 = ph[6]
-yInf = ph[7]
-s0 = ph[2]
-sInf = ph[3]
-kappa = ph[4]
-gamma = ph[5]
-theta0 = ph[0]
-p = ph[1]
-y1 = ph[8]
-y2 = ph[9]
-beta = .33
-G0 = .4
-sgB = 0.000644
+import pandas as pd
+dat = pd.read_csv('./results/Ti64/res_ti64_hier2_postSamplesPTW.csv',header=0,skiprows=1)
+parmat = np.array(dat)[range(0,2000,100),0:10]
+
+import sqlite3 as sq
+## get meta data
+con = sq.connect('./data/data_Ti64.db')
+cursor = con.cursor()
+cursor.execute("SELECT * FROM meta;")
+meta_names = list(map(lambda x: x[0], cursor.description))
+meta = pd.DataFrame(cursor.fetchall(),columns=meta_names)
+edots = meta.edot[range(196)]
+temps = meta.temperature[range(196)]
+
+nrep = parmat.shape[0]
+nexp = len(edots)
+
+parmat_big = np.kron(np.ones((nexp,1)),parmat)
+edots_big = np.kron(edots,np.ones((nrep)))
+temps_big = np.kron(temps,np.ones((nrep)))
 
 
+## connect to calibration output
+con = sq.connect('./results/Ti64/ti64_hier_temperTest2.db')
+cursor = con.cursor()
+## get constants used
+cursor.execute("SELECT * FROM 'constants';")
+constants = dict(cursor.fetchall())
 
 
-Tmelt0 = 2110
-rho0 = 4.419
-chi = 0
-matomic = 63.54
-T = 300
-psidot = 10**-2
-M = matomic/6.025*10**23
+import physical_models_vec as pm_vec
 
-That = T/Tmelt0
-G = G0*(1-alpha*That)
-xidot = .5*4*(np.pi*rho0/3/M)**(1/3)*np.sqrt(G/rho0)
+sh = pm_vec.generate_strain_history(.6, edots_big, 100)
+model= pm_vec.MaterialModel(flow_stress_model=pm_vec.PTW_Yield_Stress)
 
-psi = .5
-
-tauhaty_low = y0 - (y0-yInf)*special.erf(kappa*That*np.log(gamma*xidot/psidot))
-tauhats_low = s0 - (s0-sInf)*special.erf(kappa*That*np.log(gamma*xidot/psidot))
-
-tauhats_high = s0*(psidot/gamma/xidot)**beta
-tauhats = max(tauhats_low, tauhats_high)
-
-tauhaty_med = y1*(psidot/gamma/xidot)**y2
-tauhaty = max(tauhaty_low, min(tauhaty_med,tauhats_high)) # since tauhaty_high = tauhats_high
-
-tauhat = tauhats + 1/p * (s0-tauhaty)*np.log( 1 - (1-np.exp(-p*(tauhats-tauhaty)/(s0-tauhaty))) * np.exp(-p*theta0*psi / ( (s0-tauhaty)*(np.exp(p*(tauhats-tauhaty)/(s0-tauhaty))-1) )) )
-
-taus = tauhats*G
-tauy = tauhaty*G
-tau = tauhat * G
-
+param_names = list(dat.columns)
+param_names[0]='theta'
+# ensure correct ordering
+constant_list = model.parameters.consts
+param_list = model.parameters.params
+parameter_matrix = dict((param_names[i], parmat_big[:,i]) for i in range(parmat_big.shape[1]))
 
 import time
+t0 = time.time()
+model.initialize(parameter_matrix,constants)
+model.initialize_state(T=temps_big,stress=np.repeat(0.,parmat_big.shape[0]),strain=np.repeat(0.,parmat_big.shape[0]))
+out = model.compute_state_history(sh)
+t1 = time.time()
+time_vec = t1-t0
+
+
+
+import physical_models_old as pm_old
+out_old = np.empty(out.shape)
 
 t0 = time.time()
-for i in range(20000):
-    1+1
+for i in range(nexp*nrep):
+    sh = pm_old.generate_strain_history(.6, edots_big[i], 100)
+    model= pm_old.MaterialModel(flow_stress_model=pm_old.PTW_Yield_Stress)
+    parameters = dict(zip(param_names, parmat_big[i]))
+    model.initialize(parameters,constants)
+    model.initialize_state(T=temps_big[i],stress=0.,strain=0.)
+    out_old[:,:,i] = model.compute_state_history(sh)
 t1 = time.time()
+time_old = t1-t0
 
-total = t1-t0
+np.max(np.abs(out_old-out))
+
+
+time_old/time_vec
+
+import physical_models_c as pm_c
+out_c = np.empty(out.shape)
+param_names[0]='theta0'
+model = pm_c.MaterialModel(flow_stress_model="PTW")
+t0 = time.time()
+for i in range(nexp*nrep):
+    model.set_history_variables(0.6, edots_big[i], 100)
+
+    constant_list = model.get_constant_list()
+    param_list = model.get_parameter_list()
+    parameters = dict(zip(param_names, parmat_big[i]))
+    constant_vec = np.array([constants[key] for key in constant_list])
+    param_vec = np.array([parameters[key] for key in param_list])
+
+    model.initialize_constants(constant_vec)
+    model.update_parameters(np.array(param_vec))
+    model.initialize_state(temps_big[i])
+    out_c[:,:,i] = model.compute_state_history()
+t1 = time.time()
+time_c = t1-t0
+
+np.max(np.abs(out-out_c))
+
+time_c/time_vec
