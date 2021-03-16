@@ -4,6 +4,7 @@
 *.DS_Store
 *.Rhistory
 *.rda
+**/.idea/
 /DJWLocal
 *~$*
 /calibration/**/*.o
