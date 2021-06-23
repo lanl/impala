@@ -3,6 +3,7 @@ import numpy as np
 import numpy.ma as ma
 np.seterr(all = 'raise')
 from libc.math cimport fabs
+from cython.parallel import prange
 
 cdef class LocalSSq():
     cdef object ssqmat
@@ -191,5 +192,119 @@ cpdef np.ndarray[dtype = np.float_t, ndim = 2] localcov(
 
     # Return MAP estimate for inv. Wishart assuming diagonal prior
     return (ssq + np.eye(d) * psi0) / (nlobs + nu - d - 1)
+
+cpdef double [:,:] localcovmv(
+            double [:,:] obs, double [:] target,
+            double distance, int nu, double psi0,
+            ):
+    """
+    Localized Covariance Matrix window
+    Arguments:
+    -   obs:    Observations prior to current one
+    -   current:    target location
+    -   distance:   Covariance matrix window radius
+    -   nu:     prior degrees of freedom for proposal matrix
+    -   psi0:   prior diagonal value for proposal matrix
+    """
+    cdef double[:,:] obsv = obs
+    cdef double[:] targ   = target
+    cdef double s, denom
+    cdef int d = target.shape[0]  # dimension of data
+    cdef int nobs = obs.shape[0]  # number of observations
+    cdef int nlobs = 0            # Counter for number of local observations
+
+    # Matrix to store local observations.  Declare as empty, fill later
+    cdef np.ndarray[dtype = np.float_t, ndim = 2] localnp = \
+                                    np.empty((nobs, d), dtype = np.float)
+    cdef double [:,:] local = localnp
+    # Vector to store sum (and then mean) of local Observations
+    cdef np.ndarray[dtype = np.float_t, ndim = 1] lsmnp = \
+                                    np.empty(d, dtype = np.float)
+    cdef double [:] lsm = lsmnp
+    # Matrix to store covariance.
+    cdef np.ndarray[dtype = np.float_t, ndim = 2] covnp = \
+                                    np.empty((d,d), dtype = float)
+    cdef double [:,:] cov = covnp
+
+    # Iterators
+    cdef int i, j, k
+
+    # Loop through data by row
+    for i in range(nobs):
+        # For each column
+        for j in range(d):
+            # Check if local.  If not, break out of loop.
+            if fabs(obs[i,j] - target[j]) > distance:
+                break
+            # If all dimensions of row are local, add observation to local Matrix
+            # Iterate counter for local observations, add observation to sum
+            else:
+                local[nlobs] = obs[i]
+                nlobs += 1
+                for j in range(d):
+                    lsm[j] += obs[i,j]
+
+    # Verify if number of local observations exceeds minimum
+    try:
+        assert nlobs > d
+    except AssertionError:
+        return np.eye(d) * psi0 / nu
+    # Compute column-wise means
+    for j in range(d):
+        lsm[j] /= nlobs
+
+    # Calculate deviations from mean for local observations
+    for i in range(nlobs):
+        for j in range(d):
+            local[i,j] -= lsm[j]
+
+    denom = float(nlobs + nu - d - 1)
+    for i in range(d):
+        for j in range(d):
+            if i == j:
+                s = psi0
+            else:
+                s = 0
+            for k in range(nlobs):
+                s += local[k,i] * local[k,j]
+            cov[i,j] = s / denom
+    return cov
+
+cdef int int_vector_sum(int[:] vec) nogil:
+    cdef int i
+    cdef int s = 0
+    for i in range(vec.shape[0]):
+        s += i
+    return s
+
+cpdef np.ndarray[dtype = np.float_t, ndim = 2] localcovpar(
+        np.ndarray[dtype = np.float_t, ndim = 2] obsv,
+        np.ndarray[dtype = np.float_t, ndim = 1] current,
+        double distance, double nu, double psi0,
+        ):
+    cdef double[:,:] obs = obsv
+    cdef double[:] target = current
+    cdef int i, j
+    cdef int nsamp = obs.shape[0]
+    cdef int d = obs.shape[1]
+    cdef np.ndarray[dtype = np.int_t, ndim = 1] localvec = np.zeros(nsamp, dtype = int)
+    cdef int[:] local = localvec
+    for i in prange(nsamp, nogil=True, num_threads = 8, schedule = 'guided'):
+        for j in range(d):
+            if obs[i,j] - target[j] > distance:
+                break
+        else:
+            local[i] = 1
+    cdef int nloc = int_vector_sum(local)
+    try:
+        nloc > d
+    except AssertionError:
+        return np.eye(d) * psi0 / nu
+    cdef np.ndarray[dtype = np.float_t, ndim = 2] locarr = obsv[localvec]
+    cdef np.ndarray[dtype = np.float_t, ndim = 1] locmean = locarr.mean(axis = 0)
+    locarr -= locmean
+    cdef np.ndarray[dtype = np.float_t, ndim = 2] ssq = locarr.T.dot(locarr)
+    return (ssq + np.eye(d) * psi0) / (nloc + nu - d - 1)
+
 
 # EOF
