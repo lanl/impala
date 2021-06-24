@@ -173,6 +173,9 @@ class PTW_Yield_Stress(BaseModel):
         #    raise ConstraintError
 
         good = (mp.sInf < mp.s0) * (mp.yInf < mp.y0) * (mp.y0 < mp.s0) * (mp.yInf < mp.sInf) * (mp.y1 > mp.s0) * (mp.y2 > mp.beta)
+        if np.any(~good):
+            #return np.array([-999.]*len(good))
+            raise('PTW bad val')
 
         #convert to 1/s strain rate since PTW rate is in that unit
         edot = edot * 1.0E6
@@ -193,6 +196,8 @@ class PTW_Yield_Stress(BaseModel):
         #PTW characteristic strain rate [ 1/s ]
         xiDot = 0.5 * ainv * xfact * pow(6.022E29, 1.0 / 3.0) * 1.0E4
 
+        if np.any(mp.gamma * xiDot / edot <= 0) or np.any(np.isinf(mp.gamma * xiDot / edot)):
+            print("bad")
         argErf = mp.kappa * t_hom * np.log( mp.gamma * xiDot / edot )
 
         saturation1 = mp.s0 - ( mp.s0 - mp.sInf ) * erf( argErf )
@@ -255,13 +260,16 @@ class PTW_Yield_Stress(BaseModel):
         #     else:
         #         scaled_stress = tau_s
 
+        small = 1.0e-10
         scaled_stress = tau_s
-        ind = np.where((mp.p>0) * (tau_s!=tau_y))
-        eArg1 = mp.p * (tau_s - tau_y) / (mp.s0 - tau_y)
-        eArg2 = eps * mp.p * mp.theta / (mp.s0 - tau_y) / (np.exp(eArg1) - 1.0)
-        theLog = np.log(1.0 - (1.0 - np.exp(- eArg1[ind])) * np.exp(-eArg2[ind]))
+        ind = np.where((mp.p>small) * np.abs(tau_s-tau_y)>small)
+        eArg1 = (mp.p * (tau_s - tau_y) / (mp.s0 - tau_y))[ind]
+        eArg2 = (eps * mp.p * mp.theta)[ind] / (mp.s0 - tau_y)[ind] / (np.exp(eArg1) - 1.0) # eArg1 already subsetted by ind
+        if np.any((1.0 - (1.0 - np.exp(- eArg1)) * np.exp(-eArg2)) <= 0) or np.any(np.isinf(1.0 - (1.0 - np.exp(- eArg1)) * np.exp(-eArg2))):
+            print('bad')
+        theLog = np.log(1.0 - (1.0 - np.exp(- eArg1)) * np.exp(-eArg2))
         scaled_stress[ind] = (tau_s[ind] + ( mp.s0[ind] - tau_y[ind] ) * theLog / mp.p[ind] )
-        ind2 = np.where((mp.p<0) * (tau_s>tau_y))
+        ind2 = np.where((mp.p<small) * (tau_s>tau_y))
         scaled_stress[ind2] = (tau_s[ind2] - (tau_s - tau_y)[ind2]* np.exp(- eps[ind2] * mp.theta[ind2] / (tau_s - tau_y)[ind2]))
 
         # should be flow stress in units of Mbar
@@ -476,7 +484,6 @@ class MaterialModel(object):
         state = self.state
         self.update_state(strain_rate[:,0], 0.)
         results[0] = np.array([times[:,0], state.strain, state.stress, state.T, state.G, np.repeat(state.rho,nrep)])
-# why is state.G ever scalar??
 
         for i in range(1, Nhist):
             self.update_state(strain_rate[:,i-1], times[:,i] - times[:,i-1])
@@ -494,11 +501,16 @@ def generate_strain_history(emax, edot, Nhist):
     strains = np.linspace(0., emax, Nhist)
     nrep=len(edot)
     times = np.empty((nrep, Nhist))
-    for i in range(nrep):
-        times[i,:] = np.linspace(0., tmax[i], Nhist)
+    #for i in range(nrep):
+    #    times[i,:] = np.linspace(0., tmax[i], Nhist)
+    times = np.linspace(0., tmax, Nhist)
     strain_rate = np.empty((nrep, Nhist - 1))
-    for i in range(nrep):
-        strain_rate[i, :] = np.diff(strains) / np.diff(times[i, :])
-    return dict((['times',times], ['strains',strains], ['strain_rate',strain_rate]))
+    #for i in range(nrep):
+    #    strain_rate[i, :] = np.diff(strains) / np.diff(times[i, :])
+
+    strain_diffs = np.diff(strains)
+
+    strain_rate = strain_diffs[:, np.newaxis] / np.diff(times,axis=0)
+    return dict((['times',times.T], ['strains',strains], ['strain_rate',strain_rate.T]))
 
 # EOF

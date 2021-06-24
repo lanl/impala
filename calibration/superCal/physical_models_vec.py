@@ -260,15 +260,16 @@ class PTW_Yield_Stress(BaseModel):
         #     else:
         #         scaled_stress = tau_s
 
+        small = 1.0e-10
         scaled_stress = tau_s
-        ind = np.where((mp.p>0) * (tau_s!=tau_y))
-        eArg1 = mp.p * (tau_s - tau_y) / (mp.s0 - tau_y)
-        eArg2 = eps * mp.p * mp.theta / (mp.s0 - tau_y) / (np.exp(eArg1) - 1.0)
-        if np.any((1.0 - (1.0 - np.exp(- eArg1[ind])) * np.exp(-eArg2[ind])) <= 0) or np.any(np.isinf(1.0 - (1.0 - np.exp(- eArg1[ind])) * np.exp(-eArg2[ind]))):
+        ind = np.where((mp.p>small) * np.abs(tau_s-tau_y)>small)
+        eArg1 = (mp.p * (tau_s - tau_y) / (mp.s0 - tau_y))[ind]
+        eArg2 = (eps * mp.p * mp.theta)[ind] / (mp.s0 - tau_y)[ind] / (np.exp(eArg1) - 1.0) # eArg1 already subsetted by ind
+        if np.any((1.0 - (1.0 - np.exp(- eArg1)) * np.exp(-eArg2)) <= 0) or np.any(np.isinf(1.0 - (1.0 - np.exp(- eArg1)) * np.exp(-eArg2))):
             print('bad')
-        theLog = np.log(1.0 - (1.0 - np.exp(- eArg1[ind])) * np.exp(-eArg2[ind]))
+        theLog = np.log(1.0 - (1.0 - np.exp(- eArg1)) * np.exp(-eArg2))
         scaled_stress[ind] = (tau_s[ind] + ( mp.s0[ind] - tau_y[ind] ) * theLog / mp.p[ind] )
-        ind2 = np.where((mp.p<0) * (tau_s>tau_y))
+        ind2 = np.where((mp.p<small) * (tau_s>tau_y))
         scaled_stress[ind2] = (tau_s[ind2] - (tau_s - tau_y)[ind2]* np.exp(- eps[ind2] * mp.theta[ind2] / (tau_s - tau_y)[ind2]))
 
         # should be flow stress in units of Mbar
