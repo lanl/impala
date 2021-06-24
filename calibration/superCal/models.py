@@ -89,7 +89,7 @@ class ModelPTW:
 
         x = strain_hists2.flatten("F") # ordered as 100 strains for first experiment, first param setting, then 100 strains for 2nd experiment, 1st param setting...
         y = state_hists[:, 2, :].flatten("F")
-        ifunc = interp1d(x, y, kind='linear', assume_sorted=False)
+        ifunc = interp1d(x, y, kind='linear', assume_sorted=False, fill_value="extrapolate")
         ypred = ifunc(xpred2).reshape([nrep,self.nhists])
         # flattening and then interpolating is much faster than looping over interpolating
 
