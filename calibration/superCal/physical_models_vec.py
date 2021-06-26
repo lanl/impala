@@ -1,18 +1,20 @@
 """
-physical_models.py
+physical_models_vec.py
 
     A module for material strength behavior to be imported into python scripts for
     optimizaton or training emulators.  Adapted from strength_models_add_ptw.py
 
-    Original Author : DJ Luscher,   LANL, djl@lanl.gov
-    Current Author  : Peter Trubey, LANL, ptrubey@lanl.gov
+    Authors:
+        DJ Luscher,    djl@lanl.gov
+        Peter Trubey,  ptrubey@lanl.gov
+        Devin Francom, dfrancom@lanl.gov
 """
 
 import numpy as np
 np.seterr(all = 'raise')
 #import ipdb
 import copy
-from math import pi, sqrt
+from math import pi
 from scipy.special import erf
 
 ## Error Definitions
@@ -94,13 +96,13 @@ class Simple_Shear_Modulus(BaseModel):
         tmelt = self.parent.state.Tmelt
 
         return mp.G0 * (1. - mp.alpha * (temp / tmelt))
-        
+
 class Stein_Shear_Modulus(BaseModel):
     #consts = ['G0', 'sgA', 'sgB']
     #assuming constant density and pressure
     #so we only include the temperature dependence
     consts = ['G0', 'sgB']
-    eta=1.0
+    eta = 1.0
 
     def value(self, *args):
         mp    = self.parent.parameters
@@ -109,14 +111,13 @@ class Stein_Shear_Modulus(BaseModel):
         #just putting this here for completeness
         #aterm = a/eta**(1.0/3.0)*pressure
         aterm = 0.0
-        bterm = mp.sgB*(temp-300.0)
-        gnow  = mp.G0*(1.0+aterm-bterm)
+        bterm = mp.sgB * (temp - 300.0)
+        gnow  = mp.G0 * (1.0 + aterm - bterm)
         #if temp >= tmelt: gnow = 0.0
         #if gnow < 0.0:    gnow = 0.0
         gnow[np.where(temp >= tmelt)] = 0.
         gnow[np.where(gnow < 0)] = 0.
         return gnow
-
 
 # Yield Stress Models
 
@@ -172,7 +173,10 @@ class PTW_Yield_Stress(BaseModel):
         #        np.any(mp.y0 > mp.s0) or np.any(mp.yInf > mp.sInf) or np.any(mp.y1 < mp.s0) or np.any(mp.y2 < mp.beta)):
         #    raise ConstraintError
 
-        good = (mp.sInf < mp.s0) * (mp.yInf < mp.y0) * (mp.y0 < mp.s0) * (mp.yInf < mp.sInf) * (mp.y1 > mp.s0) * (mp.y2 > mp.beta)
+        good = (
+            (mp.sInf < mp.s0) * (mp.yInf < mp.y0) * (mp.y0 < mp.s0)   *
+            (mp.yInf < mp.sInf) * (mp.y1 > mp.s0) * (mp.y2 > mp.beta)
+            )
         if np.any(~good):
             #return np.array([-999.]*len(good))
             raise('PTW bad val')
@@ -203,7 +207,7 @@ class PTW_Yield_Stress(BaseModel):
         saturation1 = mp.s0 - ( mp.s0 - mp.sInf ) * erf( argErf )
         #saturation2 = mp.s0 * np.power( edot / mp.gamma / xiDot , mp.beta )
         #saturation2 = mp.s0 * (edot / mp.gamma / xiDot)**mp.beta
-        saturation2 = mp.s0 * np.exp(mp.beta*np.log(edot / mp.gamma / xiDot))
+        saturation2 = mp.s0 * np.exp(mp.beta * np.log(edot / mp.gamma / xiDot))
         #if saturation1 > saturation2:
         #    tau_s=saturation1 # thermal activation regime
         #else:
@@ -262,21 +266,24 @@ class PTW_Yield_Stress(BaseModel):
 
         small = 1.0e-10
         scaled_stress = tau_s
-        ind = np.where((mp.p>small) * np.abs(tau_s-tau_y)>small)
+        ind = np.where((mp.p > small) * (np.abs(tau_s - tau_y) > small))
         eArg1 = (mp.p * (tau_s - tau_y) / (mp.s0 - tau_y))[ind]
         eArg2 = (eps * mp.p * mp.theta)[ind] / (mp.s0 - tau_y)[ind] / (np.exp(eArg1) - 1.0) # eArg1 already subsetted by ind
-        if np.any((1.0 - (1.0 - np.exp(- eArg1)) * np.exp(-eArg2)) <= 0) or np.any(np.isinf(1.0 - (1.0 - np.exp(- eArg1)) * np.exp(-eArg2))):
+        if (np.any((1.0 - (1.0 - np.exp(- eArg1)) * np.exp(-eArg2)) <= 0) or \
+                np.any(np.isinf(1.0 - (1.0 - np.exp(- eArg1)) * np.exp(-eArg2)))):
             print('bad')
         theLog = np.log(1.0 - (1.0 - np.exp(- eArg1)) * np.exp(-eArg2))
         scaled_stress[ind] = (tau_s[ind] + ( mp.s0[ind] - tau_y[ind] ) * theLog / mp.p[ind] )
-        ind2 = np.where((mp.p<small) * (tau_s>tau_y))
-        scaled_stress[ind2] = (tau_s[ind2] - (tau_s - tau_y)[ind2]* np.exp(- eps[ind2] * mp.theta[ind2] / (tau_s - tau_y)[ind2]))
-
+        ind2 = np.where((mp.p <= small) * (tau_s>tau_y))
+        scaled_stress[ind2] = (
+            + tau_s[ind2]
+            - (tau_s - tau_y)[ind2] * np.exp(- eps[ind2] * mp.theta[ind2] / (tau_s - tau_y)[ind2])
+            )
         # should be flow stress in units of Mbar
         out = scaled_stress * shear * 2.0
         out[np.where(~good)] = -999.
         return out
-        
+
 class Stein_Flow_Stress(BaseModel):
     params = ['y0', 'a', 'b', 'beta', 'n', 'ymax']
     consts = ['G0', 'epsi', 'chi']
@@ -468,7 +475,7 @@ class MaterialModel(object):
         self.edot = edot
         self.Nhist = Nhist
         return
-    
+
     def get_history_variables(self):
         return [self.emax, self.edot, self.Nhist]
 

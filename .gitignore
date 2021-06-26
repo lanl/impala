@@ -17,3 +17,4 @@
 /calibration/py_calibration_hier/physical_models_c.c
 /calibration/py_calibration_hier/plots/*
 /calibration/superCal/.vs
+/calibration/superCal/.vscode
