@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import sqlite3 as sq
 # import pyBASS as pb
-import impala_test2 as impala
+import impala
 import models
 
 nExp = 20
