@@ -3,19 +3,21 @@ import numpy as np
 import pandas as pd
 import sqlite3 as sq
 # import pyBASS as pb
-import impala_test as impala
+import impala_test2 as impala
 import models
+
+nExp = 20
 
 #%%
 ## get meta data
 con = sq.connect('./../py_calibration_hier/data/data_Ti64.db')
 meta = pd.read_sql('select * from meta;', con)
-edots = meta.edot[:196]
-temps = meta.temperature[:196]
+edots = meta.edot[:nExp]
+temps = meta.temperature[:nExp]
 
 ## get SHPB experimental data
 dat_all = []
-for i in range(196):
+for i in range(nExp):
     ## get first datset
     dat_all.append(pd.read_sql('select * from data_{};'.format(i + 1), con).values)
 
@@ -54,28 +56,18 @@ def cf(x, bounds):
 setup = impala.CalibSetup(bounds, cf)
 
 #%%
-
-#yobs = np.hstack([np.array(v)[:,1] for v in dat_all])
 yobs = np.hstack([v.T[1] for v in dat_all])
 sh = [v.T[0] for v in dat_all]
-
-#yobs = np.concatenate((np.array(dat_all[0])[:,1],np.array(dat_all[1])[:,1]))
-# sh = [np.array(dat_all[0])[:,0], np.array(dat_all[1])[:,0]]
-# sh = [np.array(v)[:,0] for v in dat_all]
-model = models.ModelPTW(np.array(meta.temperature[0:196]), np.array(meta.edot[0:196]), consts, sh)
-sd_est = np.array([.001]*196)
-s2_df = np.array([5]*196)
-#s2_ind = np.array([0]*len(dat_all[0]) + [1]*len(dat_all[1]))
-
-s2_ind = np.hstack([[v]*len(dat_all[v]) for v in list(range(196))])
+model = models.ModelPTW(np.array(meta.temperature[0:nExp]), np.array(meta.edot[0:nExp]), consts, sh)
+sd_est = np.array([.001]*nExp)
+s2_df = np.array([5]*nExp)
+s2_ind = np.hstack([[v]*len(dat_all[v]) for v in list(range(nExp))])
 
 setup.addVecExperiments(yobs, model, sd_est, s2_df, s2_ind)
 setup.setTemperatureLadder(1.1**np.arange(100))
 setup.setMCMC(30000,10000,1,100)
 
 np.seterr(under='ignore')
-
-
 #%%
 
 out = impala.calibPool(setup)
