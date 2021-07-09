@@ -70,7 +70,7 @@ setup.setMCMC(30000,10000,1,100)
 np.seterr(under='ignore')
 #%%
 
-out = impala.calibPool(setup)
+out = impala.calibHier(setup)
 
 #%%
 

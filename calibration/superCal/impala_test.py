@@ -130,13 +130,19 @@ def chol_sample_1per_constraints(means, covs, cf, bounds_mat, bounds_keys, bound
         good[~good] = cf(tran(cand[~good], bounds_mat, bounds_keys), bounds)
     return cand
 
-def chol_sample_nper_constraints(means, covs, n, bounds_mat, bounds_keys, bounds):
+def chol_sample_nper_constraints(means, covs, n, cf, bounds_mat, bounds_keys, bounds):
     """ Sample with constraints.  If fail constraints, resample. """
     chols = cholesky(covs)
-    cand = means + np.einsum('ijk,ilk->ilj', chols, normal(size = (*means.shape, n)))
-    good = np.array(list(map()))
-    pass
-
+    cand = means + np.einsum('ijk,nik->nij', chols, normal(size = (n, *means.shape)))
+    for i in range(cand.shape[1]):
+        goodi = cv(tran(cand[:,i], bounds_mat, bounds_keys),bounds)
+        while np.any(~goodi):
+            cand[np.where(~goodi),i] = (
+                + means[i]
+                + np.einsum('ik,nk->ni', chols[i], normal(size = ((~goodi).sum(), means.shape[1])))
+                )
+            goodi[~goodi] = cf(tran(cand[~goodi], bounds_mat, bounds_keys), bounds)
+    return cand
 
 def cov_3d_pcm(arr, mean):
     """ Covariance array from 3d Array (with pre-computed mean):
@@ -171,76 +177,33 @@ def calibHier(setup):
     theta0_start = np.random.uniform(size=[setup.ntemps, setup.p])
     good = setup.checkConstraints(tran(theta0_start, setup.bounds_mat, setup.bounds.keys()), setup.bounds)
     while np.any(~good):
-        theta0_start[np.where(~good)] = np.random.normal(size = [(~good).sum(), setup.p])
+        theta0_start[np.where(~good)] = uniform(size = [(~good).sum(), setup.p])
         good[np.where(~good)] = setup.checkConstraints(
-            tran2(theta0_start[np.where(~good)], setup.bounds_mat, setup.bounds.keys()),
+            tran(theta0_start[np.where(~good)], setup.bounds_mat, setup.bounds.keys()),
             setup.bounds,
             )
     theta0[0] = theta0_start
     Sigma0[0] = np.eye(setup.p) * 0.25**2
 
     for i in range(setup.nexp):
-        # theta_start = np.empty([setup.ntheta[i], setup.ntemps, setup.p])
-        theta_start = chol_sample_nper(theta0[0], Sigma0[0], setup.ntheta[i])
-
-
-    for i in range(setup.nexp):
-        theta_start = np.empty([setup.ntheta[i], setup.ntemps, setup.p])
-        for it in range(setup.ntheta[i]):
-            for t in range(setup.ntemps):
-                good = False
-
-                ii=0
-                while ~good:
-                    ii += 1
-                    theta_start[it, t, :] = chol_sample(theta0[0, t, :], Sigma0[0, t, :, :])
-                    good = setup.checkConstraints(
-                        tran(theta_start[it, t, :], setup.bounds_mat, setup.bounds.keys()),
-                        setup.bounds,
-                        )
-                    #print(ii)
-
-        theta[i][0, :, :, :] = np.copy(theta_start)
-
-    pred_curr = []
-    sse_curr = []#np.empty([setup.ntemps, setup.nexp, setup.ntheta])
+        theta[i][0] = chol_sample_nper_constraints(theta0[0], Sigma0[0], setup.ntheta[i],
+                        setup.checkConstraints, setup.bounds_mat, setup.bounds.keys(), setup.bounds)
+    pred_curr = [None] * setup.nexp
+    sse_curr = [None] * setup.nexp
 
     for i in range(setup.nexp):
-        if setup.ntheta[i] == 1:
-            parlist = tran(
-                        np.reshape(theta[i][0, :, :, :], [setup.ntemps*setup.ntheta[i], setup.p]),
-                        setup.bounds_mat,
-                        setup.bounds.keys()
-                    )
-        else:
-            parlist = []
-            for it in range(setup.ntheta[i]):
-                parlist.append(tran(
-                            np.reshape(theta[i][0, :, :, :], [setup.ntemps*setup.ntheta[i], setup.p]),
-                            setup.bounds_mat,
-                            setup.bounds.keys()
-                        ))
-        pred_curr.append(
-            np.reshape(setup.models[i].eval(parlist), [setup.ntheta[i], setup.ntemps, setup.y_lens[i]]) # not sure if these two reshapes are right
-        )
-        sse_curr.append(np.sum((pred_curr[i] - setup.ys[i]) ** 2 / s2_vec_curr[i].T, 2))
+        _parlist = tran(theta[i][0].reshape(setup.ntemps * setup.ntheta[i], setup.p), setup.bounds_mat, setup.bounds.keys())
+        pred_curr[i] = setup.models[i].eval(_parlist).reshape((setup.ntheta[i], setup.ntemps, setup.y_lens[i]))
+        sse_curr[i] = ((pred_curr[i] - setup.ys[i]) * pred_curr[i] - setup.ys[i] / s2_vec_curr[i].T).sum(axis = 2)
 
     eps = 1.0e-13
     cc = 2.4**2/setup.p
-    tau = []
-    for i in range(setup.nexp):
-        tau.append(np.repeat(-4.0, setup.ntemps*setup.ntheta[i]).reshape([setup.ntemps, setup.ntheta[i]]))
 
-    S = []
-    cov = []
-    mu = []
-    for i in range(setup.nexp):
-        S.append(np.empty([setup.ntemps, setup.ntheta[i], setup.p, setup.p]))
-        cov.append(np.empty([setup.ntemps, setup.ntheta[i], setup.p, setup.p]))
-        mu.append(np.empty([setup.ntemps, setup.ntheta[i], setup.p]))
-        for t in range(setup.ntemps):
-            for it in range(setup.ntheta[i]):
-                S[i][t,it,:,:] = np.eye(setup.p)*1e-6
+    tau = [ -4 * np.ones(setup.ntemps, setup.ntheta[i]) for i in range(setup.nexp)]
+    S   = [np.empty((setup.ntemps, setup.ntheta[i], setup.p, setup.p)) for i in range(setup.nexp)]
+    cov = [np.empty((setup.ntemps, setup.ntheta[i], setup.p, setup.p)) for i in range(setup.nexp)]
+    mu  = [np.empty((setup.ntemps, setup.ntheta[i], setup.p)) for i in range(setup.nexp)]
+    S[:] = np.eye(setup.p) * 1e-6
 
     theta0_prior_cov = np.eye(setup.p)*1.**2
     theta0_prior_prec = scipy.linalg.inv(theta0_prior_cov)
@@ -250,35 +213,27 @@ def calibHier(setup):
     Sigma0_prior_scale = np.eye(setup.p)*.1**2
 
     Sigma0_ldet_curr = np.empty(setup.ntemps)
-    Sigma0_inv_curr = np.empty([setup.ntemps, setup.p, setup.p])
-    for t in range(setup.ntemps):
-        Sigma0_ldet_curr[t] = np.linalg.slogdet(Sigma0[0,t,:,:])[1]
-        Sigma0_inv_curr[t,:,:] = np.linalg.inv(Sigma0[0,t,:,:])
-
-    count = []
-    count_decor = []
-    count_100 = []
+    Sigma0_inv_curr  = np.empty([setup.ntemps, setup.p, setup.p])
+    Sigma0_ldet_curr = slogdet(Sigma0[0])[1]
+    Sigma0_inv_curr  = 1 / Sigma0[0] # Sigma0[0] is np.eye(p)...so x^-1 = 1/x
 
     count_temper = np.zeros([setup.ntemps, setup.ntemps])
+    count = [np.zeros((setup.ntheta[i], setup.ntemps)) for i in range(setup.nexp)]
+    count_decor = [np.zeros((setup.ntheta[i], setup.p, setup.ntemps)) for i in range(setup.nexp)]
+    count_100 = [np.zeros((setup.ntheta[i], setup.ntemps)) for i in range(setup.nexp)]
 
-    for i in range(setup.nexp):
-        count.append(np.zeros([setup.ntheta[i], setup.ntemps]))
-        count_decor.append(np.zeros([setup.ntheta[i], setup.p, setup.ntemps]))
-        count_100.append(np.zeros([setup.ntheta[i], setup.ntemps]))
-
-    pred_cand = np.copy(pred_curr)
-    sse_cand = np.copy(sse_curr)
-
+    pred_cand = pred_curr.copy()
+    sse_cand  = sse_curr.copy()
     ## start MCMC
     for m in range(1,setup.nmcmc):
-        #print(m)
-
         for i in range(setup.nexp):
-            theta[i][m,:,:,:] = np.copy(theta[i][m-1,:,:,:]) # current set to previous, will change if accepted
-
+            theta[i][m] = theta[i][m-1].copy() # current set to previous, will change if accepted
         ## adaptive Metropolis for each temperature
         if m == 300:
+            mu[i][:] = theta[i][:(m-1)]
             for i in range(setup.nexp):
+                mu[i][:]  = theta[i][:(m-1)].mean(axis = 0)
+                cov[i][:] =
                 for it in range(setup.ntheta[i]):
                     for t in range(setup.ntemps):
                         mu[i][t,it,:] = np.mean(theta[i][:(m-1),it,t,:], 0)
@@ -704,19 +659,6 @@ def calibPool(setup):
                     for i in range(setup.nexp):
                         pred_curr[i][t] = pred_cand[i][t]
                     sse_curr[t] = sse_cand[t]
-                #
-                # for t in range(setup.ntemps): # need to add constraint function
-                #     if ~good_values[t]:
-                #         alpha = -9999
-                #     else:
-                #         alpha = np.sum(-0.5 * setup.itl[t] * (sse_cand[t, :] - sse_curr[t, :]))
-                #
-                #     if np.log(np.random.rand()) < alpha:
-                #         theta[m, t, k] = theta_cand[t, k]
-                #         count_decor[k, t] += 1
-                #         for i in range(setup.nexp):
-                #             pred_curr[i][t, :] = pred_cand[i][t, :]
-                #         sse_curr[t, :] = sse_cand[t, :]
 
         ## Gibbs update s2
         for i in range(setup.nexp):
