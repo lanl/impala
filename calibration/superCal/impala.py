@@ -7,6 +7,7 @@ import scipy
 from scipy import stats
 from numpy.random import uniform, normal
 from math import sqrt, floor
+from scipy.special import erf
 
 #####################
 # class for setting everything up
@@ -95,13 +96,13 @@ def invprobit(y):
     """ Inverse Probit Transformation: For y in (-inf,inf), x in (0,1) """
     return 0.5 * (1 + erf(y / np.sqrt(2.)))
 
-def tran(th, bounds, names):
+def tran2(th, bounds, names):
     #for i in range(th.shape[1]):
     #    th[:,i] = unnormalize(th[:,i],bounds[:,i])
     th = unnormalize(th, bounds)
     return dict(zip(names,th.T))
 
-def tran2(th, bounds, names):
+def tran(th, bounds, names):
     return dict(zip(names, unnormalize(invprobit(th),bounds).T))
 
 def chol_sample(mean, cov):
@@ -631,7 +632,7 @@ def calibPool(setup):
 
         # for each temperature, accept or reject
         alpha = np.array([-np.inf] * setup.ntemps)
-        alpha[good_values] = (- 0.5 * setup.itl[good_values] * (sse_cand[good_values] - sse_curr[good_values])).sum(axis = 1)
+        alpha[good_values] = (- 0.5 * setup.itl[good_values] * (sse_cand[good_values] - sse_curr[good_values]).T).sum(axis = 0)
         lu = np.log(uniform(size=setup.ntemps))
         for t in np.where(lu < alpha)[0]: # first index because output of np.where is a tuple of arrays...
             theta[m,t] = theta_cand[t]
