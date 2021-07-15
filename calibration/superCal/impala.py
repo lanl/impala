@@ -638,15 +638,10 @@ def calibPool(setup):
                     )
                 sse_cand[:, i] = np.sum((pred_cand[i] - setup.ys[i]) * (pred_cand[i] - setup.ys[i]) / s2_vec_curr[i].T, 1)
 
-
-
-
         tsq_diff = 0 # ((theta_cand * theta_cand).sum(axis = 1) - (theta[m-1] * theta[m-1]).sum(axis = 1))[good_values]
         sse_diff = (sse_cand - sse_curr).sum(axis = 1)[good_values]
         # for each temperature, accept or reject
-        # alpha = np.array([-np.inf] * setup.ntemps)
         alpha[:] = -np.inf
-        # alpha[good_values] = (- 0.5 * setup.itl[good_values] * (sse_cand[good_values] - sse_curr[good_values]).T).sum(axis = 0)
         alpha[good_values] = -0.5 * setup.itl[good_values] * (sse_diff + tsq_diff)
         for t in np.where(np.log(uniform(size=setup.ntemps)) < alpha)[0]:
             theta[m,t] = theta_cand[t]
@@ -692,26 +687,6 @@ def calibPool(setup):
                         pred_curr[i][t] = pred_cand[i][t]
                     sse_curr[t] = sse_cand[t]
 
-                # if np.any(good_values):
-                #     for i in range(setup.nexp):
-                #         pred_cand[i][good_values, :] = setup.models[i].eval(
-                #             tran(theta_cand[good_values, :], setup.bounds_mat, setup.bounds.keys()),
-                #             )
-                #         sse_cand[:, i] = np.sum((pred_cand[i] - setup.ys[i]) * (pred_cand[i] - setup.ys[i]) / s2_vec_curr[i].T, 1)
-
-                # for t in range(setup.ntemps): # need to add constraint function
-                #     if ~good_values[t]:
-                #         alpha = -9999
-                #     else:
-                #         alpha = np.sum(-0.5 * setup.itl[t] * (sse_cand[t, :] - sse_curr[t, :]))
-                #
-                #     if np.log(np.random.rand()) < alpha:
-                #         theta[m, t, k] = theta_cand[t, k]
-                #         count_decor[k, t] += 1
-                #         for i in range(setup.nexp):
-                #             pred_curr[i][t, :] = pred_cand[i][t, :]
-                #         sse_curr[t, :] = sse_cand[t, :]
-
         ## Gibbs update s2
         for i in range(setup.nexp):
             dev_sq = (pred_cand[i] - setup.ys[i])**2 # squared deviations
@@ -729,22 +704,6 @@ def calibPool(setup):
         if m > 1000 and setup.ntemps > 1:
             for _ in range(setup.nswap):
                 sw = np.random.choice(setup.ntemps, 2 * setup.nswap_per, replace = False).reshape(-1,2)
-                # sw_alpha[:] = 0.
-                # for i in range(setup.nexp):
-                #     sw_alpha += (setup.itl[sw.T[1]] - setup.itl[sw.T[0]])*(
-                #         - 0.5 * np.log(s2_vec_curr[i][:,sw.T[0]]).sum(axis = 0)
-                #         - 0.5 * sse_curr[sw.T[0], i]
-                #         - ((setup.ig_a[i] + 1) * np.log(s2[i][m][sw.T[0]])).sum(axis = 1)
-                #         - (setup.ig_b[i] / np.log(s2[i][m][sw.T[0]])).sum(axis = 1)
-                #         - 0.5 * (theta[m][sw.T[0]]**2).sum(axis = 1)
-                #         + 0.5 * np.log(s2_vec_curr[i][:,sw.T[1]]).sum(axis = 0)
-                #         + 0.5 * sse_curr[sw.T[1], i]
-                #         + ((setup.ig_a[i] + 1) * np.log(s2[i][m][sw.T[1]])).sum(axis = 1)
-                #         + (setup.ig_b[i] / np.log(s2[i][m][sw.T[1]])).sum(axis = 1)
-                #         + 0.5 * (theta[m][sw.T[1]]**2).sum(axis = 1)
-                #         )
-                # sw_alpha += 0
-
                 sw_alpha[:] = 0.
                 for i in range(setup.nexp):
                     sw_alpha += (setup.itl[sw.T[1]] - setup.itl[sw.T[0]])*(
