@@ -97,11 +97,11 @@ def invprobit(y):
     """ Inverse Probit Transformation: For y in (-inf,inf), x in (0,1) """
     return 0.5 * (1 + erf(y / np.sqrt(2.)))
 
+# initfunc = np.random.normal # if probit, then normal--if uniform, then uniform
+initfunc = np.random.uniform
+
 def tran(th, bounds, names):
-    #for i in range(th.shape[1]):
-    #    th[:,i] = unnormalize(th[:,i],bounds[:,i])
-    th = unnormalize(th, bounds)
-    return dict(zip(names,th.T))
+    return dict(zip(names, unnormalize(th, bounds).T))
 
 def tran2(th, bounds, names):
     return dict(zip(names, unnormalize(invprobit(th),bounds).T))
@@ -109,10 +109,8 @@ def tran2(th, bounds, names):
 def chol_sample(mean, cov):
     return mean + np.dot(np.linalg.cholesky(cov), np.random.standard_normal(mean.size))
 
-# def chol_1_to_many_sample(mean, cov)
-
 def chol_sample_1per(means, covs):
-    return means + np.einsum('ijk,ik->ij', cholesky(covs), normal(size = (means.shape)))
+    return means + np.einsum('...jk,...k->...j', cholesky(covs), normal(size = (means.shape)))
 
 def chol_sample_nper(means, covs, n):
     return means + np.einsum('ijk,ilk->ilj', cholesky(covs), normal(size = (*means.shape, n)))
@@ -151,8 +149,16 @@ def cov_3d_pcm(arr, mean):
     out = 3d Array (nTemp x nCol x nCol)
     """
     N = arr.shape[0]
-    d = arr - mean
-    return np.einsum('kij,kil->ijl',d,d) / (N - 1)
+    return np.einsum('kij,kil->ijl', arr - mean, arr - mean) / (N - 1)
+
+def cov_4d_pcm(arr, mean):
+    """ Covariance Array from 4d Array (With pre-computed mean):
+    arr = 4d array (nSamp x nTemp x nTheta x nCol)
+    mean = 3d Array (nTemp x nCol)
+    out = 4d Array (nTemp x nTheta x nCol x nCol)
+    """
+    N = arr.shape[0]
+    return np.einsum('ktij,ktil->tijl', arr - mean, arr - mean) / (N - 1)
 
 def mvnorm_logpdf(x, mu, Prec, ldet):
     k = x.shape[-1]
@@ -222,35 +228,49 @@ def calibHier(setup):
     count_decor = [np.zeros((setup.ntheta[i], setup.p, setup.ntemps)) for i in range(setup.nexp)]
     count_100 = [np.zeros((setup.ntheta[i], setup.ntemps)) for i in range(setup.nexp)]
 
+    theta_cand = [np.empty([setup.ntheta[i], setup.ntemps, setup.p]) for i in setup.nexp]
     pred_cand = pred_curr.copy()
     sse_cand  = sse_curr.copy()
     ## start MCMC
+
+
+
     for m in range(1,setup.nmcmc):
         for i in range(setup.nexp):
             theta[i][m] = theta[i][m-1].copy() # current set to previous, will change if accepted
         ## adaptive Metropolis for each temperature
         if m == 300:
-            mu[i][:] = theta[i][:(m-1)]
             for i in range(setup.nexp):
                 mu[i][:]  = theta[i][:(m-1)].mean(axis = 0)
-                cov[i][:] =
-                for it in range(setup.ntheta[i]):
-                    for t in range(setup.ntemps):
-                        mu[i][t,it,:] = np.mean(theta[i][:(m-1),it,t,:], 0)
-                        cov[i][t,it,:,:] = np.cov(theta[i][:(m-1),it,t,:], rowvar=False)
-                        S[i][t,it,:,:] = (cov[i][t,it,:,:]*cc + np.eye(setup.p)*eps*cc) * np.exp(tau[i][t,it])
-
+                cov[i][:] = cov_4d_pcm(theta[i][:(m-1)], mu[i])
+                S[i][:]   = cc * np.einsum('tejl,t->tejl', cov[i] + np.eye(setup.p) * eps, np.exp(tau[i]))
+            # for i in range(setup.nexp):
+            #     mu[i][:]  = theta[i][:(m-1)].mean(axis = 0)
+            #     cov[i][:] =
+            #     for it in range(setup.ntheta[i]):
+            #         for t in range(setup.ntemps):
+            #             mu[i][t,it,:] = np.mean(theta[i][:(m-1),it,t,:], 0)
+            #             cov[i][t,it,:,:] = np.cov(theta[i][:(m-1),it,t,:], rowvar=False)
+            #             S[i][t,it,:,:] = (cov[i][t,it,:,:]*cc + np.eye(setup.p)*eps*cc) * np.exp(tau[i][t,it])
         if m > 300:
             for i in range(setup.nexp):
-                for it in range(setup.ntheta[i]):
-                    for t in range(setup.ntemps):
-                        mu[i][t,it,:] = mu[i][t,it,:] + (theta[i][m-1,it,t,:] - mu[i][t,it,:]) / (m-1)
-                        cov[i][t,it,:,:] = (m-1)/(m-2) * cov[i][t,it,:,:] + (m-2)/(m-1)**2 * \
-                            np.outer(theta[i][m-1,it,t,:] - mu[i][t,it,:], theta[i][m-1,it,t,:] - mu[i][t,it,:])
-                        S[i][t,it,:,:] = (cov[i][t,it,:,:]*cc + np.eye(setup.p)*eps*cc) * np.exp(tau[i][t,it])
+                mu[i] += (theta[i][m-1] - mu[i]) / (m - 1)
+                cov[i] = (
+                    + (m-1) / (m-2) * cov
+                    + (m-2) / (m-1) / (m-1) * np.einsum('tij,til->tijl', theta[i][m-1] - mu[i], theta[i][m-1] - mu[i])
+                    )
+                S[i] = cc * np.einsum('tejl,t->tejl', cov[i] + np.eye(setup.p) * eps, np.exp(tau[i]))
+                # for it in range(setup.ntheta[i]):
+                #     for t in range(setup.ntemps):
+                #         mu[i][t,it,:] = mu[i][t,it,:] + (theta[i][m-1,it,t,:] - mu[i][t,it,:]) / (m-1)
+                #         cov[i][t,it,:,:] = (m-1)/(m-2) * cov[i][t,it,:,:] + (m-2)/(m-1)**2 * \
+                #             np.outer(theta[i][m-1,it,t,:] - mu[i][t,it,:], theta[i][m-1,it,t,:] - mu[i][t,it,:])
+                #         S[i][t,it,:,:] = (cov[i][t,it,:,:]*cc + np.eye(setup.p)*eps*cc) * np.exp(tau[i][t,it])
 
         # generate proposal
-        theta_cand = []
+        theta_cand = [None] * setup.nexp
+        for i in range(setup.nexp):
+            theta_cand[i][:] = chol_sample_1per(theta[i], S[i])
         theta_cand_mat = []
         good_values = []
         good_values_mat = []
@@ -546,47 +566,49 @@ def calibPool(setup):
     s2 = [np.ones([setup.nmcmc, setup.ntemps, setup.ns2[i]]) for i in range(setup.nexp)]
     s2_vec_curr = [s2[i][0,:,setup.s2_ind[i]] for i in range(setup.nexp)]
 
-    theta_start = np.random.normal(size=[setup.ntemps, setup.p])
-    good = setup.checkConstraints(tran2(theta_start, setup.bounds_mat, setup.bounds.keys()), setup.bounds)
+    theta_start = initfunc(size=[setup.ntemps, setup.p])
+    good = setup.checkConstraints(tran(theta_start, setup.bounds_mat, setup.bounds.keys()), setup.bounds)
     while np.any(~good):
         theta_start[np.where(~good)] = np.random.normal(size = [(~good).sum(), setup.p])
         good[np.where(~good)] = setup.checkConstraints(
-            tran2(theta_start[np.where(~good)], setup.bounds_mat, setup.bounds.keys()),
+            tran(theta_start[np.where(~good)], setup.bounds_mat, setup.bounds.keys()),
             setup.bounds,
             )
-    theta[0, :, :] = theta_start
+    theta[0] = theta_start
 
     pred_curr = []
     sse_curr = np.empty([setup.ntemps, setup.nexp])
     for i in range(setup.nexp):
-        pred_curr.append(setup.models[i].eval(tran2(theta[0, :, :], setup.bounds_mat, setup.bounds.keys())))
+        pred_curr.append(setup.models[i].eval(tran(theta[0, :, :], setup.bounds_mat, setup.bounds.keys())))
         sse_curr[:, i] = np.sum((pred_curr[i] - setup.ys[i]) ** 2 / s2_vec_curr[i].T, 1)
 
-    eps = 1.0e-13
-    tau = np.repeat(-4.0, setup.ntemps)
-    cc = 2.4**2/setup.p
-    S = np.empty([setup.ntemps, setup.p, setup.p])
-    for t in range(setup.ntemps):
-        S[t,:,:] = np.eye(setup.p)*1e-6
-    cov = np.empty([setup.ntemps, setup.p, setup.p])
-    mu = np.empty([setup.ntemps, setup.p])
+    eps  = 1.0e-13
+    tau  = np.repeat(-4.0, setup.ntemps)
+    cc   = 2.4**2/setup.p
+    S    = np.empty([setup.ntemps, setup.p, setup.p])
+    S[:] = np.eye(setup.p)*1e-6
+    cov  = np.empty([setup.ntemps, setup.p, setup.p])
+    mu   = np.empty([setup.ntemps, setup.p])
 
     count = np.zeros([setup.ntemps, setup.ntemps], dtype = int)
     count_decor = np.zeros([setup.p, setup.ntemps], dtype = int)
     count_100 = np.zeros(setup.ntemps, dtype = int)
 
     pred_cand = np.copy(pred_curr)
-    sse_cand = np.copy(sse_curr)
+    sse_cand  = np.copy(sse_curr)
+
+    alpha    = np.ones(setup.ntemps) * (-np.inf)
+    sw_alpha = np.zeros(setup.nswap_per)
 
     ## start MCMC
     for m in range(1,setup.nmcmc):
-        theta[m,:,:] = np.copy(theta[m-1,:,:]) # current set to previous, will change if accepted
+        theta[m] = np.copy(theta[m-1]) # current set to previous, will change if accepted
 
         ## adaptive Metropolis for each temperature
         if m == 300:
             mu  = theta[:(m-1)].mean(axis = 0)
             cov = cov_3d_pcm(theta[:(m-1)], mu)
-            S   = cc * np.einsum('ijk,i->ijk',cov + np.eye(setup.p) * eps, np.exp(tau))
+            S   = cc * np.einsum('ijk,i->ijk', cov + np.eye(setup.p) * eps, np.exp(tau))
 
         if m > 300:
             mu += (theta[m-1] - mu) / (m - 1)
@@ -594,7 +616,7 @@ def calibPool(setup):
                 + (m-1)/(m-2) * cov
                 + (m - 2)/(m - 1)/(m - 1) * np.einsum('ti,tj->tij', theta[m-1] - mu, theta[m-1] - mu)
                 )
-            S   = cc * np.einsum('ijk,i->ijk',cov + np.eye(setup.p) * eps, np.exp(tau))
+            S   = cc * np.einsum('ijk,i->ijk', cov + np.eye(setup.p) * eps, np.exp(tau))
 
         # generate proposal
         theta_cand  = (
@@ -602,23 +624,25 @@ def calibPool(setup):
             + np.einsum('ijk,ik->ij', cholesky(S), normal(size = (setup.ntemps, setup.p)))
             )
         good_values = setup.checkConstraints(
-            tran2(theta_cand, setup.bounds_mat, setup.bounds.keys()), setup.bounds,
+            tran(theta_cand, setup.bounds_mat, setup.bounds.keys()), setup.bounds,
             )
         # get predictions and SSE
         pred_cand = np.copy(pred_curr)
         sse_cand = np.copy(sse_curr)
         if np.any(good_values):
             for i in range(setup.nexp):
-                pred_cand[i][good_values, :] = setup.models[i].eval(
-                    tran2(theta_cand[good_values], setup.bounds_mat, setup.bounds.keys())
+                pred_cand[i][good_values] = setup.models[i].eval(
+                    tran(theta_cand[good_values], setup.bounds_mat, setup.bounds.keys())
                     )
                 sse_cand[:, i] = np.sum((pred_cand[i] - setup.ys[i]) * (pred_cand[i] - setup.ys[i]) / s2_vec_curr[i].T, 1)
 
+        tsq_diff = 0 # ((theta_cand * theta_cand).sum(axis = 1) - (theta[m-1] * theta[m-1]).sum(axis = 1))[good_values]
+        sse_diff = (sse_cand - sse_curr).sum(axis = 1)[good_values]
         # for each temperature, accept or reject
-        alpha = np.array([-np.inf] * setup.ntemps)
-        alpha[good_values] = (- 0.5 * setup.itl[good_values] * (sse_cand[good_values] - sse_curr[good_values])).sum(axis = 1)
-        lu = np.log(uniform(size=setup.ntemps))
-        for t in np.where(lu < alpha)[0]: # first index because output of np.where is a tuple of arrays...
+        alpha[:] = -np.inf
+        # alpha[good_values] = (- 0.5 * setup.itl[good_values] * (sse_cand[good_values] - sse_curr[good_values])).sum(axis = 1)
+        alpha[good_values] = -0.5 * setup.itl[good_values] * (sse_diff + tsq_diff)
+        for t in np.where(np.log(uniform(size=setup.ntemps)) < alpha)[0]: # first index because output of np.where is a tuple of arrays...
             theta[m,t] = theta_cand[t]
             count[t,t] += 1
             sse_curr[t] = sse_cand[t]
@@ -637,9 +661,9 @@ def calibPool(setup):
         if m % setup.decor == 0:
             for k in range(setup.p):
                 theta_cand = np.copy(theta[m,:,:])
-                theta_cand[:,k] = np.random.normal(size = setup.ntemps) # independence proposal, will vectorize of columns
+                theta_cand[:,k] = initfunc(size = setup.ntemps) # independence proposal, will vectorize of columns
                 good_values = setup.checkConstraints(
-                    tran2(theta_cand, setup.bounds_mat, setup.bounds.keys()), setup.bounds,
+                    tran(theta_cand, setup.bounds_mat, setup.bounds.keys()), setup.bounds,
                     )
                 pred_cand = np.copy(pred_curr)
                 sse_cand = np.copy(sse_curr)
@@ -647,12 +671,14 @@ def calibPool(setup):
                 if np.any(good_values):
                     for i in range(setup.nexp):
                         pred_cand[i][good_values, :] = setup.models[i].eval(
-                            tran2(theta_cand[good_values, :], setup.bounds_mat, setup.bounds.keys()),
+                            tran(theta_cand[good_values, :], setup.bounds_mat, setup.bounds.keys()),
                             )
-                        sse_cand[:, i] = np.sum((pred_cand[i] - setup.ys[i]) ** 2 / s2_vec_curr[i].T, 1)
+                        sse_cand[:, i] = np.sum((pred_cand[i] - setup.ys[i]) * (pred_cand[i] - setup.ys[i]) / s2_vec_curr[i].T, 1)
 
-                alpha = np.array([-np.inf] * setup.ntemps)
-                alpha[good_values] = (- 0.5 * setup.itl[good_values] * (sse_cand[good_values] - sse_curr[good_values])).sum(axis = 1)
+                alpha[:] = -np.inf
+                tsq_diff = 0. # ((theta_cand * theta_cand).sum(axis = 1) - (theta[m] * theta[m]).sum(axis = 1))[good_values]
+                sse_diff = (sse_cand - sse_curr).sum(axis = 1)[good_values]
+                alpha[good_values] = -0.5 * setup.itl[good_values] * (sse_diff + tsq_diff)
                 for t in np.where(np.log(uniform(size = setup.ntemps)) < alpha)[0]:
                     theta[m,t,k] = theta_cand[t,k]
                     count_decor[k,t] += 1
@@ -677,9 +703,10 @@ def calibPool(setup):
         if m > 1000 and setup.ntemps > 1:
             for _ in range(setup.nswap):
                 sw = np.random.choice(setup.ntemps, 2 * setup.nswap_per, replace = False).reshape(-1,2)
-                alpha = np.zeros(setup.nswap_per) # log probability of swap
+                # alpha = np.zeros(setup.nswap_per) # log probability of swap
+                sw_alpha[:] = 0.
                 for i in range(setup.nexp):
-                    alpha += (setup.itl[sw.T[1]] - setup.itl[sw.T[0]])*(
+                    sw_alpha += (setup.itl[sw.T[1]] - setup.itl[sw.T[0]])*(
                         - 0.5 * np.log(s2_vec_curr[i][:,sw.T[0]]).sum(axis = 0)
                         - 0.5 * sse_curr[sw.T[0], i]
                         - ((setup.ig_a[i] + 1) * np.log(s2[i][m][sw.T[0]])).sum(axis = 1)
@@ -689,7 +716,11 @@ def calibPool(setup):
                         + ((setup.ig_a[i] + 1) * np.log(s2[i][m][sw.T[1]])).sum(axis = 1)
                         + (setup.ig_b[i] / np.log(s2[i][m][sw.T[1]])).sum(axis = 1)
                         )
-                for tt in sw[np.where(np.log(uniform(size = setup.nswap_per)) < alpha)[0]]:
+                # sw_alpha += (setup.itl[sw.T[1]] - setup.itl[sw.T[0]]) * (    # probit transform jacobian
+                #     - 0.5 * (theta[m][sw.T[0]]**2).sum(axis = 1)
+                #     + 0.5 * (theta[m][sw.T[1]]**2).sum(axis = 1)
+                #    )
+                for tt in sw[np.where(np.log(uniform(size = setup.nswap_per)) < sw_alpha)[0]]:
                     count[tt[0],tt[1]] += 1
                     theta[m][tt[0]], theta[m][tt[1]] = theta[m][tt[1]].copy(), theta[m][tt[0]].copy()
                     sse_curr[tt[0]], sse_curr[tt[1]] = sse_curr[tt[1]].copy(), sse_curr[tt[0]].copy()
