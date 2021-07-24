@@ -254,15 +254,16 @@ def calibHier(setup):
 
     dev_sq = [np.empty(pred_curr[i].shape) for i in range(setup.nexp)]
 
-    eps = 1.0e-13
+    eps = 1.0e-12
     AM_SCALAR = 2.4**2/setup.p
 
-    tau = [ -4 * np.ones((setup.ntemps, setup.ntheta[i])) for i in range(setup.nexp)]
+    tau = [ -3 * np.ones((setup.ntemps, setup.ntheta[i])) for i in range(setup.nexp)]
+    # tau = [np.zeros((setup.ntemps, setup.ntheta[i])) for i in range(setup.nexp)]
     S   = [np.empty((setup.ntemps, setup.ntheta[i], setup.p, setup.p)) for i in range(setup.nexp)]
     cov = [np.empty((setup.ntemps, setup.ntheta[i], setup.p, setup.p)) for i in range(setup.nexp)]
     mu  = [np.empty((setup.ntheta[i], setup.ntemps, setup.p)) for i in range(setup.nexp)]
     for i in range(setup.nexp):
-        S[i][:] = np.eye(setup.p) * 1e-6
+        S[i][:] = np.eye(setup.p) * 1e-4
 
     theta0_prior_cov = np.eye(setup.p)*1.**2
     theta0_prior_prec = scipy.linalg.inv(theta0_prior_cov)
@@ -303,16 +304,16 @@ def calibHier(setup):
         ## adaptive Metropolis for each temperature
         if m == 300:
             for i in range(setup.nexp):
-                mu[i][:]  = theta[i][:(m-1)].mean(axis = 0)
-                cov[i][:] = cov_4d_pcm(theta[i][:(m-1)], mu[i])
+                mu[i][:]  = theta[i][:m].mean(axis = 0)
+                cov[i][:] = cov_4d_pcm(theta[i][:m], mu[i])
                 S[i][:]   = AM_SCALAR * np.einsum('tejl,te->tejl', cov[i] + np.eye(setup.p) * eps, np.exp(tau[i]))
 
         if m > 300:
             for i in range(setup.nexp):
-                mu[i] += (theta[i][m-1] - mu[i]) / (m - 1)
+                mu[i] += (theta[i][m-1] - mu[i]) / m
                 cov[i][:] = (
-                    + (m-1) / (m-2) * cov[i]
-                    + (m-2) / (m-1) / (m-1) * np.einsum('etj,etl->tejl', theta[i][m-1] - mu[i], theta[i][m-1] - mu[i])
+                    + (m / (m-1)) * cov[i]
+                    + ((m-1) / (m * m)) * np.einsum('etj,etl->tejl', theta[i][m-1] - mu[i], theta[i][m-1] - mu[i])
                     )
                 S[i] = AM_SCALAR * np.einsum('tejl,te->tejl', cov[i] + np.eye(setup.p) * eps, np.exp(tau[i]))
 
@@ -335,21 +336,19 @@ def calibHier(setup):
             sse_cand[i][:] = ((pred_cand[i] - setup.ys[i]) * (pred_cand[i] - setup.ys[i]) / s2_vec_curr[i].T).sum(axis = 2)
             # Calculate log-probability of MCMC accept
             alpha[i][:] = - np.inf
-            alpha[i][good_values[i]] = (
-                -0.5 * itl_mat[i][good_values[i]] * (
-                    + sse_cand[i][good_values[i]]
-                    - sse_curr[i][good_values[i]]
-                    + mvnorm_logpdf_(theta_cand[i], theta0[m-1], Sigma0_inv_curr, Sigma0_ldet_curr)[good_values[i]]
-                    - mvnorm_logpdf_(theta[i][m-1], theta0[m-1], Sigma0_inv_curr, Sigma0_ldet_curr)[good_values[i]]
-                    )
+            alpha[i][good_values[i]] = itl_mat[i][good_values[i]] * (
+                - 0.5 * (sse_cand[i][good_values[i]] - sse_curr[i][good_values[i]])
+                + mvnorm_logpdf_(theta_cand[i], theta0[m-1], Sigma0_inv_curr, Sigma0_ldet_curr)[good_values[i]]
+                - mvnorm_logpdf_(theta[i][m-1], theta0[m-1], Sigma0_inv_curr, Sigma0_ldet_curr)[good_values[i]]
                 )
             # MCMC Accept
             accept[i][:] = np.log(uniform(size = alpha[i].shape)) < alpha[i]
+            
             # Where accept, make changes
-            theta[i][m][accept[i]] = theta_cand[i][accept[i]]
+            theta[i][m][accept[i]]  = theta_cand[i][accept[i]]
             pred_curr[i][accept[i]] = pred_cand[i][accept[i]]
-            sse_curr[i][accept[i]] = sse_cand[i][accept[i]]
-            count[i][accept[i]] += 1
+            sse_curr[i][accept[i]]  = sse_cand[i][accept[i]]
+            count[i][accept[i]]     += 1
             count_100[i][accept[i]] += 1
 
         # Adaptive Metropolis Update
@@ -409,8 +408,10 @@ def calibHier(setup):
             # (array(ntemps x ny x ntheta) - vector(ny))^2 should be array(ntemps x ny x ntheta)
             for j in range(setup.ns2[i]):
                 sseij = np.sum(dev_sq[i][:,:,np.where(setup.s2_ind[i]==j)[0]], 2) # sse for jth s2ind in experiment i
-                s2[i][m, :, j] = 1 / np.random.gamma(setup.itl*(setup.ny_s2[i][j]/2 + np.array(setup.ig_a[i][j]) + 1) - 1,
-                    1 / (setup.itl*(np.array(setup.ig_b[i][j]) + .5*sseij)))
+                s2[i][m, :, j] = 1 / np.random.gamma(
+                    setup.itl*(setup.ny_s2[i][j]/2 + np.array(setup.ig_a[i][j]) + 1) - 1, 
+                    1 / (setup.itl*(np.array(setup.ig_b[i][j]) + .5*sseij)),
+                    )
 
             s2_vec_curr[i][:] = s2[i][m,:,setup.s2_ind[i]]
             sse_curr[i] = ((pred_curr[i] - setup.ys[i]) * (pred_curr[i] - setup.ys[i]) / s2_vec_curr[i].T).sum(axis = 2)
@@ -429,6 +430,7 @@ def calibHier(setup):
             np.einsum('tlk,tk->tl', cc, dd), cc,
             setup.checkConstraints, setup.bounds_mat, setup.bounds.keys(), setup.bounds,
             )
+        
 
         ## Gibbs update Sigma0
         mat *= 0.
@@ -437,16 +439,17 @@ def calibHier(setup):
 
         Sigma0_scales = Sigma0_prior_scale + np.einsum('t,tml->tml',setup.itl,mat)
         for t in range(setup.ntemps):
-            Sigma0[m][t] = invwishart.rvs(df = Sigma0_dfs[t], scale = Sigma0_scales[t])
+            Sigma0[m,t] = invwishart.rvs(df = Sigma0_dfs[t], scale = Sigma0_scales[t])
         Sigma0_ldet_curr[:] = np.linalg.slogdet(Sigma0[m])[1]
         Sigma0_inv_curr[:] = np.linalg.inv(Sigma0[m])
+
 
         ## tempering swaps
         if m > 1000 and setup.ntemps > 1:
             for _ in range(setup.nswap):
                 sw = np.random.choice(setup.ntemps, 2 * setup.nswap_per, replace = False).reshape(-1,2)
                 sw_alpha[:] = 0.
-                sw_alpha += (
+                sw_alpha += (setup.itl[sw.T[1]] - setup.itl[sw.T[0]]) * (
                     - mvnorm_logpdf(theta0[m][sw.T[1]], theta0_prior_mean, theta0_prior_prec, theta0_prior_ldet)
                     + mvnorm_logpdf(theta0[m][sw.T[0]], theta0_prior_mean, theta0_prior_prec, theta0_prior_ldet)
                     - invwishart_logpdf(Sigma0[m][sw.T[1]], Sigma0_prior_df, Sigma0_prior_scale)
@@ -454,16 +457,16 @@ def calibHier(setup):
                     )
                 for i in range(setup.nexp):
                     sw_alpha += (setup.itl[sw.T[1]] - setup.itl[sw.T[0]]) * (
-                        # for t_1
-                        - invgamma_logpdf(s2[i][m][sw.T[1]], setup.ig_a[i], setup.ig_b[i])
-                        - mvnorm_logpdf_(theta[i][m][:,sw.T[1]], theta0[m,sw.T[1]], Sigma0_inv_curr[sw.T[1]], Sigma0_ldet_curr[sw.T[1]]).sum(axis = 0)
-                        + 0.5 * np.log(s2_vec_curr[i][:,sw.T[1]]).sum(axis = 0)
-                        + 0.5 * sse_curr[i][:,sw.T[1]].sum(axis = 0)
                         # for t_0
                         + invgamma_logpdf(s2[i][m][sw.T[0]], setup.ig_a[i], setup.ig_b[i])
                         + mvnorm_logpdf_(theta[i][m][:,sw.T[0]], theta0[m, sw.T[0]], Sigma0_inv_curr[sw.T[0]], Sigma0_ldet_curr[sw.T[0]]).sum(axis = 0)
                         - 0.5 * np.log(s2_vec_curr[i][:,sw.T[0]]).sum(axis = 0)
                         - 0.5 * sse_curr[i][:,sw.T[0]].sum(axis = 0)
+                        # for t_1
+                        - invgamma_logpdf(s2[i][m][sw.T[1]], setup.ig_a[i], setup.ig_b[i])
+                        - mvnorm_logpdf_(theta[i][m][:,sw.T[1]], theta0[m,sw.T[1]], Sigma0_inv_curr[sw.T[1]], Sigma0_ldet_curr[sw.T[1]]).sum(axis = 0)
+                        + 0.5 * np.log(s2_vec_curr[i][:,sw.T[1]]).sum(axis = 0)
+                        + 0.5 * sse_curr[i][:,sw.T[1]].sum(axis = 0)
                         )
                 for tt in sw[np.where(sw[np.log(uniform(size = setup.nswap_per)) < sw_alpha])[0]]:
                     count_temper[tt[0], tt[1]] += 1
@@ -533,15 +536,15 @@ def calibPool(setup):
 
         ## adaptive Metropolis for each temperature
         if m == 300:
-            mu  = theta[:(m-1)].mean(axis = 0)
-            cov = cov_3d_pcm(theta[:(m-1)], mu)
+            mu  = theta[:m].mean(axis = 0)
+            cov = cov_3d_pcm(theta[:m], mu)
             S   = cc * np.einsum('ijk,i->ijk', cov + np.eye(setup.p) * eps, np.exp(tau))
 
         if m > 300:
             mu += (theta[m-1] - mu) / (m - 1)
             cov = (
-                + (m-1)/(m-2) * cov
-                + (m - 2)/(m - 1)/(m - 1) * np.einsum('ti,tj->tij', theta[m-1] - mu, theta[m-1] - mu)
+                + (m/(m-1)) * cov
+                + ((m - 1)/(m * m)) * np.einsum('ti,tj->tij', theta[m-1] - mu, theta[m-1] - mu)
                 )
             S   = cc * np.einsum('ijk,i->ijk', cov + np.eye(setup.p) * eps, np.exp(tau))
 
