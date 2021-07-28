@@ -213,7 +213,7 @@ def invgamma_logpdf(s, alpha, beta):
 
 from collections import namedtuple
 OutCalibPool = namedtuple('OutCalibPool', 'theta s2 count count_decor count_100 tau pred_curr')
-OutCalibHier = namedtuple('OutCalibPool', 'theta s2 count count_decor count_100 count_temper tau pred_curr theta0 Sigma0')
+OutCalibHier = namedtuple('OutCalibHier', 'theta s2 count count_decor count_100 count_temper tau pred_curr theta0 Sigma0')
 
 def calibHier(setup):
     t0 = time.time()
@@ -263,7 +263,7 @@ def calibHier(setup):
     eps = 1.0e-12
     AM_SCALAR = 2.4**2/setup.p
 
-    tau = [ -3 * np.ones((setup.ntemps, setup.ntheta[i])) for i in range(setup.nexp)]
+    tau = [ -0 * np.ones((setup.ntemps, setup.ntheta[i])) for i in range(setup.nexp)]
     # tau = [np.zeros((setup.ntemps, setup.ntheta[i])) for i in range(setup.nexp)]
     S   = [np.empty((setup.ntemps, setup.ntheta[i], setup.p, setup.p)) for i in range(setup.nexp)]
     cov = [np.empty((setup.ntemps, setup.ntheta[i], setup.p, setup.p)) for i in range(setup.nexp)]
@@ -364,8 +364,8 @@ def calibHier(setup):
             delta = min(0.1, 1/np.sqrt(m+1)*5)
             for i in range(setup.nexp):
                 tau_up[i][:] = (count_100[i] < 23).T
-                tau[i][tau_up[i]] += delta
-                tau[i][~tau_up[i]] -= delta
+                tau[i][tau_up[i]] -= delta
+                tau[i][~tau_up[i]] += delta
                 count_100[i] *= 0
 
         ## Decorrelation Step
