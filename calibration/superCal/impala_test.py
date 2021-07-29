@@ -271,7 +271,7 @@ def calibHier(setup):
     for i in range(setup.nexp):
         S[i][:] = np.eye(setup.p) * 1e-4
 
-    theta0_prior_cov = np.eye(setup.p)*1.**2
+    theta0_prior_cov = np.eye(setup.p)*10.**2
     theta0_prior_prec = scipy.linalg.inv(theta0_prior_cov)
     theta0_prior_mean = np.repeat(.5, setup.p)
     theta0_prior_ldet = slogdet(theta0_prior_cov)[1]
@@ -279,7 +279,7 @@ def calibHier(setup):
     tbar = np.empty(theta0[0].shape)
     mat = np.zeros((setup.ntemps, setup.p, setup.p))
 
-    Sigma0_prior_df = setup.p
+    Sigma0_prior_df = setup.p + 100
     Sigma0_prior_scale = np.eye(setup.p)*.1**2
     Sigma0_dfs = Sigma0_prior_df + ntheta * setup.itl
 
@@ -392,9 +392,9 @@ def calibHier(setup):
                     alpha[i][:] = - np.inf
                     alpha[i][good_values[i]] = (
                         - 0.5 * itl_mat[i][good_values[i]] * (sse_cand[i][good_values[i]] - sse_curr[i][good_values[i]])
-                        - 0.5 * itl_mat[i][good_values[i]] * (
+                        + itl_mat[i][good_values[i]] * (
                             + mvnorm_logpdf_(theta_cand[i], theta0[m-1], Sigma0_inv_curr, Sigma0_ldet_curr)[good_values[i]]
-                            - mvnorm_logpdf_(theta_cand[i], theta0[m-1], Sigma0_inv_curr, Sigma0_ldet_curr)[good_values[i]]
+                            - mvnorm_logpdf_(theta[i][m], theta0[m-1], Sigma0_inv_curr, Sigma0_ldet_curr)[good_values[i]]
                             )
                         )
                     # MCMC Accept
@@ -428,7 +428,7 @@ def calibHier(setup):
         cc = np.linalg.inv(np.einsum('t,tpq->tpq', ntheta * setup.itl, Sigma0_inv_curr) + theta0_prior_prec)
         tbar *= 0.
         for i in range(setup.nexp):
-            tbar += theta[i][m-1].sum(axis = 0)
+            tbar += theta[i][m].sum(axis = 0)
         tbar /= ntheta
         dd = (
             + np.einsum('t,tl->tl', setup.itl, np.einsum('tlk,tk->tl', ntheta * Sigma0_inv_curr, tbar))
