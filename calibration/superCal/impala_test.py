@@ -280,7 +280,7 @@ def calibHier(setup):
     mat = np.zeros((setup.ntemps, setup.p, setup.p))
 
     Sigma0_prior_df = setup.p
-    Sigma0_prior_scale = np.eye(setup.p)*2.**2
+    Sigma0_prior_scale = np.eye(setup.p)*.1**2
     Sigma0_dfs = Sigma0_prior_df + ntheta * setup.itl
 
     Sigma0_ldet_curr = slogdet(Sigma0[0])[1]
@@ -577,7 +577,7 @@ def calibPool(setup):
         # for each temperature, accept or reject
         alpha[:] = - np.inf
         # alpha[good_values] = (- 0.5 * setup.itl[good_values] * (sse_cand[good_values] - sse_curr[good_values])).sum(axis = 1)
-        alpha[good_values] = -0.5 * setup.itl[good_values] * (sse_diff + tsq_diff)
+        alpha[good_values] = - 0.5 * setup.itl[good_values] * (sse_diff + tsq_diff)
         for t in np.where(np.log(uniform(size=setup.ntemps)) < alpha)[0]: # first index because output of np.where is a tuple of arrays...
             theta[m,t] = theta_cand[t]
             count[t,t] += 1
