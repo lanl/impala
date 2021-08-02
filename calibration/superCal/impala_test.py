@@ -163,7 +163,7 @@ def cov_4d_pcm(arr, mean):
     return np.einsum('kitj,kitl->tijl', arr - mean, arr - mean) / (N - 1)
 
 def mvnorm_logpdf(x, mean, Prec, ldet): # VALIDATED
-    """ 
+    """
     # k = x.shape[-1]
     # part1 = -k * 0.5 * np.log(2 * np.pi) - 0.5 * ldet
     # x = x - mu
@@ -293,14 +293,13 @@ def calibHier(setup):
 
     theta_cand = [np.empty([setup.ntheta[i], setup.ntemps, setup.p]) for i in range(setup.nexp)]
     theta_cand_mat = [np.empty([setup.ntemps * setup.ntheta[i], setup.p]) for i in range(setup.nexp)]
-    
-    pred_cand = [_.copy() for _ in pred_curr] 
+
+    pred_cand = [_.copy() for _ in pred_curr]
     sse_cand = [_.copy() for _ in sse_curr]
-    
+
     alpha  = [np.ones((setup.ntheta[i], setup.ntemps)) * -np.inf for i in range(setup.nexp)]
     accept = [np.zeros(alpha[i].shape, dtype = bool) for i in range(setup.nexp)]
     sw_alpha = np.zeros(setup.nswap_per)
-    tau_up = [np.zeros(t.shape, dtype = bool) for t in tau]
     good_values = [np.zeros(alpha[i].shape, dtype = bool) for i in range(setup.nexp)]
     good_values_mat = [good_values[i].reshape(setup.ntheta[i] * setup.ntemps) for i in range(setup.nexp)]
 
@@ -348,7 +347,7 @@ def calibHier(setup):
                 + mvnorm_logpdf_(theta_cand[i], theta0[m-1], Sigma0_inv_curr, Sigma0_ldet_curr)[good_values[i]]
                 - mvnorm_logpdf_(theta[i][m-1], theta0[m-1], Sigma0_inv_curr, Sigma0_ldet_curr)[good_values[i]]
                 )
-            
+
             # MCMC Accept
             accept[i][:] = np.log(uniform(size = alpha[i].shape)) < alpha[i]
 
@@ -363,9 +362,8 @@ def calibHier(setup):
         if m % 100 == 0 and m > 300:
             delta = min(0.1, 1/np.sqrt(m+1)*5)
             for i in range(setup.nexp):
-                tau_up[i][:] = (count_100[i] < 23).T
-                tau[i][tau_up[i]] -= delta
-                tau[i][~tau_up[i]] += delta
+                tau[i][(count_100[i] < 23).T] -= delta
+                tau[i][(count_100[i] > 23).T] += delta
                 count_100[i] *= 0
 
         ## Decorrelation Step
@@ -482,7 +480,7 @@ def calibHier(setup):
                         theta[i][m,:,tt[0]], theta[i][m,:,tt[1]]     = theta[i][m,:,tt[1]].copy(), theta[i][m,:,tt[0]].copy()
                         s2[i][m,tt[0]], s2[i][m,tt[1]]               = s2[i][m,tt[1]].copy(), s2[i][m,tt[0]].copy()
                         pred_curr[i][:,tt[0]], pred_curr[i][:,tt[1]] = pred_curr[i][:,tt[1]].copy(), pred_curr[i][:,tt[0]].copy()
-                        sse_curr[i][:,tt[0]], sse_curr[i][:,tt[1]]   = sse_curr[i][:,tt[1]].copy(), sse_curr[i][:,tt[1]].copy()
+                        sse_curr[i][:,tt[0]], sse_curr[i][:,tt[1]]   = sse_curr[i][:,tt[1]].copy(), sse_curr[i][:,tt[0]].copy()
                         s2_vec_curr[i][:]                            = s2[i][m, :, setup.s2_ind[i]]
                     theta0[m,tt[0]], theta0[m,tt[1]] = theta0[m,tt[1]].copy(), theta0[m,tt[0]].copy()
                     Sigma0[m,tt[0]], Sigma0[m,tt[1]] = Sigma0[m,tt[1]].copy(), Sigma0[m,tt[0]].copy()
