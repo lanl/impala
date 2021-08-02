@@ -279,8 +279,8 @@ def calibHier(setup):
     tbar = np.empty(theta0[0].shape)
     mat = np.zeros((setup.ntemps, setup.p, setup.p))
 
-    Sigma0_prior_df = setup.p + 100
-    Sigma0_prior_scale = np.eye(setup.p)*.1**2
+    Sigma0_prior_df = setup.p
+    Sigma0_prior_scale = np.eye(setup.p)*2.**2
     Sigma0_dfs = Sigma0_prior_df + ntheta * setup.itl
 
     Sigma0_ldet_curr = slogdet(Sigma0[0])[1]
@@ -381,7 +381,7 @@ def calibHier(setup):
                     good_values[i][:] = good_values_mat[i].reshape(setup.ntheta[i], setup.ntemps)
                     # If valid, compute predictions and likelihood values
                     if np.any(good_values_mat[i]):
-                        pred_cand_mat[i][good_values_mat[i]][:] = setup.models[i].eval(
+                        pred_cand_mat[i][good_values_mat[i]] = setup.models[i].eval(
                             tran(theta_cand_mat[i], setup.bounds_mat, setup.bounds.keys())
                             )
                     pred_cand[i][:] = pred_cand_mat[i].reshape(setup.ntheta[i], setup.ntemps, setup.y_lens[i])
