@@ -278,11 +278,7 @@ def calibHier(setup):
     tbar = np.empty(theta0[0].shape)
     mat = np.zeros((setup.ntemps, setup.p, setup.p))
 
-<<<<<<< HEAD
-    Sigma0_prior_df = setup.p + 100
-=======
     Sigma0_prior_df = setup.p
->>>>>>> 22e9c833c48f6714e8caec1694a7f2dbdf7a1b75
     Sigma0_prior_scale = np.eye(setup.p)*.1**2
     Sigma0_dfs = Sigma0_prior_df + ntheta * setup.itl
 
