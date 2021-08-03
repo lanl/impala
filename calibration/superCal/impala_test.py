@@ -99,14 +99,13 @@ def invprobit(y):
     """ Inverse Probit Transformation: For y in (-inf,inf), x in (0,1) """
     return 0.5 * (1 + erf(y / np.sqrt(2.)))
 
-# initfunc = np.random.normal # if probit, then normal--if uniform, then uniform
-initfunc = np.random.uniform
+initfunc = np.random.normal # if probit, then normal--if uniform, then uniform
+# initfunc = np.random.uniform
 
 def tran(th, bounds, names):
-    return dict(zip(names, unnormalize(th, bounds).T))
-
-def tran2(th, bounds, names):
-    return dict(zip(names, unnormalize(invprobit(th),bounds).T))
+    return dict(zip(names, unnormalize(invprobit(th),bounds).T)) # If probit
+    # return dict(zip(names, unnormalize(th, bounds).T)) # If uniform
+    pass
 
 def chol_sample(mean, cov):
     return mean + np.dot(np.linalg.cholesky(cov), np.random.standard_normal(mean.size))
@@ -505,7 +504,7 @@ def calibPool(setup):
     theta_start = initfunc(size=[setup.ntemps, setup.p])
     good = setup.checkConstraints(tran(theta_start, setup.bounds_mat, setup.bounds.keys()), setup.bounds)
     while np.any(~good):
-        theta_start[np.where(~good)] = np.random.normal(size = [(~good).sum(), setup.p])
+        theta_start[np.where(~good)] = initfunc(size = [(~good).sum(), setup.p])
         good[np.where(~good)] = setup.checkConstraints(
             tran(theta_start[np.where(~good)], setup.bounds_mat, setup.bounds.keys()),
             setup.bounds,
