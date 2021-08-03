@@ -99,14 +99,13 @@ def invprobit(y):
     """ Inverse Probit Transformation: For y in (-inf,inf), x in (0,1) """
     return 0.5 * (1 + erf(y / np.sqrt(2.)))
 
-# initfunc = np.random.normal # if probit, then normal--if uniform, then uniform
-initfunc = np.random.uniform
+initfunc = np.random.normal # if probit, then normal--if uniform, then uniform
+# initfunc = np.random.uniform
 
 def tran(th, bounds, names):
-    return dict(zip(names, unnormalize(th, bounds).T))
-
-def tran2(th, bounds, names):
-    return dict(zip(names, unnormalize(invprobit(th),bounds).T))
+    return dict(zip(names, unnormalize(invprobit(th),bounds).T)) # If probit
+    # return dict(zip(names, unnormalize(th, bounds).T)) # If uniform
+    pass
 
 def chol_sample(mean, cov):
     return mean + np.dot(np.linalg.cholesky(cov), np.random.standard_normal(mean.size))
@@ -279,7 +278,11 @@ def calibHier(setup):
     tbar = np.empty(theta0[0].shape)
     mat = np.zeros((setup.ntemps, setup.p, setup.p))
 
+<<<<<<< HEAD
     Sigma0_prior_df = setup.p + 100
+=======
+    Sigma0_prior_df = setup.p
+>>>>>>> 22e9c833c48f6714e8caec1694a7f2dbdf7a1b75
     Sigma0_prior_scale = np.eye(setup.p)*.1**2
     Sigma0_dfs = Sigma0_prior_df + ntheta * setup.itl
 
@@ -505,7 +508,7 @@ def calibPool(setup):
     theta_start = initfunc(size=[setup.ntemps, setup.p])
     good = setup.checkConstraints(tran(theta_start, setup.bounds_mat, setup.bounds.keys()), setup.bounds)
     while np.any(~good):
-        theta_start[np.where(~good)] = np.random.normal(size = [(~good).sum(), setup.p])
+        theta_start[np.where(~good)] = initfunc(size = [(~good).sum(), setup.p])
         good[np.where(~good)] = setup.checkConstraints(
             tran(theta_start[np.where(~good)], setup.bounds_mat, setup.bounds.keys()),
             setup.bounds,
@@ -577,7 +580,7 @@ def calibPool(setup):
         # for each temperature, accept or reject
         alpha[:] = - np.inf
         # alpha[good_values] = (- 0.5 * setup.itl[good_values] * (sse_cand[good_values] - sse_curr[good_values])).sum(axis = 1)
-        alpha[good_values] = -0.5 * setup.itl[good_values] * (sse_diff + tsq_diff)
+        alpha[good_values] = - 0.5 * setup.itl[good_values] * (sse_diff + tsq_diff)
         for t in np.where(np.log(uniform(size=setup.ntemps)) < alpha)[0]: # first index because output of np.where is a tuple of arrays...
             theta[m,t] = theta_cand[t]
             count[t,t] += 1
