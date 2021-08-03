@@ -279,8 +279,8 @@ def calibHier(setup):
     tbar = np.empty(theta0[0].shape)
     mat = np.zeros((setup.ntemps, setup.p, setup.p))
 
-    Sigma0_prior_df = setup.p
-    Sigma0_prior_scale = np.eye(setup.p)*2.**2
+    Sigma0_prior_df = setup.p + 100
+    Sigma0_prior_scale = np.eye(setup.p)*.1**2
     Sigma0_dfs = Sigma0_prior_df + ntheta * setup.itl
 
     Sigma0_ldet_curr = slogdet(Sigma0[0])[1]
@@ -413,7 +413,7 @@ def calibHier(setup):
             #     )
             # (array(ntemps x ny x ntheta) - vector(ny))^2 should be array(ntemps x ny x ntheta)
             for j in range(setup.ns2[i]):
-                sseij = np.sum(dev_sq[i][:,:,np.where(setup.s2_ind[i]==j)[0]], 2) # sse for jth s2ind in experiment i
+                sseij = np.sum(dev_sq[i][j,:,np.where(setup.s2_ind[i]==j)[0]], 0) # sse for jth s2ind in experiment i
                 s2[i][m, :, j] = 1 / np.random.gamma(
                     setup.itl*(setup.ny_s2[i][j]/2 + np.array(setup.ig_a[i][j]) + 1) - 1,
                     1 / (setup.itl*(np.array(setup.ig_b[i][j]) + .5*sseij)),
