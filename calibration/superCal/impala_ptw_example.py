@@ -196,22 +196,32 @@ out = impala.calibHier(setup)
 uu = range(25000, 30000, 5)
 pred = setup.models[0].eval(impala.tran(out.theta[0][uu,0,0,:], setup.bounds_mat, setup.bounds.keys()))
 plt.plot(pred.T,color='grey')
-plt.plot(stress_stacked,color='black')
+plt.plot(dat_all[0][:,1],color='black')
 plt.show()
 
-pred = setup.models[0].eval(impala.tran(out.theta[1][uu,0,0,:], setup.bounds_mat, setup.bounds.keys()))
+pred = setup.models[1].eval(impala.tran(out.theta[1][uu,0,0,:], setup.bounds_mat, setup.bounds.keys()))
 plt.plot(pred.T,color='grey')
-plt.plot(stress_stacked,color='black')
+plt.plot(dat_all[1][:,1],color='black')
 plt.show()
 
-pred = setup.models[0].eval(impala.tran(out.theta[2][uu,0,0,:], setup.bounds_mat, setup.bounds.keys()))
+pred = setup.models[2].eval(impala.tran(out.theta[2][uu,0,0,:], setup.bounds_mat, setup.bounds.keys()))
 plt.plot(pred.T,color='grey')
-plt.plot(stress_stacked,color='black')
+plt.plot(dat_all[2][:,1],color='black')
 plt.show()
 
 pred = setup.models[0].eval(impala.tran(out.theta0[uu,0,:], setup.bounds_mat, setup.bounds.keys()))
 plt.plot(pred.T,color='grey')
-plt.plot(stress_stacked,color='black')
+plt.plot(dat_all[0][:,1],color='black')
+plt.show()
+
+pred = setup.models[1].eval(impala.tran(out.theta0[uu,0,:], setup.bounds_mat, setup.bounds.keys()))
+plt.plot(pred.T,color='grey')
+plt.plot(dat_all[1][:,1],color='black')
+plt.show()
+
+pred = setup.models[2].eval(impala.tran(out.theta0[uu,0,:], setup.bounds_mat, setup.bounds.keys()))
+plt.plot(pred.T,color='grey')
+plt.plot(dat_all[2][:,1],color='black')
 plt.show()
 
 # pairs plot of parameter posterior samples
