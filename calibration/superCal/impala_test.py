@@ -381,7 +381,7 @@ def calibHier(setup):
                     # If valid, compute predictions and likelihood values
                     if np.any(good_values_mat[i]):
                         pred_cand_mat[i][good_values_mat[i]] = setup.models[i].eval(
-                            tran(theta_cand_mat[i], setup.bounds_mat, setup.bounds.keys())
+                            tran(theta_cand_mat[i][good_values_mat[i]], setup.bounds_mat, setup.bounds.keys())
                             )
                     pred_cand[i][:] = pred_cand_mat[i].reshape(setup.ntheta[i], setup.ntemps, setup.y_lens[i])
                     sse_cand[i][:] = ((pred_cand[i] - setup.ys[i]) * (pred_cand[i] - setup.ys[i]) / s2_vec_curr[i].T).sum(axis = 2)
