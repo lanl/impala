@@ -99,12 +99,12 @@ def invprobit(y):
     """ Inverse Probit Transformation: For y in (-inf,inf), x in (0,1) """
     return 0.5 * (1 + erf(y / np.sqrt(2.)))
 
-initfunc = np.random.normal # if probit, then normal--if uniform, then uniform
-# initfunc = np.random.uniform
+#initfunc = np.random.normal # if probit, then normal--if uniform, then uniform
+initfunc = np.random.uniform
 
 def tran(th, bounds, names):
-    return dict(zip(names, unnormalize(invprobit(th),bounds).T)) # If probit
-    # return dict(zip(names, unnormalize(th, bounds).T)) # If uniform
+    # return dict(zip(names, unnormalize(invprobit(th),bounds).T)) # If probit
+    return dict(zip(names, unnormalize(th, bounds).T)) # If uniform
     pass
 
 def chol_sample(mean, cov):
@@ -381,7 +381,7 @@ def calibHier(setup):
                     # If valid, compute predictions and likelihood values
                     if np.any(good_values_mat[i]):
                         pred_cand_mat[i][good_values_mat[i]] = setup.models[i].eval(
-                            tran(theta_cand_mat[i], setup.bounds_mat, setup.bounds.keys())
+                            tran(theta_cand_mat[i][good_values_mat[i]], setup.bounds_mat, setup.bounds.keys())
                             )
                     pred_cand[i][:] = pred_cand_mat[i].reshape(setup.ntheta[i], setup.ntemps, setup.y_lens[i])
                     sse_cand[i][:] = ((pred_cand[i] - setup.ys[i]) * (pred_cand[i] - setup.ys[i]) / s2_vec_curr[i].T).sum(axis = 2)
