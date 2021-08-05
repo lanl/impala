@@ -179,7 +179,12 @@ class PTW_Yield_Stress(BaseModel):
             )
         if np.any(~good):
             #return np.array([-999.]*len(good))
-            raise('PTW bad val')
+            print('Failed: {}'.format(np.where(~good)[0]))
+            for param in ['sInf','s0','yInf','y0','y1','y2']:
+                print('Failing {}'.format(param))
+                print(mp.__dict__[param][~good])
+            raise ConstraintError('PTW bad val')
+
 
         #convert to 1/s strain rate since PTW rate is in that unit
         edot = edot * 1.0E6
