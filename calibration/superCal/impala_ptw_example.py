@@ -4,8 +4,9 @@
 ##########################################################################################
 
 # %%
+from importlib import reload  
 import numpy as np
-import impala
+import impala_test as impala
 import models
 import matplotlib.pyplot as plt
 np.seterr(under='ignore')
@@ -156,29 +157,59 @@ def constraints_ptw(x, bounds):
 
 ##########################################################################################
 # these define measurement error estimates, I would leave these as is for most SHPB/quasistatic data
-sd_est = np.array([.001]*nexp)
-s2_df = np.array([5]*nexp)
-s2_ind = np.hstack([[v]*len(dat_all[v]) for v in list(range(nexp))])
+#sd_est = np.array([.0001]*nexp)
+#s2_df = np.array([5]*nexp)
+#s2_ind = np.hstack([[v]*len(dat_all[v]) for v in list(range(nexp))])
 
 ##########################################################################################
 # define PTW model
 model = models.ModelPTW(temps=np.array(temps), edots=np.array(edots)*1e-6, consts=consts, strain_histories=strain_hist_list)
 
+impala = reload(impala)
+
+
 # bring everything together into calibration structure
+#setup = impala.CalibSetup(bounds, constraints_ptw)
+#setup.addVecExperiments(stress_stacked, model, sd_est, s2_df, s2_ind, theta_ind=s2_ind)
+#setup.setTemperatureLadder(1.05**np.arange(30))
+#setup.setMCMC(nmcmc=30000, nburn=10000, thin=1, decor=100)
+
+model0 = models.ModelPTW(temps=np.array(temps[0]), edots=np.array(edots[0]*1e-6), consts=consts, strain_histories=[strain_hist_list[0]])
+model1 = models.ModelPTW(temps=np.array(temps[1]), edots=np.array(edots[1]*1e-6), consts=consts, strain_histories=[strain_hist_list[1]])
+model2 = models.ModelPTW(temps=np.array(temps[2]), edots=np.array(edots[2]*1e-6), consts=consts, strain_histories=[strain_hist_list[2]])
 setup = impala.CalibSetup(bounds, constraints_ptw)
-setup.addVecExperiments(stress_stacked, model, sd_est, s2_df, s2_ind)
-setup.setTemperatureLadder(1.1**np.arange(50))
+setup.addVecExperiments(dat_all[0][:,1], model0, np.array([.0001]), np.array([5]), np.array([0]*len(strain_hist_list[0])))
+setup.addVecExperiments(dat_all[1][:,1], model1, np.array([.0001]), np.array([5]), np.array([0]*len(strain_hist_list[1])))
+setup.addVecExperiments(dat_all[2][:,1], model2, np.array([.0001]), np.array([5]), np.array([0]*len(strain_hist_list[2])))
+setup.setTemperatureLadder(1.05**np.arange(1))
 setup.setMCMC(nmcmc=30000, nburn=10000, thin=1, decor=100)
 
 ##########################################################################################
 # calibrate
-out = impala.calibPool(setup)
+out = impala.calibHier(setup)
+
+#out2 = impala.calibPool(setup)
 
 
 ##########################################################################################
 # posterior predictions (without measurement error, which has standard deviation np.sqrt(out.s2)), disregarding the first 25000 MCMC samples
-pred = setup.models[0].eval(impala.tran(out.theta[25000:30000,0,:], setup.bounds_mat, setup.bounds.keys()))
+uu = range(25000, 30000, 5)
+pred = setup.models[0].eval(impala.tran(out.theta[0][uu,0,0,:], setup.bounds_mat, setup.bounds.keys()))
+plt.plot(pred.T,color='grey')
+plt.plot(stress_stacked,color='black')
+plt.show()
 
+pred = setup.models[0].eval(impala.tran(out.theta[1][uu,0,0,:], setup.bounds_mat, setup.bounds.keys()))
+plt.plot(pred.T,color='grey')
+plt.plot(stress_stacked,color='black')
+plt.show()
+
+pred = setup.models[0].eval(impala.tran(out.theta[2][uu,0,0,:], setup.bounds_mat, setup.bounds.keys()))
+plt.plot(pred.T,color='grey')
+plt.plot(stress_stacked,color='black')
+plt.show()
+
+pred = setup.models[0].eval(impala.tran(out.theta0[uu,0,:], setup.bounds_mat, setup.bounds.keys()))
 plt.plot(pred.T,color='grey')
 plt.plot(stress_stacked,color='black')
 plt.show()
@@ -186,10 +217,124 @@ plt.show()
 # pairs plot of parameter posterior samples
 import pandas as pd
 import seaborn as sns
-dat = pd.DataFrame(impala.tran(out.theta[25000:30000,0,:], setup.bounds_mat, setup.bounds.keys()))
-g = sns.pairplot(dat, plot_kws={"s": [3]*5000}, corner=True, diag_kind='hist')
+#dat = pd.DataFrame(impala.tran(out.theta[0][uu,0,0,:], setup.bounds_mat, setup.bounds.keys()))
+dat0 = pd.DataFrame(out.theta[0][uu,0,0,:])
+g = sns.pairplot(dat0, plot_kws={"s": [3]*len(uu)}, corner=True, diag_kind='hist')
+g.set(xlim=(0,1), ylim = (0,1))
+g
+plt.show()
+
+dat1 = pd.DataFrame(out.theta[1][uu,0,0,:])
+g = sns.pairplot(dat1, plot_kws={"s": [3]*len(uu)}, corner=True, diag_kind='hist')
+g.set(xlim=(0,1), ylim = (0,1))
+g
+plt.show()
+
+dat2 = pd.DataFrame(out.theta[2][uu,0,0,:])
+g = sns.pairplot(dat2, plot_kws={"s": [3]*len(uu)}, corner=True, diag_kind='hist')
+g.set(xlim=(0,1), ylim = (0,1))
+g
+plt.show()
+
+# dat3 = dat0
+# dat3 = dat3.append(dat1)
+# dat3 = dat3.append(dat2)
+# g = sns.pairplot(dat3, plot_kws={"s": [3]*15000}, corner=True, diag_kind='hist')
+# g.set(xlim=(0,1), ylim = (0,1))
+# g
+# plt.show()
+
+dat_theta0 = pd.DataFrame(out.theta0[25000:30000,0,:])
+g = sns.pairplot(dat_theta0, plot_kws={"s": [3]*5000}, corner=True, diag_kind='hist')
+g.set(xlim=(0,1), ylim = (0,1))
 g
 plt.show()
 
 
+# dat3 = dat0
+# dat3 = dat3.append(dat1)
+# dat3 = dat3.append(dat2)
+# dat3 = dat3.append(dat_theta0)
+# g = sns.pairplot(dat3, plot_kws={"s": [3]*20000}, corner=True, diag_kind='hist')
+# g.set(xlim=(0,1), ylim = (0,1))
+# g
+# plt.show()
 
+
+theta_parent = impala.chol_sample_1per_constraints(out.theta0[uu,0,:], out.Sigma0[uu,0,:,:], setup.checkConstraints, setup.bounds_mat, setup.bounds.keys(), setup.bounds)
+
+
+
+
+
+## plot parameter pairs plots, 90% contours
+import scipy.stats as ss
+from scipy import interpolate
+nparams = 10
+def contx(x1,x2,perc=.9): # get contour for percecntile using kde
+    dd = ss.gaussian_kde([x1,x2],bw_method='silverman')
+    X, Y = np.mgrid[min(x1):max(x1):100j, min(x2):max(x2):100j]
+    positions = np.vstack([X.ravel(), Y.ravel()])
+    z = dd(positions)
+    z = z/z.sum()
+
+    t = np.linspace(0, z.max(), 1000)
+    integral = ((z >= t[:, None, None]) * z).sum(axis=(1,2))
+
+    f = interpolate.interp1d(integral, t)
+    t_contours = f(np.array([perc]))
+    return {'X':X, 'Y':Y, 'Z':z.reshape([100,100]), 'conts':t_contours }
+
+#phi0arr = out.theta0[25000:30000,0,:]
+#nexp = 3
+plt.figure(1, figsize=(15, 15))
+
+for i in range(nparams):
+    for j in range(nparams):
+        if i == j:
+            plt.subplot2grid((nparams, nparams), (i, j))
+
+            for k in range(nexp):
+                sns.distplot(out.theta[k][uu,0,0,i], hist=False, kde=True,color='lightgreen')
+
+            sns.distplot(out.theta0[uu,0,i], hist=False, kde=True,color='blue')
+
+            sns.distplot(theta_parent[:,i], hist=False, kde=True,color='grey')
+
+            plt.xlim(0,1)
+            #plt.xlim(bounds[i,0], bounds[i,1])
+            ax = plt.gca()
+            ax.axes.yaxis.set_visible(False)
+            #plt.xlabel(theta0_names[i])
+            ax.tick_params(axis='x', which='major', labelsize=8)
+            plt.setp(ax.get_xticklabels(), rotation=30, horizontalalignment='right')
+        if i < j:
+            plt.subplot2grid((nparams, nparams), (i, j))
+
+            for k in range(nexp):
+                oo = contx(out.theta[k][uu,0,0,j], out.theta[k][uu,0,0,i])
+                plt.contour(oo['X'], oo['Y'], oo['Z'], oo['conts'], colors='lightgreen')
+
+            oo = contx(out.theta0[uu,0,j], out.theta0[uu,0,i])
+            plt.contour(oo['X'], oo['Y'], oo['Z'], oo['conts'],colors = 'blue')
+
+            oo = contx(theta_parent[:,j], theta_parent[:,i])
+            plt.contour(oo['X'], oo['Y'], oo['Z'], oo['conts'],colors='grey')
+
+            plt.xlim(0,1)
+            plt.ylim(0,1)
+            #plt.xlim(bounds[j, 0], bounds[j, 1])
+            #plt.ylim(bounds[i, 0], bounds[i, 1])
+            ax = plt.gca()
+            ax.axes.xaxis.set_visible(False)
+            ax.axes.yaxis.set_visible(False)
+            print(i)
+plt.subplots_adjust(wspace=.05, hspace=.05)
+plt.subplot2grid((nparams, nparams), (2, 0))
+from matplotlib.lines import Line2D
+colors = ['lightgreen','blue','grey']
+lines = [Line2D([0],[0],color=c,linewidth=2) for c in colors]
+labels = [r'$\theta_i$',r'$\theta_0$',r'$\theta^*$']
+plt.legend(lines,labels)
+plt.axis('off')
+plt.show()
