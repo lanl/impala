@@ -99,12 +99,12 @@ def invprobit(y):
     """ Inverse Probit Transformation: For y in (-inf,inf), x in (0,1) """
     return 0.5 * (1 + erf(y / np.sqrt(2.)))
 
-#initfunc = np.random.normal # if probit, then normal--if uniform, then uniform
-initfunc = np.random.uniform
+initfunc = np.random.normal # if probit, then normal--if uniform, then uniform
+# initfunc = np.random.uniform
 
 def tran(th, bounds, names):
-    # return dict(zip(names, unnormalize(invprobit(th),bounds).T)) # If probit
-    return dict(zip(names, unnormalize(th, bounds).T)) # If uniform
+    return dict(zip(names, unnormalize(invprobit(th),bounds).T)) # If probit
+    # return dict(zip(names, unnormalize(th, bounds).T)) # If uniform
     pass
 
 def chol_sample(mean, cov):
