@@ -456,14 +456,18 @@ class MaterialModel(object):
                     {key : parameters[key] for key in self.parameters.params},
                     )
         except KeyError:
-            print('{} missing from list of supplied parameters'.format(key))
+            print('{} missing from list of supplied parameters'.format(
+                    set(self.parameters.params).difference(set(parameters.keys()))
+                    ))
             raise
         try:
             self.parameters.__dict__.update(
                     {key : constants[key] for key in self.parameters.consts},
                     )
         except KeyError:
-            print('{} missing from list of supplied constants'.format(key))
+            print('{} missing from list of supplied constants'.format(
+                    set(self.parameters.consts).difference(set(constants.keys()))
+                    ))
             raise
         return
 
@@ -495,10 +499,10 @@ class MaterialModel(object):
         results[0] = np.array([times[:,0], state.strain, state.stress, state.T, state.G, np.repeat(state.rho,nrep)])
 
         for i in range(1, Nhist):
-            # self.update_state(strain_rate[:,i-1], times[:,i] - times[:,i-1])
-            self.update_state(strain_rate.T[i-1], times.T[i] - times.T[i-1])
-            #results[i] = [times[i], state.strain, state.stress, state.T, state.G, state.rho]
-            results[i] = np.array([times.T[i], state.strain, state.stress, state.T, state.G,
+            self.update_state(strain_rate[:,i-1], times[:,i] - times[:,i-1])
+            # self.update_state(strain_rate.T[i-1], times.T[i] - times.T[i-1])
+            # results[i] = [times[i], state.strain, state.stress, state.T, state.G, state.rho]
+            results[i] = np.array([times[:,i], state.strain, state.stress, state.T, state.G,
                  np.repeat(state.rho, nrep)])
 
         return results
@@ -524,10 +528,10 @@ def generate_strain_history(emax, edot, Nhist):
     return dict((['times',times.T], ['strains',strains], ['strain_rate',strain_rate.T]))
 
 def generate_strain_history_new(emax, edot, nhist):
-    tmax = emax / edot
+    tmax    = emax / edot     
     strains = np.linspace(0, emax, nhist) # nhist * nexp
-    times = np.linspace(0, tmax, nhist) # nhist * nexp
-    strain_rate = np.diff(strains, axis = 0) / np.diff(times, axis = 0) # (nhist - 1) * nexp
-    return {'times' : times.T, 'strains' : strains.T, 'strain_rate' : strain_rate.T}
+    times   = np.linspace(0, tmax, nhist) # nhist * nexp
+    rates   = np.diff(strains, axis = 0) / np.diff(times, axis = 0) # (nhist - 1) * nexp
+    return {'times' : times.T, 'strains' : strains.T, 'strain_rate' : rates.T}
 
 # EOF
