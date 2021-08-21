@@ -61,8 +61,8 @@ class ModelPTW:
         self.temps = temps
         self.edots = edots
         self.nexp = len(strain_histories)
-        #self.Nhist = 100
-        self.Nhist = 50
+        self.Nhist = 100
+        # self.Nhist = 50
         self.stochastic = False
         self.pool = pool
         return

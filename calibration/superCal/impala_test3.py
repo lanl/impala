@@ -238,7 +238,7 @@ def calibHier(setup):
         for i in range(setup.nexp)
         ]
     s2_ind_mat = [
-        (setup.s2_ind[i][:,None] == range(setup.ntheta[i])).astype(int)
+        (setup.s2_ind[i][:,None] == range(setup.ntheta[i]))
         for i in range(setup.nexp)
         ]
 
@@ -376,8 +376,8 @@ def calibHier(setup):
             accept[i][:] = np.log(uniform(size = alpha[i].shape)) < alpha[i]
             # Where accept, make changes
             theta[i][m][accept[i]]  = theta_cand[i][accept[i]].copy()
-            pred_curr[i][accept[i] @ s2_ind_mat[i].astype(bool).T] = \
-                             pred_cand[i][accept[i] @ s2_ind_mat[i].astype(bool).T].copy()
+            pred_curr[i][accept[i] @ s2_ind_mat[i].T] = \
+                             pred_cand[i][accept[i] @ s2_ind_mat[i].T].copy()
             sse_curr[i][accept[i]] = sse_cand[i][accept[i]].copy()
             count[i][accept[i]] += 1
             count_100[i][accept[i]] += 1
@@ -427,8 +427,8 @@ def calibHier(setup):
                     accept[i][:] = (np.log(uniform(size = alpha[i].shape)) < alpha[i])
                     # Where accept, make changes
                     theta[i][m][accept[i]] = theta_cand[i][accept[i]].copy()
-                    pred_curr[i][accept[i] @ s2_ind_mat[i].astype(bool).T] = \
-                                        pred_cand[i][accept[i] @ s2_ind_mat[i].astype(bool).T].copy()
+                    pred_curr[i][accept[i] @ s2_ind_mat[i].T] = \
+                                        pred_cand[i][accept[i] @ s2_ind_mat[i].T].copy()
                     sse_curr[i][accept[i]] = sse_cand[i][accept[i]].copy()
                     count_decor[i][accept[i], k] = count_decor[i][accept[i], k] + 1
 
@@ -533,8 +533,11 @@ def calibPool(setup):
     theta = np.empty([setup.nmcmc, setup.ntemps, setup.p])
     n_s2 = np.sum(setup.ns2)
     s2 = [np.ones([setup.nmcmc, setup.ntemps, setup.ns2[i]]) for i in range(setup.nexp)]
-    s2_vec_curr = [s2[i][0,:,setup.s2_ind[i]] for i in range(setup.nexp)]
-
+    # s2_vec_curr = [s2[i][0,:,setup.s2_ind[i]] for i in range(setup.nexp)]
+    s2_ind_mat = [
+        (setup.s2_ind[i][:,None] == range(setup.ntheta[i]))
+        for i in range(setup.nexp)
+        ]
     theta_start = initfunc(size=[setup.ntemps, setup.p])
     good = setup.checkConstraints(tran(theta_start, setup.bounds_mat, setup.bounds.keys()), setup.bounds)
     while np.any(~good):
@@ -545,11 +548,15 @@ def calibPool(setup):
             )
     theta[0] = theta_start
 
-    pred_curr = []
-    sse_curr = np.empty([setup.ntemps, setup.nexp])
+    pred_curr = [None] * setup.nexp
+    # sse_curr = np.empty([setup.ntemps, setup.nexp])
+    sse_curr = np.empty([setup.nexp, setup.ntemps])
+    dev_sq = [np.empty(setup.ntemps, setup.ns2[i]) for i in range(setup.nexp)]
+
     for i in range(setup.nexp):
-        pred_curr.append(setup.models[i].eval(tran(theta[0, :, :], setup.bounds_mat, setup.bounds.keys())))
-        sse_curr[:, i] = np.sum((pred_curr[i] - setup.ys[i]) ** 2 / s2_vec_curr[i].T, 1)
+        pred_curr[i] = setup.models[i].eval(tran(theta[0], setup.bounds_mat, setup.bounds.keys()))
+        # sse_curr[:, i] = np.sum((pred_curr[i] - setup.ys[i]) ** 2 / s2_vec_curr[i].T, 1)
+        sse_curr[i] = ((pred_curr[i] - setup.ys[i])**2 @ s2_ind_mat[i] / s2[i][0]).sum(axis = 1)
 
     eps  = 1.0e-13
     tau  = np.repeat(-4.0, setup.ntemps)
@@ -574,10 +581,6 @@ def calibPool(setup):
         theta[m] = theta[m-1].copy() # current set to previous, will change if accepted
         #----------------------------------------------------------
         ## adaptive Metropolis for each temperature
-        if m == 300:
-            mu  = theta[:m].mean(axis = 0)
-            cov = cov_3d_pcm(theta[:m], mu)
-            S   = cc * np.einsum('ijk,i->ijk', cov + np.eye(setup.p) * eps, np.exp(tau))
 
         if m > 300:
             mu += (theta[m-1] - mu) / (m - 1)
@@ -586,6 +589,15 @@ def calibPool(setup):
                 + ((m - 1)/(m * m)) * np.einsum('ti,tj->tij', theta[m-1] - mu, theta[m-1] - mu)
                 )
             S   = cc * np.einsum('ijk,i->ijk', cov + np.eye(setup.p) * eps, np.exp(tau))
+
+        elif m == 300:
+            mu  = theta[:m].mean(axis = 0)
+            cov = cov_3d_pcm(theta[:m], mu)
+            S   = cc * np.einsum('ijk,i->ijk', cov + np.eye(setup.p) * eps, np.exp(tau))
+        
+        else:
+            pass
+        
         #------------------------------------------------------------------------------------------
         # generate proposal
         theta_cand  = (
@@ -604,16 +616,15 @@ def calibPool(setup):
                 pred_cand[i][good_values] = setup.models[i].eval(
                     tran(theta_cand[good_values], setup.bounds_mat, setup.bounds.keys())
                     )
-                sse_cand[:, i] = np.sum((pred_cand[i] - setup.ys[i])**2 / s2_vec_curr[i].T, 1)
+                sse_cand[i] = ((pred_cand[i] - setup.ys[i])**2 @ s2_ind_mat) / s2[i][m]
 
         tsq_diff = 0 # ((theta_cand * theta_cand).sum(axis = 1) - (theta[m-1] * theta[m-1]).sum(axis = 1))[good_values]
         sse_diff = (sse_cand - sse_curr).sum(axis = 1)[good_values]
         #------------------------------------------------------------------------------------------
         # for each temperature, accept or reject
         alpha[:] = - np.inf
-        # alpha[good_values] = (- 0.5 * setup.itl[good_values] * (sse_cand[good_values] - sse_curr[good_values])).sum(axis = 1)
         alpha[good_values] = - 0.5 * setup.itl[good_values] * (sse_diff + tsq_diff)
-        for t in np.where(np.log(uniform(size=setup.ntemps)) < alpha)[0]: # first index because output of np.where is a tuple of arrays...
+        for t in np.where(np.log(uniform(size=setup.ntemps)) < alpha)[0]:
             theta[m,t] = theta_cand[t]
             count[t,t] += 1
             sse_curr[t] = sse_cand[t]
@@ -631,7 +642,7 @@ def calibPool(setup):
         # decorrelation step
         if m % setup.decor == 0:
             for k in range(setup.p):
-                theta_cand = theta[m,:,:].copy()
+                theta_cand = theta[m].copy()
                 theta_cand[:,k] = initfunc(size = setup.ntemps) # independence proposal, will vectorize of columns
                 good_values = setup.checkConstraints(
                     tran(theta_cand, setup.bounds_mat, setup.bounds.keys()), setup.bounds,
@@ -641,10 +652,10 @@ def calibPool(setup):
 
                 if np.any(good_values):
                     for i in range(setup.nexp):
-                        pred_cand[i][good_values, :] = setup.models[i].eval(
-                            tran(theta_cand[good_values, :], setup.bounds_mat, setup.bounds.keys()),
+                        pred_cand[i][good_values] = setup.models[i].eval(
+                            tran(theta_cand[good_values], setup.bounds_mat, setup.bounds.keys()),
                             )
-                        sse_cand[:, i] = np.sum((pred_cand[i] - setup.ys[i])**2 / s2_vec_curr[i].T, 1)
+                        sse_cand[i] = ((pred_cand[i] - setup.ys[i])**2 @ s2_ind_mat[i] / s2[i][m-1]).sum(axis = 1)
 
                 alpha[:] = -np.inf
                 tsq_diff = 0. # ((theta_cand * theta_cand).sum(axis = 1) - (theta[m] * theta[m]).sum(axis = 1))[good_values]
@@ -659,11 +670,18 @@ def calibPool(setup):
         #------------------------------------------------------------------------------------------
         ## Gibbs update s2
         for i in range(setup.nexp):
-            dev_sq = (pred_cand[i] - setup.ys[i])**2 # squared deviations
-            for j in range(setup.ns2[i]):
-                sseij = np.sum(dev_sq[:,setup.s2_ind[i]==j], 1) # sse for jth s2ind in experiment i
-                s2[i][m, :, j] = 1 / np.random.gamma(setup.itl*(setup.ny_s2[i][j]/2 + np.array(setup.ig_a[i][j]) + 1) - 1,
-                    1 / (setup.itl * (np.array(setup.ig_b[i][j]) + .5 * sseij)))
+            dev_sq[i][:] = (pred_cand[i] - setup.ys[i])**2 @ s2_ind_mat # squared deviations
+            s2[i][m] = 1 / np.random.gamma(
+                    setup.itl_mat * (setup.ny_s2[i] / 2 + setup.ig_a[i] + 1) - 1,
+                    1 / (setup.itl_mat * (setup.ig_b[i] + dev_sq[i] / 2)),
+                    )
+            sse_curr[i][:] = dev_sq[i] / s2[i][m]
+                       
+                
+            # for j in range(setup.ns2[i]):
+            #     sseij = np.sum(dev_sq[:,setup.s2_ind[i]==j], 1) # sse for jth s2ind in experiment i
+            #     s2[i][m, :, j] = 1 / np.random.gamma(setup.itl*(setup.ny_s2[i][j]/2 + np.array(setup.ig_a[i][j]) + 1) - 1,
+            #         1 / (setup.itl * (np.array(setup.ig_b[i][j]) + .5 * sseij)))
 
         s2_vec_curr = [s2[i][m, :, setup.s2_ind[i]] for i in range(setup.nexp)]
 
