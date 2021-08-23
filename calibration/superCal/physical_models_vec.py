@@ -57,6 +57,20 @@ class Constant_Specific_Heat(BaseModel):
     def value(self, *args):
         return self.parent.parameters.Cv0
 
+class Linear_Specific_Heat(BaseModel):
+    """
+    Linear Specific Heat Model
+    """
+    consts = ['Cv0', 'T0', 'dCdT']
+
+    def value(self, *args):
+        c0=self.parent.parameters.Cv0
+        t0=self.parent.parameters.T0
+        dcdt=self.parent.parameters.dCdT
+        tnow=self.parent.state.T
+        cnow=c0+(tnow-t0)*dcdt
+        return cnow
+
 # Density Models
 
 class Constant_Density(BaseModel):
@@ -68,6 +82,20 @@ class Constant_Density(BaseModel):
     def value(self, *args):
         return self.parent.parameters.rho0
 
+class Linear_Density(BaseModel):
+    """
+    Linear Density Model
+    """
+    consts = ['rho0', 'T0', 'dRhodT']
+
+    def value(self, *args):
+        r0=self.parent.parameters.rho0
+        t0=self.parent.parameters.T0
+        drdt=self.parent.parameters.dRhodT
+        tnow=self.parent.state.T
+        rnow=r0+drdt*(tnow-t0)
+        return rnow
+
 # Melt Temperature Models
 
 class Constant_Melt_Temperature(BaseModel):
@@ -78,6 +106,20 @@ class Constant_Melt_Temperature(BaseModel):
 
     def value(self, *args):
         return self.parent.parameters.Tmelt0
+
+class Linear_Melt_Temperature(BaseModel):
+    """
+    Linear Melt Temperature Model
+    """
+    consts=['Tmelt0', 'rho0', 'dTmdRho']
+
+    def value(self, *args):
+        tm0=self.parent.parameters.Tmelt0
+        rnow=self.parent.state.rho
+        dtdr=self.parent.parameters.dTmdRho
+        r0=self.parent.parameters.rho0
+        tmeltnow=tm0+dtdr*(rnow-r0)
+        return tmeltnow
 
 class BGP_Melt_Temperature(BaseModel):
 
@@ -98,6 +140,17 @@ class Constant_Shear_Modulus(BaseModel):
 
     def value(self, *args):
         return self.parent.parameters.G0
+
+class Linear_Shear_Modulus(BaseModel):
+    consts =  ['G0', 'rho0', 'dGdRho' ]
+
+    def value(self, *args):
+         g0=self.parent.parameters.G0
+         rho0=self.parent.parameters.rho0
+         dgdr=self.parent.parameters.dGdRho
+         rnow=self.parent.state.rho
+         gnow=g0+dgdr*(rnow-rho0)
+         return gnow
 
 class Simple_Shear_Modulus(BaseModel):
     consts = ['G0', 'alpha']
@@ -187,7 +240,7 @@ class JC_Yield_Stress(BaseModel):
         return Y
 
 class PTW_Yield_Stress(BaseModel):
-    params = ['theta','p','s0','sInf','kappa','gamma','y0','yInf','y1', 'y2']
+    params = ['theta','p','s0','sInf','kappa','lgamma','y0','yInf','y1', 'y2']
     consts = ['beta', 'matomic', 'chi']
 
     #@profile
@@ -238,14 +291,14 @@ class PTW_Yield_Stress(BaseModel):
         #PTW characteristic strain rate [ 1/s ]
         xiDot = 0.5 * ainv * xfact * pow(6.022E29, 1.0 / 3.0) * 1.0E4
 
-        if np.any(mp.gamma * xiDot / edot <= 0) or np.any(np.isinf(mp.gamma * xiDot / edot)):
-            print("bad")
-        argErf = mp.kappa * t_hom * np.log( mp.gamma * xiDot / edot )
+        #if np.any(mp.gamma * xiDot / edot <= 0) or np.any(np.isinf(mp.gamma * xiDot / edot)):
+        #    print("bad")
+        argErf = mp.kappa * t_hom * (mp.lgamma + np.log( xiDot / edot ))
 
         saturation1 = mp.s0 - ( mp.s0 - mp.sInf ) * erf( argErf )
         #saturation2 = mp.s0 * np.power( edot / mp.gamma / xiDot , mp.beta )
         #saturation2 = mp.s0 * (edot / mp.gamma / xiDot)**mp.beta
-        saturation2 = mp.s0 * np.exp(mp.beta * np.log(edot / mp.gamma / xiDot))
+        saturation2 = mp.s0 * np.exp(mp.beta * (-mp.lgamma + np.log(edot / xiDot)))
         #if saturation1 > saturation2:
         #    tau_s=saturation1 # thermal activation regime
         #else:
@@ -260,8 +313,8 @@ class PTW_Yield_Stress(BaseModel):
         #byield = mp.y1 * np.power( mp.gamma * xiDot / edot , -mp.y2 )
         #cyield = mp.s0 * np.power( mp.gamma * xiDot / edot , -mp.beta)
 
-        byield = mp.y1 * np.exp( -mp.y2*np.log(mp.gamma * xiDot / edot ))
-        cyield = mp.s0 * np.exp( -mp.beta*np.log(mp.gamma * xiDot / edot ))
+        byield = mp.y1 * np.exp( -mp.y2*(mp.lgamma + np.log( xiDot / edot )))
+        cyield = mp.s0 * np.exp( -mp.beta*(mp.lgamma + np.log( xiDot / edot )))
 
         #if byield < cyield:
         #    dyield = byield    # intermediate regime
