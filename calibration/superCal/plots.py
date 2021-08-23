@@ -223,7 +223,7 @@ class PTW_Plotter(object):
 
                     contour = self.kde_contour(impala.invprobit(theta_parent[:, j]), 
                                                 impala.invprobit(theta_parent[:, i]), 0.9)
-                    plt.contour(contour['X'], contour['Y'], contour['Z'], contour['conts'], colors = 'blue')
+                    plt.contour(contour['X'], contour['Y'], contour['Z'], contour['conts'], colors = 'grey')
                     plt.xlim(0,1)
                     plt.ylim(0,1)
                     ax = plt.gca()
