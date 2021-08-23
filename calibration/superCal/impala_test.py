@@ -99,12 +99,12 @@ def invprobit(y):
     """ Inverse Probit Transformation: For y in (-inf,inf), x in (0,1) """
     return 0.5 * (1 + erf(y / np.sqrt(2.)))
 
-#initfunc = np.random.normal # if probit, then normal--if uniform, then uniform
-initfunc = np.random.uniform
+initfunc = np.random.normal # if probit, then normal--if uniform, then uniform
+#initfunc = np.random.uniform
 
 def tran(th, bounds, names):
-    # return dict(zip(names, unnormalize(invprobit(th),bounds).T)) # If probit
-    return dict(zip(names, unnormalize(th, bounds).T)) # If uniform
+    return dict(zip(names, unnormalize(invprobit(th),bounds).T)) # If probit
+    #return dict(zip(names, unnormalize(th, bounds).T)) # If uniform
     pass
 
 def chol_sample(mean, cov):
@@ -270,16 +270,16 @@ def calibHier(setup):
     for i in range(setup.nexp):
         S[i][:] = np.eye(setup.p) * 1e-4
 
-    theta0_prior_cov = np.eye(setup.p)*10.**2
+    theta0_prior_cov = np.eye(setup.p)
     theta0_prior_prec = scipy.linalg.inv(theta0_prior_cov)
-    theta0_prior_mean = np.repeat(.5, setup.p)
+    theta0_prior_mean = np.repeat(0., setup.p)
     theta0_prior_ldet = slogdet(theta0_prior_cov)[1]
 
     tbar = np.empty(theta0[0].shape)
     mat = np.zeros((setup.ntemps, setup.p, setup.p))
 
-    Sigma0_prior_df = setup.p
-    Sigma0_prior_scale = np.eye(setup.p)*.1**2
+    Sigma0_prior_df = setup.p + 3
+    Sigma0_prior_scale = np.eye(setup.p)*.5
     Sigma0_dfs = Sigma0_prior_df + ntheta * setup.itl
 
     Sigma0_ldet_curr = slogdet(Sigma0[0])[1]
