@@ -1,12 +1,13 @@
 # %%
+from plots import PTW_Plotter
 import numpy as np
 import pandas as pd
 import sqlite3 as sq
 # import pyBASS as pb
-import impala
-import models
+import impala_test3 as impala
+import models_test as models
 
-nExp = 20
+nExp = 40
 
 #%%
 ## get meta data
@@ -58,13 +59,13 @@ setup = impala.CalibSetup(bounds, cf)
 #%%
 yobs = np.hstack([v.T[1] for v in dat_all])
 sh = [v.T[0] for v in dat_all]
-model = models.ModelPTW(np.array(meta.temperature[0:nExp]), np.array(meta.edot[0:nExp]), consts, sh)
+model = models.ModelPTW(np.array(meta.temperature[0:nExp]), np.array(meta.edot[0:nExp]), consts, sh, False)
 sd_est = np.array([.001]*nExp)
 s2_df = np.array([5]*nExp)
 s2_ind = np.hstack([[v]*len(dat_all[v]) for v in list(range(nExp))])
 
-setup.addVecExperiments(yobs, model, sd_est, s2_df, s2_ind)
-setup.setTemperatureLadder(1.1**np.arange(100))
+setup.addVecExperiments(yobs, model, sd_est, s2_df, s2_ind, theta_ind = s2_ind.copy())
+setup.setTemperatureLadder(1.1**np.arange(20))
 setup.setMCMC(30000,10000,1,100)
 
 np.seterr(under='ignore')
@@ -72,34 +73,12 @@ np.seterr(under='ignore')
 
 out = impala.calibHier(setup)
 
+plots = PTW_Plotter(setup, out)
+plots.ptw_prediction_plots('./predictions.pdf')
+plots.pairwise_theta_plot('./pairwise.pdf')
+
 #%%
 
-# cf(impala.tran(out.theta[:,0,:], setup.bounds_mat, setup.bounds.keys()), setup.bounds)
-#
-# out.count
-# out.count_decor
-# out.tau
-# np.sqrt(out.s2)
-#
-# import matplotlib.pyplot as plt
-# plt.plot(out.theta[:,0,9])
-#
-# plt.plot(np.sqrt(out.s2)[0,range(1,30000),0,1])
-#
-# plt.plot(out.pred_curr[0][0,:])
-# plt.plot(yobs)
-#
-#
-# pred = setup.models[0].eval(impala.tran(out.theta[:,0,:], setup.bounds_mat, setup.bounds.keys()))
-# np.any(pred[:,0] == -999.)
-#
-# plt.plot(pred[25000:30000,:].T,color='grey')
-# plt.plot(yobs,color='black')
-# plt.plot(pred[0:300,:].T)
-#
-# plt.plot(pred[25010:25020,:].T)
-#
-#
-#
-# plt.plot(pred[25000:30000,s2_ind==120].T,color='grey')
-# plt.plot(yobs[s2_ind==120],color='black')
+
+
+# EOF 
