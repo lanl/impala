@@ -79,6 +79,18 @@ class Constant_Melt_Temperature(BaseModel):
     def value(self, *args):
         return self.parent.parameters.Tmelt0
 
+class BGP_Melt_Temperature(BaseModel):
+
+    consts = ['Tm_0', 'rho_m', 'gamma_1', 'gamma_3', 'q3']
+
+    def value(self, *args):
+        mp    = self.parent.parameters
+        rho   = self.parent.state.rho
+       
+        melt_temp = mp.Tm_0*np.power(rho/mp.rho_m, 1./3.)*np.exp(6*mp.gamma_1*(np.power(mp.rho_m,-1./3.)-np.power(rho,-1./3.))\
+                    +2.*mp.gamma_3/mp.q3*(np.power(mp.rho_m,-mp.q3)-np.power(rho,-mp.q3)))
+        return melt_temp
+
 # Shear Modulus Models
 
 class Constant_Shear_Modulus(BaseModel):
@@ -96,6 +108,31 @@ class Simple_Shear_Modulus(BaseModel):
         tmelt = self.parent.state.Tmelt
 
         return mp.G0 * (1. - mp.alpha * (temp / tmelt))
+
+class BGP_PW_Shear_Modulus(BaseModel):
+    #BPG model provides cold shear, i.e. shear modulus at zero temperature as a function of density.
+    #PW describes the (lienar) temperature dependence of the shear modulus. (Same dependency as
+    #in Simple_Shear_modulus.)
+    #With these two models combined, we get the shear modulus as a function of density and temperature.
+    
+    consts = ['G0', 'rho_0', 'gamma_1', 'gamma_2', 'q2', 'alpha']
+
+    def value(self, *args):
+        mp    = self.parent.parameters
+        rho   = self.parent.state.rho
+        temp  = self.parent.state.T
+        tmelt = self.parent.state.Tmelt
+ 
+        cold_shear  = mp.G0*np.exp(6.*mp.gamma_1*(np.power(mp.rho_0,-1./3.)-np.power(rho,-1./3.))\
+                    + 2*mp.gamma_2/mp.q2*(np.power(mp.rho_0,-mp.q2)-np.power(rho,-mp.q2)))
+        gnow = cold_shear*(1.- mp.alpha* (temp/tmelt))
+
+        gnow[np.where(temp >= tmelt)] = 0.
+        gnow[np.where(gnow < 0)] = 0.
+
+        #if temp >= tmelt: gnow = 0.0
+        #if gnow < 0.0:    gnow = 0.0
+        return gnow
 
 class Stein_Shear_Modulus(BaseModel):
     #consts = ['G0', 'sgA', 'sgB']
