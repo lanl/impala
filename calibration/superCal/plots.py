@@ -1,8 +1,8 @@
 from math import ceil, sqrt
-from models_test import interpolate_experiment
+from models import interpolate_experiment
 import seaborn as sns
 import numpy as np
-import impala_test3 as impala
+import impala as impala
 import matplotlib.pyplot as plt
 plt.rcParams.update({'figure.max_open_warning': 0})
 from matplotlib.backends.backend_pdf import PdfPages
@@ -123,21 +123,17 @@ class PTW_Plotter(object):
     def ptw_prediction_plots_pool(self, path):
         """ PTW Prediction Hierarchical Plots (no input) """
         sel = np.arange(20000, self.setup.nmcmc, 10) # need to script this in
-        pred_theta_raw  = [np.empty([sel.shape[0], self.setup.ys[i].shape[0]]) for i in range(self.setup.nexp)]
-        
-        theta_parent = impala.chol_sample_1per_constraints(
-                self.out.theta0[sel, 0], self.out.Sigma0[sel, 0], self.setup.checkConstraints,
-                self.setup.bounds_mat, self.setup.bounds.keys(), self.setup.bounds,
+        pred_theta_raw  = [
+            np.empty([sel.shape[0], self.setup.ys[i].shape[0]]) 
+            for i in range(self.setup.nexp)
+            ]
+        for i in range(self.setup.nexp):
+            pred_theta_raw[i] = self.setup.models[i].eval(
+                impala.tran(self.out.theta[sel,0], self.setup.bounds_mat, self.setup.bounds.keys()),
                 )
         
-        for i in range(self.setup.nexp):
-            for j in range(sel.shape[0]):
-                pred_theta_raw[i][j] = self.setup.models[i].eval(
-                    impala.tran(self.out.theta[sel[j],0], self.setup.bounds_mat,self. setup.bounds.keys())
-                    )
-        
-        real_strain = [],
-        real_stress = [],
+        real_strain = []
+        real_stress = []
         pred_theta = []
         pred_theta_quant_lb = []
         pred_theta_quant_ub = []
@@ -145,7 +141,7 @@ class PTW_Plotter(object):
         temps = []
 
         for i in range(self.setup.nexp):
-            for j in range(self.setup.ntheta[i]):
+            for j in range(self.setup.ns2[i]):
                 pred_theta.append(pred_theta_raw[i].T[self.setup.s2_ind[i] == j].T)
                 pred_theta_quant_lb.append(np.quantile(pred_theta[-1], 0.025, 0))
                 pred_theta_quant_ub.append(np.quantile(pred_theta[-1], 0.975, 0))
@@ -172,7 +168,7 @@ class PTW_Plotter(object):
             return self.ptw_prediction_plots_pool(path)
         else:
             return self.ptw_prediction_plots_hier(path)
-        return
+        pass
 
     @staticmethod
     def kde_contour(x1, x2, percentile):
@@ -187,7 +183,7 @@ class PTW_Plotter(object):
         t_contours = f(np.array([percentile]))
         return {'X' : X, 'Y' : Y, 'Z' : Z.reshape([100,100]), 'conts' : t_contours}
 
-    def pairwise_theta_plot(self, path):
+    def pairwise_theta_plot_hier(self, path):
         """ Pairwise Theta scatterplot """
         sel = np.arange(20000, self.setup.nmcmc, 10)
         theta_parent = impala.chol_sample_1per_constraints(
@@ -241,6 +237,45 @@ class PTW_Plotter(object):
         plt.savefig(path, bbox_inches = 'tight')
         return
 
+    def pairwise_theta_plot_pool(self, path):
+        sel = np.arange(20000, self.setup.nmcmc, 10)
+        plt.figure(figsize = (15,15))
+        for i in range(self.setup.p):
+            for j in range(self.setup.p):
+                if i == j:
+                    plt.subplot2grid((self.setup.p, self.setup.p), (i,j))
+                    sns.distplot(impala.invprobit(self.out.theta[sel,0,i]), hist = False, kde = True, color = 'blue')
+                    plt.xlim(0,1)
+                    ax = plt.gca()
+                    ax.axes.yaxis.set_visible(False)
+                    ax.tick_params(axis = 'x', which = 'major', labelsize = 8)
+                    plt.setp(ax.get_xticklabels(), rotation = 30, horizontalalignment = 'right')
+                elif i < j:
+                    plt.subplot2grid((self.setup.p, self.setup.p), (i,j))
+                    contour = self.kde_contour(impala.invprobit(self.out.theta[sel,0,j]),
+                                                impala.invprobit(self.out.theta[sel,0,i]), 0.9)
+                    plt.contour(contour['X'], contour['Y'], contour['Z'], contour['conts'], colors = 'blue')
+                    plt.xlim(0,1)
+                    plt.ylim(0,1)
+                    ax = plt.gca()
+                    ax.axes.xaxis.set_visible(False)
+                    ax.axes.yaxis.set_visible(False)
+                else:
+                    pass
+        plt.subplots_adjust(wspace=0.05, hspace=0.05)
+        plt.axis('off')
+        plt.savefig(path, bbox_inches = 'tight')
+        return
+        
+    def pairwise_theta_plot(self, path):
+        if self.pooled:
+            return self.pairwise_theta_plot_pool(path)
+        else:
+            return self.pairwise_theta_plot_hier(path)
+        pass
+
+
+
     def __init__(self, setup, out):
         """  """
         self.setup = setup
@@ -253,6 +288,9 @@ class PTW_Plotter(object):
             raise        
         return
 
+    pass
+
+if __name__ == '__main__':
     pass
 
 # EOF

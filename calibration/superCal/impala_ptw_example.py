@@ -6,8 +6,9 @@
 # %%
 #from importlib import reload  
 import numpy as np
-import impala_test as impala
-import models
+import impala_test3 as impala
+import models as models_old
+import models_test as models
 import matplotlib.pyplot as plt
 import dill
 # import pandas as pd
@@ -100,12 +101,6 @@ dat2 = np.array([[0.005682 , 0.0075202],
        [0.336005 , 0.0091352],
        [0.346434 , 0.0091626]])
 
-# plot the three stress-strain curves
-# plt.plot(dat0[:,0], dat0[:,1])
-# plt.plot(dat1[:,0], dat1[:,1])
-# plt.plot(dat2[:,0], dat2[:,1])
-# plt.show()
-
 # and here are the temperatures and strain rates for the three experiments:
 temp0 = 573.0 # units: Kelvin
 temp1 = 1373.0
@@ -117,8 +112,8 @@ edot2 = 2500.0
 
 # put the three experiments together in a list
 dat_all = [dat0, dat1, dat2]
-temps = [temp0, temp1, temp2]
-edots = [edot0, edot1, edot2]
+temps = np.array([temp0, temp1, temp2])
+edots = np.array([edot0, edot1, edot2])
 nexp = len(dat_all) # number of experiments
 
 stress_stacked = np.hstack([np.array(v)[:,1] for v in dat_all])
@@ -160,152 +155,156 @@ def constraints_ptw(x, bounds):
 
 ##########################################################################################
 # these define measurement error estimates, I would leave these as is for most SHPB/quasistatic data
-#sd_est = np.array([.0001]*nexp)
-#s2_df = np.array([5]*nexp)
-#s2_ind = np.hstack([[v]*len(dat_all[v]) for v in list(range(nexp))])
+sd_est = np.array([.0001]*nexp)
+s2_df = np.array([5]*nexp)
+s2_ind = np.hstack([[v]*len(dat_all[v]) for v in list(range(nexp))])
 
 ##########################################################################################
 # define PTW model
-#model = models.ModelPTW(temps=np.array(temps), edots=np.array(edots)*1e-6, consts=consts, strain_histories=strain_hist_list)
-
-#impala = reload(impala)
-
+model = models.ModelPTW(
+        temps = temps, edots = edots*1e-6, consts = consts, 
+        strain_histories = strain_hist_list, pool = False,
+        )
 
 # bring everything together into calibration structure
-#setup = impala.CalibSetup(bounds, constraints_ptw)
-#setup.addVecExperiments(stress_stacked, model, sd_est, s2_df, s2_ind, theta_ind=s2_ind)
-#setup.setTemperatureLadder(1.05**np.arange(30))
-#setup.setMCMC(nmcmc=30000, nburn=10000, thin=1, decor=100)
-
 setup = impala.CalibSetup(bounds, constraints_ptw)
+setup.addVecExperiments(stress_stacked, model, sd_est, s2_df, s2_ind, theta_ind=s2_ind)
 for i in range(nexp):
-    model = models.ModelPTW(temps=np.array(temps[i]), edots=np.array(edots[i]*1e-6), consts=consts, strain_histories=[strain_hist_list[i]])
-    setup.addVecExperiments(dat_all[i][:,1], model, np.array([.001]), np.array([5]), np.array([0]*len(strain_hist_list[i])))
-
+    modelbak = models.ModelPTW(temps=np.array(temps[i]), edots=np.array(edots[i]*1e-6), 
+                                        consts=consts, strain_histories=[strain_hist_list[i]])
+    setup.addVecExperiments(dat_all[i][:,1], modelbak, sd_est[i], s2_df[i], np.array([0]*len(strain_hist_list[i])))
 setup.setTemperatureLadder(1.05**np.arange(30))
 setup.setMCMC(nmcmc=30000, nburn=10000, thin=1, decor=100)
 
 ##########################################################################################
 # calibrate
 out = impala.calibHier(setup)
+# out2 = impala.calibPool(setup)
 
-#out2 = impala.calibPool(setup)
 
-
-uu = range(20000, 30000, 10)
+uu = np.array(list(range(20000, 30000, 10)), dtype = int)
 
 dill.dump_session('ptw_calib.pkl')
 # https://stackoverflow.com/questions/4529815/saving-an-object-data-persistence/4529901
 
+if True:
+    pass
+    # ##########################################################################################
+    # # posterior predictions (without measurement error, which has standard deviation np.sqrt(out.s2)), disregarding the first 25000 MCMC samples
+    # uu = range(25000, 30000, 5)
+    # pred = setup.models[0].eval(impala.tran(out.theta[0][uu,0,0,:], setup.bounds_mat, setup.bounds.keys()))
+    # plt.plot(pred.T,color='grey')
+    # plt.plot(dat_all[0][:,1],color='black')
+    # plt.show()
 
-# ##########################################################################################
-# # posterior predictions (without measurement error, which has standard deviation np.sqrt(out.s2)), disregarding the first 25000 MCMC samples
-# uu = range(25000, 30000, 5)
-# pred = setup.models[0].eval(impala.tran(out.theta[0][uu,0,0,:], setup.bounds_mat, setup.bounds.keys()))
-# plt.plot(pred.T,color='grey')
-# plt.plot(dat_all[0][:,1],color='black')
-# plt.show()
+    # pred = setup.models[1].eval(impala.tran(out.theta[1][uu,0,0,:], setup.bounds_mat, setup.bounds.keys()))
+    # plt.plot(pred.T,color='grey')
+    # plt.plot(dat_all[1][:,1],color='black')
+    # plt.show()
 
-# pred = setup.models[1].eval(impala.tran(out.theta[1][uu,0,0,:], setup.bounds_mat, setup.bounds.keys()))
-# plt.plot(pred.T,color='grey')
-# plt.plot(dat_all[1][:,1],color='black')
-# plt.show()
-
-# pred = setup.models[2].eval(impala.tran(out.theta[2][uu,0,0,:], setup.bounds_mat, setup.bounds.keys()))
-# plt.plot(pred.T,color='grey')
-# plt.plot(dat_all[2][:,1],color='black')
-# plt.show()
-
-
-
-# pred = setup.models[0].eval(impala.tran(out.theta0[uu,0,:], setup.bounds_mat, setup.bounds.keys()))
-# plt.plot(pred.T,color='grey')
-# pred = setup.models[0].eval(impala.tran(out.theta[0][uu,0,0,:], setup.bounds_mat, setup.bounds.keys()))
-# plt.plot(pred.T,color='green')
-# plt.plot(dat_all[0][:,1],color='black')
-# #plt.show()
-
-# pred = setup.models[1].eval(impala.tran(out.theta0[uu,0,:], setup.bounds_mat, setup.bounds.keys()))
-# plt.plot(pred.T,color='grey')
-# pred = setup.models[1].eval(impala.tran(out.theta[1][uu,0,0,:], setup.bounds_mat, setup.bounds.keys()))
-# plt.plot(pred.T,color='green')
-# plt.plot(dat_all[1][:,1],color='black')
-# #plt.show()
-
-# pred = setup.models[2].eval(impala.tran(out.theta0[uu,0,:], setup.bounds_mat, setup.bounds.keys()))
-# plt.plot(pred.T,color='grey')
-# pred = setup.models[2].eval(impala.tran(out.theta[2][uu,0,0,:], setup.bounds_mat, setup.bounds.keys()))
-# plt.plot(pred.T,color='green')
-# plt.plot(dat_all[2][:,1],color='black')
-# plt.show()
-
-# # pairs plot of parameter posterior samples
-# import pandas as pd
-# import seaborn as sns
-# #dat = pd.DataFrame(impala.tran(out.theta[0][uu,0,0,:], setup.bounds_mat, setup.bounds.keys()))
-# dat0 = pd.DataFrame(impala.invprobit(out.theta[0][uu,0,0,:]))
-# g = sns.pairplot(dat0, plot_kws={"s": [3]*len(uu)}, corner=True, diag_kind='hist')
-# g.set(xlim=(0,1), ylim = (0,1))
-# g
-# plt.show()
-
-# dat1 = pd.DataFrame(impala.invprobit(out.theta[1][uu,0,0,:]))
-# g = sns.pairplot(dat1, plot_kws={"s": [3]*len(uu)}, corner=True, diag_kind='hist')
-# g.set(xlim=(0,1), ylim = (0,1))
-# g
-# plt.show()
-
-# dat2 = pd.DataFrame(impala.invprobit(out.theta[2][uu,0,0,:]))
-# g = sns.pairplot(dat2, plot_kws={"s": [3]*len(uu)}, corner=True, diag_kind='hist')
-# g.set(xlim=(0,1), ylim = (0,1))
-# g
-# plt.show()
-
-# # dat3 = dat0
-# # dat3 = dat3.append(dat1)
-# # dat3 = dat3.append(dat2)
-# # g = sns.pairplot(dat3, plot_kws={"s": [3]*15000}, corner=True, diag_kind='hist')
-# # g.set(xlim=(0,1), ylim = (0,1))
-# # g
-# # plt.show()
-
-# dat_theta0 = pd.DataFrame(impala.invprobit(out.theta0[25000:30000,0,:]))
-# g = sns.pairplot(dat_theta0, plot_kws={"s": [3]*5000}, corner=True, diag_kind='hist')
-# g.set(xlim=(0,1), ylim = (0,1))
-# g
-# plt.show()
+    # pred = setup.models[2].eval(impala.tran(out.theta[2][uu,0,0,:], setup.bounds_mat, setup.bounds.keys()))
+    # plt.plot(pred.T,color='grey')
+    # plt.plot(dat_all[2][:,1],color='black')
+    # plt.show()
 
 
-# dat3 = dat0
-# dat3 = dat3.append(dat1)
-# dat3 = dat3.append(dat2)
-# dat3 = dat3.append(dat_theta0)
-# g = sns.pairplot(dat3, plot_kws={"s": [3]*20000}, corner=True, diag_kind='hist')
-# g.set(xlim=(0,1), ylim = (0,1))
-# g
-# plt.show()
+
+    # pred = setup.models[0].eval(impala.tran(out.theta0[uu,0,:], setup.bounds_mat, setup.bounds.keys()))
+    # plt.plot(pred.T,color='grey')
+    # pred = setup.models[0].eval(impala.tran(out.theta[0][uu,0,0,:], setup.bounds_mat, setup.bounds.keys()))
+    # plt.plot(pred.T,color='green')
+    # plt.plot(dat_all[0][:,1],color='black')
+    # #plt.show()
+
+    # pred = setup.models[1].eval(impala.tran(out.theta0[uu,0,:], setup.bounds_mat, setup.bounds.keys()))
+    # plt.plot(pred.T,color='grey')
+    # pred = setup.models[1].eval(impala.tran(out.theta[1][uu,0,0,:], setup.bounds_mat, setup.bounds.keys()))
+    # plt.plot(pred.T,color='green')
+    # plt.plot(dat_all[1][:,1],color='black')
+    # #plt.show()
+
+    # pred = setup.models[2].eval(impala.tran(out.theta0[uu,0,:], setup.bounds_mat, setup.bounds.keys()))
+    # plt.plot(pred.T,color='grey')
+    # pred = setup.models[2].eval(impala.tran(out.theta[2][uu,0,0,:], setup.bounds_mat, setup.bounds.keys()))
+    # plt.plot(pred.T,color='green')
+    # plt.plot(dat_all[2][:,1],color='black')
+    # plt.show()
+
+    # # pairs plot of parameter posterior samples
+    # import pandas as pd
+    # import seaborn as sns
+    # #dat = pd.DataFrame(impala.tran(out.theta[0][uu,0,0,:], setup.bounds_mat, setup.bounds.keys()))
+    # dat0 = pd.DataFrame(impala.invprobit(out.theta[0][uu,0,0,:]))
+    # g = sns.pairplot(dat0, plot_kws={"s": [3]*len(uu)}, corner=True, diag_kind='hist')
+    # g.set(xlim=(0,1), ylim = (0,1))
+    # g
+    # plt.show()
+
+    # dat1 = pd.DataFrame(impala.invprobit(out.theta[1][uu,0,0,:]))
+    # g = sns.pairplot(dat1, plot_kws={"s": [3]*len(uu)}, corner=True, diag_kind='hist')
+    # g.set(xlim=(0,1), ylim = (0,1))
+    # g
+    # plt.show()
+
+    # dat2 = pd.DataFrame(impala.invprobit(out.theta[2][uu,0,0,:]))
+    # g = sns.pairplot(dat2, plot_kws={"s": [3]*len(uu)}, corner=True, diag_kind='hist')
+    # g.set(xlim=(0,1), ylim = (0,1))
+    # g
+    # plt.show()
+
+    # # dat3 = dat0
+    # # dat3 = dat3.append(dat1)
+    # # dat3 = dat3.append(dat2)
+    # # g = sns.pairplot(dat3, plot_kws={"s": [3]*15000}, corner=True, diag_kind='hist')
+    # # g.set(xlim=(0,1), ylim = (0,1))
+    # # g
+    # # plt.show()
+
+    # dat_theta0 = pd.DataFrame(impala.invprobit(out.theta0[25000:30000,0,:]))
+    # g = sns.pairplot(dat_theta0, plot_kws={"s": [3]*5000}, corner=True, diag_kind='hist')
+    # g.set(xlim=(0,1), ylim = (0,1))
+    # g
+    # plt.show()
 
 
-theta_parent = impala.chol_sample_1per_constraints(out.theta0[uu,0,:], out.Sigma0[uu,0,:,:], setup.checkConstraints, setup.bounds_mat, setup.bounds.keys(), setup.bounds)
+    # dat3 = dat0
+    # dat3 = dat3.append(dat1)
+    # dat3 = dat3.append(dat2)
+    # dat3 = dat3.append(dat_theta0)
+    # g = sns.pairplot(dat3, plot_kws={"s": [3]*20000}, corner=True, diag_kind='hist')
+    # g.set(xlim=(0,1), ylim = (0,1))
+    # g
+    # plt.show()
 
+theta_parent = impala.chol_sample_1per_constraints(
+    out.theta0[uu,0,:], out.Sigma0[uu,0,:,:], setup.checkConstraints,
+    setup.bounds_mat, setup.bounds.keys(), setup.bounds
+    )
+pred_theta_raw  = [np.empty((uu.shape[0], setup.ys[i].shape[0])) for i in range(setup.nexp)]
+pred_theta0_raw = [np.empty((uu.shape[0], setup.ys[i].shape[0])) for i in range(setup.nexp)]
+pred_thetap_raw = [np.empty((uu.shape[0], setup.ys[i].shape[0])) for i in range(setup.nexp)]
 
-pred_theta = []
+for i in range(setup.nexp):
+    for j in range(uu.shape[0]):
+        pred_theta_raw[i][j]  = setup.models[i].eval(impala.tran(out.theta[i][uu[j], :, 0], setup.bounds_mat, setup.bounds.keys()))
+        pred_theta0_raw[i][j] = setup.models[i].eval(impala.tran(np.repeat(out.theta0[uu[j],0].reshape(1,-1), setup.ntheta[i], axis = 0), setup.bounds_mat, setup.bounds.keys()))
+        pred_thetap_raw[i][j] = setup.models[i].eval(impala.tran(np.repeat(theta_parent[j].reshape(1,-1), setup.ntheta[i], axis = 0), setup.bounds_mat, setup.bounds.keys()))
+
+pred_theta  = []
 pred_theta0 = []
 pred_parent = []
-pred_theta_quant = []
+pred_theta_quant  = []
 pred_theta0_quant = []
 pred_parent_quant = []
-for i in range(nexp):
-    pred_theta0.append(setup.models[i].eval(impala.tran(out.theta0[uu,0,:], setup.bounds_mat, setup.bounds.keys()))) 
-    pred_theta0_quant.append(np.quantile(pred_theta0[i], [.025,.975], 0))
-    pred_theta.append(setup.models[i].eval(impala.tran(out.theta[i][uu,0,0,:], setup.bounds_mat, setup.bounds.keys()))) 
-    pred_theta_quant.append(np.quantile(pred_theta[i], [.025,.975], 0))
-    pred_parent.append(setup.models[i].eval(impala.tran(theta_parent, setup.bounds_mat, setup.bounds.keys())))
-    pred_parent_quant.append(np.quantile(pred_parent[i], [.025,.975], 0))
 
-
-
-
+for i in range(setup.nexp):
+    for j in range(setup.ntheta[i]):
+        pred_theta.append(pred_theta_raw[i][j].T[setup.s2_ind[i] == j].T)
+        pred_theta_quant.append(np.quantile(pred_theta[-1], [0.025, 0.975], 0))
+        pred_theta0.append(pred_theta0_raw[i][j].T[setup.s2_ind[i] == j].T)
+        pred_theta0_quant.append(np.quantile(pred_theta0[-1], [0.025, 0.975], 0))
+        pred_parent.append(pred_thetap_raw[i][j].T[setup.s2_ind[i] == j].T)
+        pred_parent_quant.append(np.quantile(pred_parent[-1], [0.025, 0.975], 0))
 
 nx = 3
 ny = 1
@@ -314,12 +313,16 @@ k = 0
 plt.figure(k, figsize=(10, 4))
 for i in range(nexp):
     ax1=plt.subplot(ny,nx,ip+1)
-    plt.fill_between(np.array(dat_all[i])[:,0], pred_parent_quant[i][0], pred_parent_quant[i][1],color='lightgrey',label=r'$\theta^*$')
-    plt.fill_between(np.array(dat_all[i])[:,0], pred_theta0_quant[i][0], pred_theta0_quant[i][1],color='lightblue',label=r'$\theta_0$')
-    plt.fill_between(np.array(dat_all[i])[:,0], pred_theta[i][0], pred_theta[i][1],color='lightgreen',label=r'$\theta_i$')
-    plt.scatter(np.array(dat_all[i])[:,0], np.array(dat_all[i])[:,1],color='blue',s=.5,label='y')
-    #plt.vlines(x=np.array(dat_all[i])[:,0], ymin=np.array(dat_all[i])[:,1] - 2*stdev_mean[i], ymax=np.array(dat_all[i])[:,1] + 2*stdev_mean[i],color='blue',label='')
-    plt.ylim(0,.027)
+    plt.fill_between(np.array(dat_all[i])[:,0], pred_parent_quant[i][0],
+                        pred_parent_quant[i][1],color='lightgrey',label=r'$\theta^*$')
+    plt.fill_between(np.array(dat_all[i])[:,0], pred_theta0_quant[i][0], 
+                        pred_theta0_quant[i][1],color='lightblue',label=r'$\theta_0$')
+    plt.fill_between(np.array(dat_all[i])[:,0], pred_theta[i][0], 
+                        pred_theta[i][1],color='lightgreen',label=r'$\theta_i$')
+    plt.scatter(
+        np.array(dat_all[i])[:,0], np.array(dat_all[i])[:,1], color='blue', s=.5, label='y',
+        )
+    plt.ylim(0, .027)
     plt.xlim(0, .6)
     ax = plt.gca()
     if ip < ny*nx-nx:
@@ -327,90 +330,83 @@ for i in range(nexp):
     if (ip+1) % nx != 1:
         ax.axes.yaxis.set_visible(False)
     plt.subplots_adjust(wspace=.05, hspace=.05)
-    #plt.annotate(str(round(meta.edot[i]/1e-6,5)) + "/s  " + str(int(meta.temperature[i])) + "K",xy=(0.01, 0.9), xycoords='axes fraction')
     if (ip+1)==(nx*ny):
         ax.legend()
     ip+=1
 
 plt.savefig('ptw_postpredSHPB.png', bbox_inches='tight') 
 
-
-
-
-
-
-
-
-
 ## plot parameter pairs plots, 90% contours
-import scipy.stats as ss
-from scipy import interpolate
-nparams = 10
-def contx(x1,x2,perc=.9): # get contour for percecntile using kde
-    dd = ss.gaussian_kde([x1,x2],bw_method='silverman')
-    X, Y = np.mgrid[min(x1):max(x1):100j, min(x2):max(x2):100j]
-    positions = np.vstack([X.ravel(), Y.ravel()])
-    z = dd(positions)
-    z = z/z.sum()
+# import scipy.stats as ss
+# from scipy import interpolate
+# nparams = 10
+# def contx(x1,x2,perc=.9): # get contour for percecntile using kde
+#     dd = ss.gaussian_kde([x1,x2],bw_method='silverman')
+#     X, Y = np.mgrid[min(x1):max(x1):100j, min(x2):max(x2):100j]
+#     positions = np.vstack([X.ravel(), Y.ravel()])
+#     z = dd(positions)
+#     z = z/z.sum()
 
-    t = np.linspace(0, z.max(), 1000)
-    integral = ((z >= t[:, None, None]) * z).sum(axis=(1,2))
+#     t = np.linspace(0, z.max(), 1000)
+#     integral = ((z >= t[:, None, None]) * z).sum(axis=(1,2))
 
-    f = interpolate.interp1d(integral, t)
-    t_contours = f(np.array([perc]))
-    return {'X':X, 'Y':Y, 'Z':z.reshape([100,100]), 'conts':t_contours }
+#     f = interpolate.interp1d(integral, t)
+#     t_contours = f(np.array([perc]))
+#     return {'X':X, 'Y':Y, 'Z':z.reshape([100,100]), 'conts':t_contours }
 
 
-plt.figure(1, figsize=(15, 15))
+# plt.figure(1, figsize=(15, 15))
 
-for i in range(nparams):
-    for j in range(nparams):
-        if i == j:
-            plt.subplot2grid((nparams, nparams), (i, j))
+# for i in range(nparams):
+#     for j in range(nparams):
+#         if i == j:
+#             plt.subplot2grid((nparams, nparams), (i, j))
 
-            for k in range(nexp):
-                sns.distplot(impala.invprobit(out.theta[k][uu,0,0,i]), hist=False, kde=True,color='lightgreen')
+#             for k in range(nexp):
+#                 sns.distplot(impala.invprobit(out.theta[k][uu,0,0,i]), hist=False, kde=True,color='lightgreen')
 
-            sns.distplot(impala.invprobit(out.theta0[uu,0,i]), hist=False, kde=True,color='blue')
+#             sns.distplot(impala.invprobit(out.theta0[uu,0,i]), hist=False, kde=True,color='blue')
 
-            sns.distplot(impala.invprobit(theta_parent[:,i]), hist=False, kde=True,color='grey')
+#             sns.distplot(impala.invprobit(theta_parent[:,i]), hist=False, kde=True,color='grey')
 
-            plt.xlim(0,1)
-            #plt.xlim(bounds[i,0], bounds[i,1])
-            ax = plt.gca()
-            ax.axes.yaxis.set_visible(False)
-            #plt.xlabel(theta0_names[i])
-            ax.tick_params(axis='x', which='major', labelsize=8)
-            plt.setp(ax.get_xticklabels(), rotation=30, horizontalalignment='right')
-        if i < j:
-            plt.subplot2grid((nparams, nparams), (i, j))
+#             plt.xlim(0,1)
+#             #plt.xlim(bounds[i,0], bounds[i,1])
+#             ax = plt.gca()
+#             ax.axes.yaxis.set_visible(False)
+#             #plt.xlabel(theta0_names[i])
+#             ax.tick_params(axis='x', which='major', labelsize=8)
+#             plt.setp(ax.get_xticklabels(), rotation=30, horizontalalignment='right')
+#         if i < j:
+#             plt.subplot2grid((nparams, nparams), (i, j))
 
-            for k in range(nexp):
-                oo = contx(impala.invprobit(out.theta[k][uu,0,0,j]), impala.invprobit(out.theta[k][uu,0,0,i]))
-                plt.contour(oo['X'], oo['Y'], oo['Z'], oo['conts'], colors='lightgreen')
+#             for k in range(nexp):
+#                 oo = contx(impala.invprobit(out.theta[k][uu,0,0,j]), impala.invprobit(out.theta[k][uu,0,0,i]))
+#                 plt.contour(oo['X'], oo['Y'], oo['Z'], oo['conts'], colors='lightgreen')
 
-            oo = contx(impala.invprobit(out.theta0[uu,0,j]), impala.invprobit(out.theta0[uu,0,i]))
-            plt.contour(oo['X'], oo['Y'], oo['Z'], oo['conts'],colors = 'blue')
+#             oo = contx(impala.invprobit(out.theta0[uu,0,j]), impala.invprobit(out.theta0[uu,0,i]))
+#             plt.contour(oo['X'], oo['Y'], oo['Z'], oo['conts'],colors = 'blue')
 
-            oo = contx(impala.invprobit(theta_parent[:,j]), impala.invprobit(theta_parent[:,i]))
-            plt.contour(oo['X'], oo['Y'], oo['Z'], oo['conts'],colors='grey')
+#             oo = contx(impala.invprobit(theta_parent[:,j]), impala.invprobit(theta_parent[:,i]))
+#             plt.contour(oo['X'], oo['Y'], oo['Z'], oo['conts'],colors='grey')
 
-            plt.xlim(0,1)
-            plt.ylim(0,1)
-            #plt.xlim(bounds[j, 0], bounds[j, 1])
-            #plt.ylim(bounds[i, 0], bounds[i, 1])
-            ax = plt.gca()
-            ax.axes.xaxis.set_visible(False)
-            ax.axes.yaxis.set_visible(False)
-            print(i)
-plt.subplots_adjust(wspace=.05, hspace=.05)
-plt.subplot2grid((nparams, nparams), (2, 0))
-from matplotlib.lines import Line2D
-colors = ['lightgreen','blue','grey']
-lines = [Line2D([0],[0],color=c,linewidth=2) for c in colors]
-labels = [r'$\theta_i$',r'$\theta_0$',r'$\theta^*$']
-plt.legend(lines,labels)
-plt.axis('off')
-plt.savefig('ptw_postThetas.png', bbox_inches='tight')
+#             plt.xlim(0,1)
+#             plt.ylim(0,1)
+#             #plt.xlim(bounds[j, 0], bounds[j, 1])
+#             #plt.ylim(bounds[i, 0], bounds[i, 1])
+#             ax = plt.gca()
+#             ax.axes.xaxis.set_visible(False)
+#             ax.axes.yaxis.set_visible(False)
+#             print(i)
+# plt.subplots_adjust(wspace=.05, hspace=.05)
+# plt.subplot2grid((nparams, nparams), (2, 0))
+# from matplotlib.lines import Line2D
+# colors = ['lightgreen','blue','grey']
+# lines = [Line2D([0],[0],color=c,linewidth=2) for c in colors]
+# labels = [r'$\theta_i$',r'$\theta_0$',r'$\theta^*$']
+# plt.legend(lines,labels)
+# plt.axis('off')
+# plt.savefig('ptw_postThetas.png', bbox_inches='tight')
 
 # %%
+
+raise
