@@ -24,7 +24,7 @@ class ModelBassPca:
         self.pool = pool # I don't do anything with this below...in hierarchical case, requires one theta for each BassPCA model
         return
 
-    def eval(self, parmat):
+    def eval(self, parmat, pool = None):
         """
         parmat : ~
         """
@@ -37,7 +37,7 @@ class ModelF:
         self.mod = f
         self.input_names = input_names
 
-    def eval(self, parmat):
+    def eval(self, parmat, pool = None):
         parmat_array = np.vstack([parmat[v] for v in self.input_names]).T # get correct subset/ordering of inputs
         return np.apply_along_axis(self.mod, 1, parmat_array)
 
@@ -67,12 +67,12 @@ class ModelPTW:
         return
 
 
-    def eval(self, parmat): # note: extra parameters ignored
+    def eval(self, parmat, pool = None): # note: extra parameters ignored
         """ parmat:  dictionary of parameters """
-        if self.pool:  # Pooled Case
-            nrep = parmat['p'].shape[0] # number of temper temps
+        if (pool is True) or self.pool:  # Pooled Case
+            nrep = parmat['p'].shape[0]  # number of temper temps
             parmat_big = {key : np.kron(np.ones(self.nexp), parm) for key, parm in parmat.items()}
-        else:          # hierarchical case
+        else: # hierarchical case
             nrep = parmat['p'].shape[0] // self.nexp # number of temper temps
             parmat_big = parmat
 
