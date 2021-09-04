@@ -1030,7 +1030,6 @@ def calibClust(setup, parallel = False):
         for i in range(setup.nexp):
             theta_ext[theta_unravel, delta[i][m].ravel()] += True
         ntheta[:] = theta_ext.sum(axis = 1)
-
         cc[:] = np.linalg.inv(
             np.einsum('t,tpq->tpq', ntheta * setup.itl, Sigma0_inv_curr) + theta0_prior_prec,
             )
@@ -1061,6 +1060,13 @@ def calibClust(setup, parallel = False):
             Sigma0[m,t] = invwishart.rvs(df = Sigma0_dfs[t], scale = Sigma0_scales[t])
         Sigma0_ldet_curr[:] = np.linalg.slogdet(Sigma0[m])[1]
         Sigma0_inv_curr[:] = np.linalg.inv(Sigma0[m])
+        
+        ## Gibbs update non-extant theta
+        theta_cand[:] = chol_sample_nper_constraints(
+                theta0[m], Sigma0[m], nclustmax, setup.checkConstraints,
+                setup.bounds_mat, setup.bounds.keys(), setup.bounds,
+                )
+        theta[m,~theta_ext] = theta_cand[~theta_ext]    
         
         ## Gibbs Update eta
         eta[m] = sample_eta(eta[m-1], ntheta, sum(setup.ns2[i] for i in range(setup.nexp)))
