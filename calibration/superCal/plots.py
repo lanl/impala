@@ -9,6 +9,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.lines import Line2D
 from scipy.stats import gaussian_kde
 from scipy.interpolate import interp1d
+from numpy.random import uniform
 
 class PTW_Plotter(object):
     """ PTW Prediction and Pairwise Plots """
@@ -162,13 +163,106 @@ class PTW_Plotter(object):
         pdf.close()
         return
 
+    def ptw_prediction_plots_cluster(self, path):
+        sel = np.arange(20000, self.setup.nmcmc, 10) # need to script this in
+        pred_theta_raw  = [np.empty([sel.shape[0], self.setup.ys[i].shape[0]]) for i in range(self.setup.nexp)]
+        pred_theta0_raw = [np.empty([sel.shape[0], self.setup.ys[i].shape[0]]) for i in range(self.setup.nexp)]
+        pred_thetap_raw = [np.empty([sel.shape[0], self.setup.ys[i].shape[0]]) for i in range(self.setup.nexp)]
+
+        thetas = self.out.theta[sel,0]
+        deltas = [self.out.delta[i][sel] for i in range(self.setup.nexp)]
+        nclustmax = max(self.out.delta[i].max() for i in range(self.setup.nexp)) + 1
+        dcounts = np.zeros((sel.shape[0], nclustmax))
+        for it, s in enumerate(sel):
+            for i in range(self.setup.nexp):
+                dcounts[it] += np.bincount(self.out.delta[i][s,0], minlength = nclustmax)
+        etas = self.out.eta[sel,0]
+        nclust = (dcounts > 0).sum(axis = 1)
+        prob   = dcounts + (dcounts == 0) * (etas / (nclustmax - nclust + 1e-9)).reshape(-1,1)
+        prob[:] /= prob.sum(axis = 1).reshape(-1,1)
+        cumprob = np.cumsum(prob, axis = 1)
+        unif = uniform(size = (sel.shape[0],1))
+        dnew = (unif > cumprob).sum(axis = 1)
+        theta_parent = thetas[np.arange(sel.shape[0]), dnew]
+        for i in range(self.setup.nexp):
+            for j in range(sel.shape[0]):
+                pred_theta_raw[i][j] = self.setup.models[i].eval(
+                    impala.tran(
+                        self.out.theta_hist[i][sel[j],0], 
+                        self.setup.bounds_mat,self. setup.bounds.keys(),
+                        ),
+                    )
+                pred_theta0_raw[i][j] = self.setup.models[i].eval(
+                    impala.tran(
+                        np.repeat(self.out.theta0[sel[j],0].reshape(1,-1), self.setup.ns2[i], axis = 0), 
+                        self.setup.bounds_mat, self.setup.bounds.keys(),
+                        ),
+                    )
+                pred_thetap_raw[i][j] = self.setup.models[i].eval(
+                    impala.tran(
+                        np.repeat(theta_parent[j].reshape(1,-1), self.setup.ns2[i], axis = 0), 
+                        self.setup.bounds_mat, self.setup.bounds.keys(),
+                        ),
+                    )
+        
+        real_strain = []
+        real_stress = []
+        pred_theta = []
+        pred_theta0 = []
+        pred_thetap = []
+        pred_theta_quant_lb = []
+        pred_theta_quant_ub = []
+        pred_theta0_quant_lb = []
+        pred_theta0_quant_ub = []
+        pred_thetap_quant_lb = []
+        pred_thetap_quant_ub = []
+        edots = []
+        temps = []
+
+        for i in range(self.setup.nexp):
+            for j in range(self.setup.ntheta[i]):
+                pred_theta.append(pred_theta_raw[i].T[self.setup.s2_ind[i] == j].T)
+                pred_theta_quant_lb.append(np.quantile(pred_theta[-1], 0.025, 0))
+                pred_theta_quant_ub.append(np.quantile(pred_theta[-1], 0.975, 0))
+                pred_theta0.append(pred_theta0_raw[i].T[self.setup.s2_ind[i] == j].T)
+                pred_theta0_quant_lb.append(np.quantile(pred_theta0[-1], 0.025, 0))
+                pred_theta0_quant_ub.append(np.quantile(pred_theta0[-1], 0.975, 0))
+                pred_thetap.append(pred_thetap_raw[i].T[self.setup.s2_ind[i] == j].T)
+                pred_thetap_quant_lb.append(np.quantile(pred_thetap[-1], 0.025, 0))
+                pred_thetap_quant_ub.append(np.quantile(pred_thetap[-1], 0.975, 0))
+                edots.append(self.setup.models[i].edots[j])
+                temps.append(self.setup.models[i].temps[j])
+                real_strain.append(self.setup.models[i].meas_strain_histories[j])
+                real_stress.append(self.setup.ys[i][self.setup.s2_ind[i] == j])
+
+        rows = zip(
+            real_strain, real_stress, pred_theta_quant_lb, pred_theta_quant_ub,
+            pred_theta0_quant_lb, pred_theta0_quant_ub, pred_thetap_quant_lb, pred_thetap_quant_ub,
+            edots, temps,
+            )
+        keys = [
+            'actual_x','actual_y','pred_y_lb', 'pred_y_ub','hier_y_lb', 
+            'hier_y_ub','pnew_y_lb','pnew_y_ub','edot','temp',
+            ]
+        plot_param_list = [dict(zip(keys,row)) for row in rows]
+
+        pdf = PdfPages(path)
+        for plot_params in plot_param_list:
+            self.ptw_prediction_plot_single(**plot_params, pdf = pdf)
+        pdf.close()
+        return
+
     def ptw_prediction_plots(self, path):
         """ PTW Prediction Plots against model """
-        if self.pooled:
+        if (type(self.out) is impala.OutCalibPool):
             return self.ptw_prediction_plots_pool(path)
-        else:
+        elif (type(self.out) is impala.OutCalibHier):
             return self.ptw_prediction_plots_hier(path)
-        pass
+        elif (type(self.out) is impala.OutCalibClust):
+            return self.ptw_prediction_plots_cluster(path)
+        else:
+            raise ValueError('Improper out type')
+        return
 
     @staticmethod
     def kde_contour(x1, x2, percentile):
@@ -266,26 +360,89 @@ class PTW_Plotter(object):
         plt.axis('off')
         plt.savefig(path, bbox_inches = 'tight')
         return
-        
-    def pairwise_theta_plot(self, path):
-        if self.pooled:
-            return self.pairwise_theta_plot_pool(path)
-        else:
-            return self.pairwise_theta_plot_hier(path)
+
+    def pairwise_theta_plot_cluster(self, path):
+        sel = np.arange(20000, self.setup.nmcmc, 10)
+        thetas = self.out.theta[sel,0]
+        deltas = [self.out.delta[i][sel] for i in range(self.setup.nexp)]
+        nclustmax = max(self.out.delta[i].max() for i in range(self.setup.nexp)) + 1
+        dcounts = np.zeros((sel.shape[0], nclustmax))
+        for it, s in enumerate(sel):
+            for i in range(self.setup.nexp):
+                dcounts[it] += np.bincount(self.out.delta[i][s,0], minlength = nclustmax)
+        etas = self.out.eta[sel, 0]
+        nclust = (dcounts > 0).sum(axis = 1)
+        prob   = dcounts + (dcounts == 0) * (etas / (nclustmax - nclust + 1e-9)).reshape(-1,1)
+        prob  /= prob.sum(axis = 1).reshape(-1,1)
+        cumprob = np.cumsum(prob, axis = 1)
+        unif = uniform(size = (sel.shape[0],1))
+        dnew = (unif > cumprob).sum(axis = 1)
+        theta_parent = thetas[np.arange(sel.shape[0]), dnew]
+        plt.figure(figsize = (15,15))
+        for i in range(self.setup.p):
+            for j in range(self.setup.p):
+                if i == j:
+                    plt.subplot2grid((self.setup.p, self.setup.p), (i,j))
+                    for k in range(self.setup.nexp):
+                        for s in range(self.setup.ns2[k]):
+                            sns.distplot(impala.invprobit(self.out.theta_hist[k][sel,0,s,i]), 
+                                            hist = False, kde = True, color = 'lightgreen')
+                    sns.distplot(impala.invprobit(self.out.theta0[sel, 0, i]), hist = False, kde = True, color = 'blue')
+                    sns.distplot(impala.invprobit(theta_parent[:,i]), hist = False, kde = True, color = 'grey')
+                    plt.xlim(0,1)
+                    ax = plt.gca()
+                    ax.axes.yaxis.set_visible(False)
+                    ax.tick_params(axis = 'x', which = 'major', labelsize = 8)
+                    plt.setp(ax.get_xticklabels(), rotation = 30, horizontalalignment = 'right')
+                elif i < j:
+                    plt.subplot2grid((self.setup.p, self.setup.p), (i,j))
+                    for k in range(self.setup.nexp):
+                        for s in range(self.setup.ns2[k]):
+                            contour = self.kde_contour(impala.invprobit(self.out.theta_hist[k][sel, 0, s, j]),
+                                                        impala.invprobit(self.out.theta_hist[k][sel, 0, s, i]), 0.9)
+                            plt.contour(contour['X'], contour['Y'], contour['Z'], contour['conts'], colors = 'lightgreen')
+                    contour = self.kde_contour(impala.invprobit(self.out.theta0[sel, 0, j]), 
+                                                impala.invprobit(self.out.theta0[sel, 0, i]), 0.9)
+                    plt.contour(contour['X'], contour['Y'], contour['Z'], contour['conts'], colors = 'blue')
+
+                    contour = self.kde_contour(impala.invprobit(theta_parent[:, j]), 
+                                                impala.invprobit(theta_parent[:, i]), 0.9)
+                    plt.contour(contour['X'], contour['Y'], contour['Z'], contour['conts'], colors = 'grey')
+                    plt.xlim(0,1)
+                    plt.ylim(0,1)
+                    ax = plt.gca()
+                    ax.axes.xaxis.set_visible(False)
+                    ax.axes.yaxis.set_visible(False)
+                else:
+                    pass
+        plt.subplots_adjust(wspace=0.05, hspace=0.05)
+        plt.subplot2grid((self.setup.p, self.setup.p), (2, 0))
+        colors = ['lightgreen','blue','grey']
+        lines = [Line2D([0],[0],color = c, linewidth = 2) for c in colors]
+        labels = [r'$\theta_i$',r'$\theta_0$',r'$\theta^*$']
+        plt.legend(lines,labels)
+        plt.axis('off')
+        plt.subplot2grid((self.setup.p, self.setup.p), (4, 0))
+        sns.distplot(nclust, kde = True, color = 'blue')
+        plt.xlim(0,nclustmax)
+        plt.savefig(path, bbox_inches = 'tight')
         pass
 
-
-
+    def pairwise_theta_plot(self, path):
+        if (type(self.out) is impala.OutCalibPool):
+            return self.pairwise_theta_plot_pool(path)
+        elif (type(self.out) is impala.OutCalibHier):
+            return self.pairwise_theta_plot_hier(path)
+        elif (type(self.out) is impala.OutCalibClust):
+            return self.pairwise_theta_plot_cluster(path)
+        else:
+            raise ValueError('Improper out type')
+        return
+    
     def __init__(self, setup, out):
         """  """
         self.setup = setup
         self.out   = out
-        if (type(self.out) is impala.OutCalibPool):
-            self.pooled = True
-        elif (type(self.out) is impala.OutCalibHier):
-            self.pooled = False
-        else:
-            raise        
         return
 
     pass

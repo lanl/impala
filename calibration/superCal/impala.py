@@ -219,6 +219,17 @@ def invgamma_logpdf(s, alpha, beta):
         ).sum(axis = 1)
     return ld
 
+def gamma_logpdf(s, alpha, beta):
+    """ logpdf pf gamma distribution -- assume s = (n); alpha, beta  = 1"""
+    ld = (
+        + alpha * np.log(beta) 
+        - gammaln(alpha)
+        + (alpha - 1) * np.log(s)
+        - beta * s
+        )
+    return ld
+
+
 from collections import namedtuple
 OutCalibPool = namedtuple(
     'OutCalibPool', 'theta s2 count count_decor count_100 tau pred_curr',
@@ -227,8 +238,10 @@ OutCalibHier = namedtuple(
     'OutCalibHier', 'theta s2 count count_decor count_100 count_temper tau pred_curr theta0 Sigma0',
     )
 OutCalibClust = namedtuple(
-    'OutCalibClust', 'theta s2 count count_temper tau pred_curr theta0 Sigma0 delta eta'
+    'OutCalibClust', 'theta theta_hist s2 count count_temper pred_curr theta0 Sigma0 delta eta'
     )
+
+## Hierarchical Calibration
 
 def calibHier(setup):
     t0 = time.time()
@@ -532,6 +545,8 @@ def calibHier(setup):
                             count_temper, tau, pred_curr, theta0, Sigma0)
     return(out)
 
+## Pooled Calibration
+
 def calibPool(setup):
     t0 = time.time()
     theta = np.empty([setup.nmcmc, setup.ntemps, setup.p])
@@ -731,15 +746,14 @@ def sample_delta_per_temperature(curr_delta_t, log_posts_t, inv_temp_t, eta_t):
     posts_t = np.exp(log_posts_t - log_posts_t.max(axis = 0)).T # (unscaled, unnormalized) densities
     njs = np.bincount(curr_delta_t, minlength = posts_t.shape[1])
     djs = (njs == 0) * eta_t / (sum(njs == 0) + 1e-9)
+    temp = np.empty(posts_t.shape[1])
     for s in range(curr_delta_t.shape[0]):
         njs[curr_delta_t[s]] -= 1
-        curr_delta_t[s] = choice(
-                posts_t.shape[1], 
-                p = (
-                    ((njs + djs) * posts_t[s] / (curr_delta_t.shape[0] - 1 + eta_t))**inv_temp_t
-                    / sum(((njs + djs) * posts_t[s] / (curr_delta_t.shape[0] - 1 + eta_t))**inv_temp_t)
-                    ),
-                )
+        temp[:] = - np.inf
+        temp[(njs + djs) > 0] = inv_temp_t * (np.log((njs + djs)[njs + djs > 0]) + log_posts_t.T[s, njs + djs > 0])
+        temp[:] -= temp.max()
+        temp[:] = np.exp(temp) / np.exp(temp).sum()
+        curr_delta_t[s] = choice(posts_t.shape[1], p = temp)
         njs[curr_delta_t[s]] += 1
         djs[njs > 0] = 0.
     return curr_delta_t
@@ -812,6 +826,8 @@ def sample_eta(curr_eta, nclust, ndat):
     aaa = np.vstack((aa,aa - 1)).T[np.arange(aa.shape[0]), sel]
     return gamma(shape = aaa, scale = 1 / bb)
 
+## DP Cluster Calibration
+
 def calibClust(setup, parallel = False):
     t0 = time.time()
     if parallel:
@@ -822,7 +838,7 @@ def calibClust(setup, parallel = False):
     s2_ind_mat = [(setup.s2_ind[i][:,None] == range(setup.ns2[i])) for i in range(setup.nexp)]
     ntheta_cand = 10
     ntotexp = sum(setup.ns2)
-    nclustmax = ntotexp // 2 + 10
+    nclustmax = ntotexp // 2
     temps = np.arange(setup.ntemps)
     itl_mat_theta = (np.ones((setup.ntemps, nclustmax)).T * setup.itl).T
     itl_mat_s2 = [
@@ -916,12 +932,13 @@ def calibClust(setup, parallel = False):
     theta0_prior_ldet = slogdet(theta0_prior_cov)[1]
     tbar = np.empty(theta0[0].shape)
     mat = np.zeros((setup.ntemps, setup.p, setup.p))
-    Sigma0_prior_df = setup.p
+    Sigma0_prior_df    = setup.p
     Sigma0_prior_scale = np.eye(setup.p)*.1**2
-    Sigma0_dfs = Sigma0_prior_df + nclustmax * setup.itl
-    Sigma0_scales = np.empty((setup.ntemps, setup.p, setup.p))
-    Sigma0_ldet_curr = slogdet(Sigma0[0])[1]
-    Sigma0_inv_curr  = np.linalg.inv(Sigma0[0])
+    Sigma0_dfs         = Sigma0_prior_df + nclustmax * setup.itl
+    Sigma0_scales      = np.empty((setup.ntemps, setup.p, setup.p))
+    Sigma0_scales[:]   = Sigma0_prior_scale
+    Sigma0_ldet_curr   = slogdet(Sigma0[0])[1]
+    Sigma0_inv_curr    = np.linalg.inv(Sigma0[0])
     cc = np.empty((setup.ntemps, setup.p, setup.p))
     dd = np.empty((setup.ntemps, setup.p))    
     ## Initialize Counters
@@ -938,14 +955,17 @@ def calibClust(setup, parallel = False):
     ## start MCMC
     for m in range(1,setup.nmcmc):
         #------------------------------------------------------------------------------------------
-        ## Gibbs Update for delta
+        ## Gibbs Update for delta (cluster identifier)
         for i in range(setup.nexp):
             sse_cand_delta[i][:] = ((setup.models[i].eval(
-                tran(theta[m-1].reshape(-1, setup.p), setup.bounds_mat, setup.bounds.keys()), True) 
-                @ s2_ind_mat[i]).reshape(setup.ntemps, nclustmax, setup.ns2[i]) 
-                / s2[i][m-1].reshape(setup.ntemps, 1, setup.ns2[i])
-                )
-            delta[i][m] = sample_delta(delta[i][m-1].copy(), sse_cand_delta[i], setup.itl, eta[m-1], pool)
+                    tran(theta[m-1].reshape(setup.ntemps * nclustmax, setup.p), 
+                        setup.bounds_mat, setup.bounds.keys()), True)
+                    @ s2_ind_mat[i]).reshape(setup.ntemps, nclustmax, setup.ns2[i]) 
+                    / s2[i][m-1].reshape(setup.ntemps, 1, setup.ns2[i])
+                    )
+            delta[i][m] = sample_delta(
+                    delta[i][m-1].copy(), - 0.5 * sse_cand_delta[i], setup.itl, eta[m-1], pool
+                    )
             delta_ind_mat[i][:] = delta[i][m,:,:,None] == range(nclustmax)
             curr_delta[i][:] = delta[i][m]
         #------------------------------------------------------------------------------------------
@@ -974,9 +994,8 @@ def calibClust(setup, parallel = False):
         else:
             pass
         #------------------------------------------------------------------------------------------
-        # MCMC update for thetas
+        # MCMC within Gibbs update for thetas (in cluster)
         sse_cand_theta_[:] = 0.
-        
         theta[m]      = theta[m-1]
         theta_eval[:] = theta[m-1]
         theta_cand[:] = chol_sample_1per(theta[m-1], S)
@@ -1017,6 +1036,7 @@ def calibClust(setup, parallel = False):
                 False,
                 )
         count += accept.sum(axis = 1)
+        #------------------------------------------------------------------------------------------
         ## Gibbs update s2
         for i in range(setup.nexp):
             dev_sq[i][:] = (pred_curr[i] - setup.ys[i])**2 @ s2_ind_mat[i]
@@ -1043,7 +1063,7 @@ def calibClust(setup, parallel = False):
             np.einsum('tlk,tk->tl', cc, dd), cc,
             setup.checkConstraints, setup.bounds_mat, setup.bounds.keys(), setup.bounds,
             )
-
+        #------------------------------------------------------------------------------------------
         ## Gibbs update Sigma0
         mat[:] *= 0.
         for i in range(setup.nexp):
@@ -1056,21 +1076,22 @@ def calibClust(setup, parallel = False):
                         * theta_ext.reshape(setup.ntemps, nclustmax, 1)),
                     )
         Sigma0_scales[:] = Sigma0_prior_scale + mat
+        Sigma0_dfs[:]    = Sigma0_prior_df + theta_ext.sum(axis = 1) * setup.itl
         for t in range(setup.ntemps):
             Sigma0[m,t] = invwishart.rvs(df = Sigma0_dfs[t], scale = Sigma0_scales[t])
         Sigma0_ldet_curr[:] = np.linalg.slogdet(Sigma0[m])[1]
         Sigma0_inv_curr[:] = np.linalg.inv(Sigma0[m])
-        
-        ## Gibbs update non-extant theta
+        #------------------------------------------------------------------------------------------
+        ## Gibbs update for theta (not in cluster)
         theta_cand[:] = chol_sample_nper_constraints(
                 theta0[m], Sigma0[m], nclustmax, setup.checkConstraints,
                 setup.bounds_mat, setup.bounds.keys(), setup.bounds,
                 )
         theta[m,~theta_ext] = theta_cand[~theta_ext]    
-        
+        #------------------------------------------------------------------------------------------
         ## Gibbs Update eta
         eta[m] = sample_eta(eta[m-1], ntheta, sum(setup.ns2[i] for i in range(setup.nexp)))
-
+        #------------------------------------------------------------------------------------------
         ## tempering swaps
         if m > 1000 and setup.ntemps > 1:
             for _ in range(setup.nswap):
@@ -1083,6 +1104,8 @@ def calibClust(setup, parallel = False):
                                         theta0_prior_prec, theta0_prior_ldet)
                     - invwishart_logpdf(Sigma0[m][sw.T[1]], Sigma0_prior_df, Sigma0_prior_scale)
                     + invwishart_logpdf(Sigma0[m][sw.T[0]], Sigma0_prior_df, Sigma0_prior_scale)
+                    - gamma_logpdf(eta[m][sw.T[1]], 2, 0.1)
+                    + gamma_logpdf(eta[m][sw.T[0]], 2, 0.1)
                     )
                 for i in range(setup.nexp):
                     sw_alpha[:] = sw_alpha + (setup.itl[sw.T[1]] - setup.itl[sw.T[0]]) * (
@@ -1122,12 +1145,11 @@ def calibClust(setup, parallel = False):
                                             sse_curr[i][tt[1]].copy(), sse_curr[i][tt[0]].copy()
                     theta_ext[tt[0]], theta_ext[tt[1]] = theta_ext[tt[1]].copy(), theta_ext[tt[0]].copy()
         print('\rCalibration MCMC {:.01%} Complete'.format(m / setup.nmcmc), end='')
-
+    #------------------------------------------------------------------------------------------
     t1 = time.time()
     print('\rCalibration MCMC Complete. Time: {:f} seconds.'.format(t1 - t0))
     count_temper = count_temper + count_temper.T - np.diag(np.diag(count_temper))
-    # theta_reshape = [np.swapaxes(t,1,2) for t in theta]
-    out = OutCalibClust(theta, s2, count, count_temper, pred_curr, theta0, Sigma0, delta, eta)
+    out = OutCalibClust(theta, theta_hist, s2, count, count_temper, pred_curr, theta0, Sigma0, delta, eta)
     return(out)
 
 if __name__ == '__main__':

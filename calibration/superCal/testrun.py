@@ -1,5 +1,5 @@
 # %%
-from plots import PTW_Plotter
+import plots
 import numpy as np
 import pandas as pd
 import sqlite3 as sq
@@ -80,7 +80,6 @@ s2_ind = np.hstack([[v]*len(dat_all[v]) for v in list(range(nExp))])
 # plots2.pairwise_theta_plot('./hier_pairwise.pdf')
 
 #%%  Clustered Model
-
 if __name__ == '__main__':
     model3 = models.ModelPTW(np.array(meta.temperature[0:nExp]), np.array(meta.edot[0:nExp]), consts, sh, False)
     setup3 = impala.CalibSetup(bounds, cf)
@@ -88,7 +87,7 @@ if __name__ == '__main__':
     setup3.setTemperatureLadder(1.1**np.arange(20))
     setup3.setMCMC(30000, 10000, 1, 100)
     out3   = impala.calibClust(setup3, True)
-    plots3 = PTW_Plotter(setup3, out3)
+    plots3 = plots.PTW_Plotter(setup3, out3)
     plots3.ptw_prediction_plots('./clust_predictions.pdf')
     plots3.pairwise_theta_plot('./clust_pairwise.pdf')
 
