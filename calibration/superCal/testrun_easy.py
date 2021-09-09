@@ -18,7 +18,7 @@ def f1(x):
 yobs1 = np.array([.5,.5])
 
 def f2(x):
-    oo = x[1] #+ x[1]
+    oo = x[0] #+ x[1]
     out = np.array([oo,oo])
     return out
 yobs2 = np.array([.7,.7])
