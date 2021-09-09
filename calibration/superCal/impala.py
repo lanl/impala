@@ -797,9 +797,9 @@ def one_step_in_cluster_covariance_update(Sj, mSj, nSj, n, mus, covs):
         )
     mSj[:] = mC
     nSj[:] = nC
-    return
+    return Sj, mSj, nSj
 
-def cluster_covariance_update(S, mS, nS, n, delta, covs, mus, nexp, nclustmax, temps, theta_unravel):
+def cluster_covariance_update(S, mS, nS, n, delta, covs, mus, nexp, nclustmax, temps):
     """
     S, m, n -- modified in place
     Goal is cluster-level covariance matrix
@@ -815,10 +815,11 @@ def cluster_covariance_update(S, mS, nS, n, delta, covs, mus, nexp, nclustmax, t
     nS[:] = 0.
     for i in range(nexp):
         for j in range(delta[i].shape[1]):
-            one_step_in_cluster_covariance_update(
-                S[temps,delta[i].T[j]], mS[temps, delta[i].T[j]], nS[temps, delta[i].T[j]],
-                n, mus[i][temps, j], covs[i][temps, j]
-                )
+            S[temps, delta[i].T[j]], mS[temps, delta[i].T[j]], nS[temps, delta[i].T[j]] = \
+                    one_step_in_cluster_covariance_update(
+                        S[temps,delta[i].T[j]], mS[temps, delta[i].T[j]], nS[temps, delta[i].T[j]],
+                        n, mus[i][temps, j], covs[i][temps, j]
+                        )
     S[:] += np.eye(S.shape[-1]) * 1e-9
     return
 
@@ -962,9 +963,9 @@ def calibClust(setup, parallel = False):
         #------------------------------------------------------------------------------------------
         ## Gibbs Update for delta (cluster identifier)
         for i in range(setup.nexp):
-            sse_cand_delta[i][:] = ((setup.models[i].eval(
+            sse_cand_delta[i][:] = (((setup.models[i].eval(
                     tran(theta[m-1].reshape(setup.ntemps * nclustmax, setup.p), 
-                        setup.bounds_mat, setup.bounds.keys()), True)
+                        setup.bounds_mat, setup.bounds.keys()), True) - setup.ys[i])**2
                     @ s2_ind_mat[i]).reshape(setup.ntemps, nclustmax, setup.ns2[i]) 
                     / s2[i][m-1].reshape(setup.ntemps, 1, setup.ns2[i])
                     )
@@ -986,7 +987,7 @@ def calibClust(setup, parallel = False):
                     )
             cluster_covariance_update(
                 S, mS, nS, m - 1, curr_delta, cov, mu, 
-                setup.nexp, nclustmax, temps, theta_unravel,
+                setup.nexp, nclustmax, temps,
                 )
         elif m == 300:
             for i in range(setup.nexp):
@@ -994,7 +995,7 @@ def calibClust(setup, parallel = False):
                 cov[i][:] = cov_4d_pcm(theta_hist[i][:m], mu[i])
             cluster_covariance_update(
                 S, mS, nS, m - 1, curr_delta, cov, mu, 
-                setup.nexp, nclustmax, temps, theta_unravel,
+                setup.nexp, nclustmax, temps,
                 )
         else:
             pass
@@ -1018,8 +1019,8 @@ def calibClust(setup, parallel = False):
                 tran(theta[m-1, theta_unravel[i], delta[i][m].ravel()],
                         setup.bounds_mat, setup.bounds.keys())
                 )
-            sse_cand_theta[i][:] = (pred_cand_theta[i] @ s2_ind_mat[i] / s2[i][m-1])
-            sse_curr_theta[i][:] = (pred_curr_theta[i] @ s2_ind_mat[i] / s2[i][m-1])
+            sse_cand_theta[i][:] = ((pred_cand_theta[i] - setup.ys[i])**2 @ s2_ind_mat[i] / s2[i][m-1])
+            sse_curr_theta[i][:] = ((pred_curr_theta[i] - setup.ys[i])**2 @ s2_ind_mat[i] / s2[i][m-1])
             sse_cand_theta_[:] += np.einsum('te,tek->tk', sse_cand_theta[i], delta_ind_mat[i])
             sse_curr_theta_[:] += np.einsum('te,tek->tk', sse_curr_theta[i], delta_ind_mat[i])
 
@@ -1041,6 +1042,11 @@ def calibClust(setup, parallel = False):
                 False,
                 )
         count += accept.sum(axis = 1)
+        theta_ext[:] = False
+        for i in range(setup.nexp):
+            theta_ext[theta_unravel, delta[i][m].ravel()] += True
+        ntheta[:] = theta_ext.sum(axis = 1)
+        
         #------------------------------------------------------------------------------------------
         ## Gibbs update s2
         for i in range(setup.nexp):
@@ -1051,10 +1057,6 @@ def calibClust(setup, parallel = False):
                 )
             sse_curr[i][:] = dev_sq[i] / s2[i][m]
         ## Gibbs update theta0
-        theta_ext[:] = False
-        for i in range(setup.nexp):
-            theta_ext[theta_unravel, delta[i][m].ravel()] += True
-        ntheta[:] = theta_ext.sum(axis = 1)
         cc[:] = np.linalg.inv(
             np.einsum('t,tpq->tpq', ntheta * setup.itl, Sigma0_inv_curr) + theta0_prior_prec,
             )
