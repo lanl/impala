@@ -743,17 +743,22 @@ def calibPool(setup):
 def sample_delta_per_temperature(curr_delta_t, log_posts_t, inv_temp_t, eta_t):
     """ Given log-posteriors, current delta -- 
         iterates through delta assignments, reassigning probabilistically. """
-    posts_t = np.exp(log_posts_t - log_posts_t.max(axis = 0)).T # (unscaled, unnormalized) densities
-    njs = np.bincount(curr_delta_t, minlength = posts_t.shape[1])
+    njs = np.bincount(curr_delta_t, minlength = log_posts_t.shape[0])
     djs = (njs == 0) * eta_t / (sum(njs == 0) + 1e-9)
-    temp = np.empty(posts_t.shape[1])
+    temp = np.empty(log_posts_t.shape[0])
+    unis = uniform(size = curr_delta_t.shape[0])
     for s in range(curr_delta_t.shape[0]):
         njs[curr_delta_t[s]] -= 1
         temp[:] = - np.inf
-        temp[(njs + djs) > 0] = inv_temp_t * (np.log((njs + djs)[njs + djs > 0]) + log_posts_t.T[s, njs + djs > 0])
-        temp[:] -= temp.max()
-        temp[:] = np.exp(temp) / np.exp(temp).sum()
-        curr_delta_t[s] = choice(posts_t.shape[1], p = temp)
+        temp[(njs + djs) > 0] = ( # log-posterior under each cluster
+            inv_temp_t * (np.log((njs + djs)[njs + djs > 0]) + log_posts_t.T[s, njs + djs > 0])
+            )
+        temp[:] -= temp.max() # 
+        # temp[:] = np.exp(temp) / np.exp(temp).sum()
+        temp[:] = np.cumsum(np.exp(temp))
+        temp[:] /= temp[-1] # normalized cumulative sum of probability of cluster choice
+        curr_delta_t[s] = (unis[s] > temp).sum()
+        # curr_delta_t[s] = choice(log_posts_t.shape[0], p = temp)
         njs[curr_delta_t[s]] += 1
         djs[njs > 0] = 0.
     return curr_delta_t
@@ -761,7 +766,7 @@ def sample_delta_per_temperature(curr_delta_t, log_posts_t, inv_temp_t, eta_t):
 def sample_delta_per_temperature_wrapper(args):
     return sample_delta_per_temperature(*args)
 
-def sample_delta(curr_delta, log_posts, eta, inv_temps, pool = None):
+def sample_delta(curr_delta, log_posts, inv_temps, eta, pool = None):
     args = zip(curr_delta, log_posts, inv_temps, eta)
     if pool is None:
         delta = np.array(list(map(sample_delta_per_temperature_wrapper, args)))
@@ -838,7 +843,7 @@ def calibClust(setup, parallel = False):
     s2_ind_mat = [(setup.s2_ind[i][:,None] == range(setup.ns2[i])) for i in range(setup.nexp)]
     ntheta_cand = 10
     ntotexp = sum(setup.ns2)
-    nclustmax = ntotexp // 2
+    nclustmax = max(10, ntotexp // 2)
     temps = np.arange(setup.ntemps)
     itl_mat_theta = (np.ones((setup.ntemps, nclustmax)).T * setup.itl).T
     itl_mat_s2 = [
