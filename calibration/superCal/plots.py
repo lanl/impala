@@ -439,6 +439,37 @@ class PTW_Plotter(object):
             raise ValueError('Improper out type')
         return
     
+    @staticmethod
+    def cluster_matrix(delta_list, ns2, nclustmax, nburn = 20000, nthin = 10):
+        # subset delta to post burn-in
+        delta_relist = [d[nburn::nthin] for d in delta_list]
+        # Declare constants 
+        nsamp = delta_relist[0].shape[0]
+        nexp  = len(delta_relist)
+        # create a combined delta array (for all experiments/vectorized experiments)
+        # Boolean array, so (True iff member of cluster)
+        breaks = np.hstack((0,np.cumsum(ns2)))
+        bounds = [(breaks[i],breaks[i+1]) for i in range(breaks.shape[0] - 1)]
+        delta_mat = np.empty((delta_relist[0].shape[0], breaks[-1], nclustmax), dtype = bool)
+        # Fill the combined delta array
+        for i in range(breaks.shape[0] - 1):
+            delta_mat[:,bounds[i][0]:bounds[i][1]] = delta_relist[i][:,0,:,None] == np.arange(nclustmax)
+        # X = matrix of incidence (nsamp x nclust) ->  XX^t matrix of coincidence (nsamp x nsamp)
+        # Average over all iterations -> matrix of average coincidence / shared cluster membership
+        out = np.einsum('icp,iqp->icq', delta_mat, delta_mat).mean(axis = 0)
+        return out, breaks
+    
+    def cluster_matrix_plot(self, path, **kwargs):
+        cmat, breaks = self.cluster_matrix(self.out.delta, self.setup.ns2, self.out.nclustmax, **kwargs)
+        plt.matshow(cmat)
+        if breaks.shape[0] > 1:
+            for breakpoint in breaks[1:-1] - 0.5:
+                plt.axhline(breakpoint, color = 'red', linestyle = '--')
+                plt.axvline(breakpoint, color = 'green', linestyle = '--')
+        #plt.savefig(path, bbox_inches = 'tight')
+        plt.show()
+        return
+    
     def __init__(self, setup, out):
         """  """
         self.setup = setup

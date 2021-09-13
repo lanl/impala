@@ -67,6 +67,7 @@ class CalibSetup:
         for i in range(len(vec)):
             vec[i] = np.sum(s2_ind==i)
         self.ny_s2.append(vec)
+        self.nclustmax = max(sum(self.ntheta), 10)
         return
     def setTemperatureLadder(self, temperature_ladder):
         self.tl = temperature_ladder
@@ -80,6 +81,8 @@ class CalibSetup:
         self.thin = thin
         self.decor = decor
         return
+    def set_max_clusters(self, nclustmax):
+        self.nclustmax = nclustmax
     pass
 
 def normalize(x, bounds):
@@ -238,7 +241,7 @@ OutCalibHier = namedtuple(
     'OutCalibHier', 'theta s2 count count_decor count_100 count_temper tau pred_curr theta0 Sigma0',
     )
 OutCalibClust = namedtuple(
-    'OutCalibClust', 'theta theta_hist s2 count count_temper pred_curr theta0 Sigma0 delta eta'
+    'OutCalibClust', 'theta theta_hist s2 count count_temper pred_curr theta0 Sigma0 delta eta nclustmax'
     )
 
 ## Hierarchical Calibration
@@ -757,7 +760,7 @@ def sample_delta_per_temperature(curr_delta_t, log_posts_t, inv_temp_t, eta_t):
         # temp[:] = np.exp(temp) / np.exp(temp).sum()
         temp[:] = np.cumsum(np.exp(temp))
         temp[:] /= temp[-1] # normalized cumulative sum of probability of cluster choice
-        curr_delta_t[s] = (unis[s] > temp).sum()
+        curr_delta_t[s] = (unis[s] >= temp).sum()
         # curr_delta_t[s] = choice(log_posts_t.shape[0], p = temp)
         njs[curr_delta_t[s]] += 1
         djs[njs > 0] = 0.
@@ -1002,6 +1005,7 @@ def calibClust(setup, parallel = False):
         #------------------------------------------------------------------------------------------
         # MCMC within Gibbs update for thetas (in cluster)
         sse_cand_theta_[:] = 0.
+        sse_curr_theta_[:] = 0.
         theta[m]      = theta[m-1]
         theta_eval[:] = theta[m-1]
         theta_cand[:] = chol_sample_1per(theta[m-1], S)
@@ -1156,7 +1160,8 @@ def calibClust(setup, parallel = False):
     t1 = time.time()
     print('\rCalibration MCMC Complete. Time: {:f} seconds.'.format(t1 - t0))
     count_temper = count_temper + count_temper.T - np.diag(np.diag(count_temper))
-    out = OutCalibClust(theta, theta_hist, s2, count, count_temper, pred_curr, theta0, Sigma0, delta, eta)
+    out = OutCalibClust(theta, theta_hist, s2, count, count_temper, 
+                            pred_curr, theta0, Sigma0, delta, eta, nclustmax)
     return(out)
 
 if __name__ == '__main__':
