@@ -350,7 +350,7 @@ def calibHier(setup):
             for i in range(setup.nexp):
                 mu[i] += (theta[i][m-1] - mu[i]) / m
                 cov[i][:] = (
-                    + (m / (m-1)) * cov[i]
+                    + ((m-1) / m) * cov[i]
                     + ((m-1) / (m * m)) * np.einsum(
                         'tej,tel->tejl', theta[i][m-1] - mu[i], theta[i][m-1] - mu[i],
                         )
@@ -613,8 +613,8 @@ def calibPool(setup):
         if m > 300:
             mu += (theta[m-1] - mu) / (m - 1)
             cov = (
-                + (m/(m-1)) * cov
-                + ((m - 1)/(m * m)) * np.einsum('ti,tj->tij', theta[m-1] - mu, theta[m-1] - mu)
+                + ((m - 1) / m) * cov
+                + ((m - 1) / (m * m)) * np.einsum('ti,tj->tij', theta[m-1] - mu, theta[m-1] - mu)
                 )
             S   = cc * np.einsum('ijk,i->ijk', cov + np.eye(setup.p) * eps, np.exp(tau))
 
@@ -983,7 +983,7 @@ def calibClust(setup, parallel = False):
             for i in range(setup.nexp):
                 mu[i] += (theta_hist[i][m-1] - mu[i]) / m
                 cov[i][:] = (
-                    + (m / (m-1)) * cov[i]
+                    + ((m-1) / m) * cov[i]
                     + ((m-1) / (m * m)) * np.einsum(
                         'tej,tel->tejl', theta_hist[i][m-1] - mu[i], theta_hist[i][m-1] - mu[i],
                         )
