@@ -277,7 +277,7 @@ class PTW_Plotter(object):
         t_contours = f(np.array([percentile]))
         return {'X' : X, 'Y' : Y, 'Z' : Z.reshape([100,100]), 'conts' : t_contours}
 
-    def pairwise_theta_plot_hier(self, path):
+    def pairwise_theta_plot_hier(self, path = None):
         """ Pairwise Theta scatterplot """
         sel = np.arange(20000, self.setup.nmcmc, 10)
         theta_parent = impala.chol_sample_1per_constraints(
@@ -328,10 +328,13 @@ class PTW_Plotter(object):
         labels = [r'$\theta_i$',r'$\theta_0$',r'$\theta^*$']
         plt.legend(lines,labels)
         plt.axis('off')
-        plt.savefig(path, bbox_inches = 'tight')
+        if path:
+            plt.savefig(path, bbox_inches = 'tight')
+        else:
+            plt.show()
         return
 
-    def pairwise_theta_plot_pool(self, path):
+    def pairwise_theta_plot_pool(self, path = None):
         sel = np.arange(20000, self.setup.nmcmc, 10)
         plt.figure(figsize = (15,15))
         for i in range(self.setup.p):
@@ -358,10 +361,13 @@ class PTW_Plotter(object):
                     pass
         plt.subplots_adjust(wspace=0.05, hspace=0.05)
         plt.axis('off')
-        plt.savefig(path, bbox_inches = 'tight')
+        if path:
+            plt.savefig(path, bbox_inches = 'tight')
+        else:
+            plt.show()
         return
 
-    def pairwise_theta_plot_cluster(self, path):
+    def pairwise_theta_plot_cluster(self, path = None):
         sel = np.arange(20000, self.setup.nmcmc, 10)
         thetas = self.out.theta[sel,0]
         deltas = [self.out.delta[i][sel] for i in range(self.setup.nexp)]
@@ -425,7 +431,10 @@ class PTW_Plotter(object):
         plt.subplot2grid((self.setup.p, self.setup.p), (4, 0))
         sns.distplot(nclust, kde = True, color = 'blue')
         plt.xlim(0,nclustmax)
-        plt.savefig(path, bbox_inches = 'tight')
+        if path:
+            plt.savefig(path, bbox_inches = 'tight')
+        else:
+            plt.show()
         pass
 
     def pairwise_theta_plot(self, path):
@@ -459,15 +468,18 @@ class PTW_Plotter(object):
         out = np.einsum('icp,iqp->icq', delta_mat, delta_mat).mean(axis = 0)
         return out, breaks
     
-    def cluster_matrix_plot(self, path, **kwargs):
+    def cluster_matrix_plot(self, path = None, **kwargs):
         cmat, breaks = self.cluster_matrix(self.out.delta, self.setup.ns2, self.out.nclustmax, **kwargs)
         plt.matshow(cmat)
         if breaks.shape[0] > 1:
             for breakpoint in breaks[1:-1] - 0.5:
                 plt.axhline(breakpoint, color = 'red', linestyle = '--')
                 plt.axvline(breakpoint, color = 'green', linestyle = '--')
-        #plt.savefig(path, bbox_inches = 'tight')
-        plt.show()
+        plt.legend()
+        if path:
+            plt.savefig(path, bbox_inches = 'tight')
+        else:
+            plt.show()
         return
     
     def __init__(self, setup, out):

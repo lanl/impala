@@ -6,7 +6,7 @@ import sqlite3 as sq
 import impala as impala
 import models as models
 np.seterr(under='ignore')
-nExp = 40
+nExp = 10
 ## get meta data
 con = sq.connect('./../py_calibration_hier/data/data_Ti64.db')
 meta = pd.read_sql('select * from meta;', con)
@@ -81,14 +81,21 @@ s2_ind = np.hstack([[v]*len(dat_all[v]) for v in list(range(nExp))])
 
 #%%  Clustered Model
 if __name__ == '__main__':
-    model3 = models.ModelPTW(np.array(meta.temperature[0:nExp]), np.array(meta.edot[0:nExp]), consts, sh, False)
+    # model3 = models.ModelPTW(np.array(meta.temperature[0:nExp]), np.array(meta.edot[0:nExp]), consts, sh, False)
     setup3 = impala.CalibSetup(bounds, cf)
-    setup3.addVecExperiments(yobs, model3, sd_est, s2_df, s2_ind, theta_ind = s2_ind.copy())
-    setup3.setTemperatureLadder(1.1**np.arange(20))
+    # setup3.addVecExperiments(yobs, model3, sd_est, s2_df, s2_ind, theta_ind = s2_ind.copy())
+    for i in range(nExp):
+        model = models.ModelPTW(np.array(meta.temperature[i:(i+1)]), np.array(meta.edot[i:(i+1)]), 
+                                            consts, dat_all[i].T[0].reshape(1,-1), True)
+        setup3.addVecExperiments(dat_all[i].T[1], model, np.array([0.001]),
+                                 np.array([10]), np.zeros(dat_all[i].T[1].shape[0]))
+
+    setup3.setTemperatureLadder(1.1**np.arange(1))
     setup3.setMCMC(30000, 10000, 1, 100)
-    out3   = impala.calibClust(setup3, True)
+    out3   = impala.calibClust(setup3)
     plots3 = plots.PTW_Plotter(setup3, out3)
     plots3.ptw_prediction_plots('./clust_predictions.pdf')
     plots3.pairwise_theta_plot('./clust_pairwise.pdf')
+    plots3.cluster_matrix_plot('./clust_clusters.pdf')
 
 # EOF 
