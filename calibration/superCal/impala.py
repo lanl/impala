@@ -590,7 +590,9 @@ def calibPool(setup):
 
     sse_curr[:] = 0.
     for i in range(setup.nexp):
-        pred_curr[i] = setup.models[i].eval(tran(theta[0], setup.bounds_mat, setup.bounds.keys()))
+        pred_curr[i] = setup.models[i].eval(
+            tran(theta[0].repeat(setup.ns2[i], axis = 0), setup.bounds_mat, setup.bounds.keys()),
+            )
         # sse_curr[:, i] = np.sum((pred_curr[i] - setup.ys[i]) ** 2 / s2_vec_curr[i].T, 1)
         sse_curr += ((pred_curr[i] - setup.ys[i])**2 @ s2_ind_mat[i] / s2[i][0]).sum(axis = 1)
 
@@ -651,7 +653,10 @@ def calibPool(setup):
             sse_cand[good_values] = 0.
             for i in range(setup.nexp):
                 pred_cand[i][good_values] = setup.models[i].eval(
-                    tran(theta_cand[good_values], setup.bounds_mat, setup.bounds.keys())
+                    tran(
+                        theta_cand[good_values].repeat(setup.ns2[i], axis = 0), 
+                        setup.bounds_mat, setup.bounds.keys()
+                        )
                     )
                 sse_cand += (((pred_cand[i] - setup.ys[i])**2 @ s2_ind_mat[i]) / s2[i][m-1]).sum(axis = 1)
 
@@ -690,7 +695,8 @@ def calibPool(setup):
                 if np.any(good_values):
                     for i in range(setup.nexp):
                         pred_cand[i][good_values] = setup.models[i].eval(
-                            tran(theta_cand[good_values], setup.bounds_mat, setup.bounds.keys()),
+                            tran(theta_cand[good_values].repeat(setup.ns2[i], axis = 0), 
+                            setup.bounds_mat, setup.bounds.keys()),
                             )
                         sse_cand[:] = (((pred_cand[i] - setup.ys[i])**2 @ s2_ind_mat[i]) / s2[i][m-1]).sum(axis = 1)
 
@@ -984,6 +990,7 @@ def calibClust(setup, parallel = False):
         for i in range(setup.nexp):
             delta[i][m] = delta[i][m-1]
         
+        #   Establish initial cluster weighting
         njs[:] = 0.
         for l in range(setup.nexp):
             njs[:] += bincount2D_vectorized(delta[l][m], setup.nclustmax)
@@ -992,8 +999,12 @@ def calibClust(setup, parallel = False):
 
         for i in range(setup.nexp):
             pred_cand_delta[i][:] = setup.models[i].eval(
-                tran(theta[m-1].reshape(-1, setup.p), setup.bounds_mat, setup.bounds.keys()), True,
-                    )
+                tran(
+                    theta[m-1].reshape(-1, setup.p).repeat(setup.ns2[i], axis = 0),
+                    setup.bounds_mat, 
+                    setup.bounds.keys(),
+                    ),
+                )
             sse_cand_delta[i][:] = (
                 ((pred_cand_delta[i] - setup.ys[i])**2 @ s2_ind_mat[i]).reshape(delta_size[i])
                 / s2[i][m-1,:,None,:]
