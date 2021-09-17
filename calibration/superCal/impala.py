@@ -875,7 +875,10 @@ def calibClust(setup, parallel = False):
     for i in range(setup.nexp):
         delta[i][0] = choice(setup.nclustmax, size = (setup.ntemps, setup.ns2[i]))
     delta_ind_mat = [(delta[i][0,:,:,None] == range(setup.nclustmax)) for i in range(setup.nexp)]
-    njs = np.zeros((setup.ntemps, setup.nclustmax))
+    njs = np.zeros((setup.ntemps, setup.nclustmax), dtype = int) # (extant) cluster weight for ijth experiment
+    not_njs = np.zeros(njs.shape, dtype = bool)                  # (njs > 0) -> false
+    djs = np.empty(njs.shape)                                    # (candidate) cluster weight for ijth experiment
+    cluster_weights = np.empty(njs.shape)
     for i in range(setup.nexp):
         njs[:] += bincount2D_vectorized(delta[i][0], setup.nclustmax)
     curr_delta    = [delta[i][0].copy() for i in range(setup.nexp)]
@@ -970,26 +973,62 @@ def calibClust(setup, parallel = False):
     sw_alpha = np.zeros(setup.nswap_per)
     good_values = np.zeros(alpha_wide_shape, dtype = bool)
 
+    delta_size = [(setup.ntemps, setup.nclustmax, setup.ns2[i]) for i in range(setup.nexp)]
+    cluster_cum_prob = np.empty((setup.ntemps, setup.nclustmax))
+    cluster_sample_unif = [np.empty((setup.ntemps, setup.ns2[i])) for i in range(setup.nexp)]
+
     ## start MCMC
     for m in range(1,setup.nmcmc):
         #------------------------------------------------------------------------------------------
         ## Gibbs Update for delta (cluster identifier)
         for i in range(setup.nexp):
-            sse_cand_delta[i][:] = (((setup.models[i].eval(
-                    tran(theta[m-1].reshape(setup.ntemps * setup.nclustmax, setup.p), 
-                        setup.bounds_mat, setup.bounds.keys()), True) - setup.ys[i])**2
-                    @ s2_ind_mat[i]).reshape(setup.ntemps, setup.nclustmax, setup.ns2[i]) 
-                    / s2[i][m-1].reshape(setup.ntemps, 1, setup.ns2[i])
+            delta[i][m] = delta[i][m-1]
+        
+        njs[:] = 0.
+        for l in range(setup.nexp):
+            njs[:] += bincount2D_vectorized(delta[l][m], setup.nclustmax)
+        not_njs[:] = (njs == 0) # fixed at start of iteration
+                                # if (non-extant) cluster j becomes extant, then set this to False.
+
+        for i in range(setup.nexp):
+            pred_cand_delta[i][:] = setup.models[i].eval(
+                tran(theta[m-1].reshape(-1, setup.p), setup.bounds_mat, setup.bounds.keys()), True,
                     )
-            delta[i][m] = sample_delta(
-                    delta[i][m-1].copy(), njs, - 0.5 * sse_cand_delta[i], setup.itl, eta[m-1], pool
+            sse_cand_delta[i][:] = (
+                ((pred_cand_delta[i] - setup.ys[i])**2 @ s2_ind_mat[i]).reshape(delta_size[i])
+                / s2[i][m-1,:,None,:]
+                )
+            # delta[i][m] = delta[i][m-1]
+            cluster_sample_unif[i][:] = uniform(size = (setup.ntemps, setup.ns2[i]))
+            for j in range(setup.ns2[i]):
+                # weighting assigned to extant clusters for ij'th within-vectorized experiment
+                njs[temps, delta[i][m,:,j]] -= 1
+                # weighting assigned to candidate (non-extant) clusters
+                djs[:] = not_njs * (eta[m-1] / not_njs.sum(axis = 1)).reshape(-1,1)
+                # djs[:] = (njs == 0) * (eta[m-1] / (njs == 0).sum(axis = 1)).reshape(-1,1)
+                # unnormalized log-probability of cluster membership
+                with np.errstate(divide='ignore', invalid = 'ignore'):
+                    cluster_cum_prob[:] = (
+                        + np.log(njs + djs) 
+                        - 0.5 * sse_cand_delta[i][:,:,j] * setup.itl.reshape(-1,1)
+                        )
+                # np.nan_to_num(cluster_cum_prob, False, nan = -np.inf, neginf = -np.inf)
+                #---fix for numerical stability in np.exp
+                cluster_cum_prob   -= cluster_cum_prob.max(axis = 1).reshape(-1,1)
+                # Un-normalized cumulative probability of cluster membership
+                cluster_cum_prob[:] = np.exp(cluster_cum_prob).cumsum(axis = 1)
+                # Normalized cumulative probability of cluster membership
+                cluster_cum_prob /= cluster_cum_prob[:,-1].reshape(-1,1)
+                delta[i][m,:,j] = (
+                    (cluster_sample_unif[i][:,j].reshape(-1,1) > cluster_cum_prob).sum(axis = 1)
                     )
+                # Fix weights using new cluster assignments for ij'th within-vectorized experiment
+                njs[temps, delta[i][m,:,j]] += 1
+                # If a candidate cluster became extant--remove candidate flag.
+                not_njs[njs > 0] = False
+            
             delta_ind_mat[i][:] = delta[i][m,:,:,None] == range(setup.nclustmax)
             curr_delta[i][:] = delta[i][m]
-            njs[:] = 0.
-            for l in range(setup.nexp):
-                njs[:] += bincount2D_vectorized(delta[i][m], setup.nclustmax)
-
         #------------------------------------------------------------------------------------------
         ## adaptive Metropolis per Cluster
         if m > 300:
@@ -1040,7 +1079,7 @@ def calibClust(setup, parallel = False):
             sse_curr_theta[i][:] = ((pred_curr_theta[i] - setup.ys[i])**2 @ s2_ind_mat[i] / s2[i][m-1])
             sse_cand_theta_[:] += np.einsum('te,tek->tk', sse_cand_theta[i], delta_ind_mat[i])
             sse_curr_theta_[:] += np.einsum('te,tek->tk', sse_curr_theta[i], delta_ind_mat[i])
-
+        
         alpha[:] = - np.inf
         alpha[good_values] = (itl_mat_theta * (
             - 0.5 * (sse_cand_theta_ - sse_curr_theta_)

@@ -428,16 +428,19 @@ class PTW_Plotter(object):
         labels = [r'$\theta_i$',r'$\theta_0$',r'$\theta^*$']
         plt.legend(lines,labels)
         plt.axis('off')
-        plt.subplot2grid((self.setup.p, self.setup.p), (4, 0))
-        sns.distplot(nclust, kde = True, color = 'blue')
-        plt.xlim(0,nclustmax)
+        try:
+            plt.subplot2grid((self.setup.p, self.setup.p), (4, 0))
+            sns.distplot(nclust, kde = True, color = 'blue')
+            plt.xlim(0,nclustmax)
+        except IndexError:
+            pass
         if path:
             plt.savefig(path, bbox_inches = 'tight')
         else:
             plt.show()
         pass
 
-    def pairwise_theta_plot(self, path):
+    def pairwise_theta_plot(self, path = None):
         if (type(self.out) is impala.OutCalibPool):
             return self.pairwise_theta_plot_pool(path)
         elif (type(self.out) is impala.OutCalibHier):
