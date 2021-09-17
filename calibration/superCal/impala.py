@@ -1015,7 +1015,7 @@ def calibClust(setup, parallel = False):
                 # weighting assigned to extant clusters for ij'th within-vectorized experiment
                 njs[temps, delta[i][m,:,j]] -= 1
                 # weighting assigned to candidate (non-extant) clusters
-                djs[:] = not_njs * (eta[m-1] / not_njs.sum(axis = 1)).reshape(-1,1)
+                djs[:] = not_njs * (eta[m-1] / (not_njs.sum(axis = 1) + 1e-9)).reshape(-1,1)
                 # djs[:] = (njs == 0) * (eta[m-1] / (njs == 0).sum(axis = 1)).reshape(-1,1)
                 # unnormalized log-probability of cluster membership
                 with np.errstate(divide='ignore', invalid = 'ignore'):
