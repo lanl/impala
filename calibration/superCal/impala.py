@@ -815,7 +815,7 @@ def one_step_in_cluster_covariance_update(Sj, mSj, nSj, n, mus, covs):
     nSj[:] = nC
     return Sj, mSj, nSj
 
-def cluster_covariance_update(S, mS, nS, n, delta, covs, mus, nexp, nclustmax, temps):
+def cluster_covariance_update_old(S, mS, nS, n, delta, covs, mus, nexp, nclustmax, temps):
     """
     S, m, n -- modified in place
     Goal is cluster-level covariance matrix
@@ -826,16 +826,37 @@ def cluster_covariance_update(S, mS, nS, n, delta, covs, mus, nexp, nclustmax, t
     output: 
         S     [ntemps, nclustmax, p, p]
     """
-    S[:] = 0.
+    S[:]  = np.eye(S.shape[-1]) * 1e-9
     mS[:] = 0.
     nS[:] = 0.
     for i in range(nexp):
         for j in range(delta[i].shape[1]):
             S[temps, delta[i].T[j]], mS[temps, delta[i].T[j]], nS[temps, delta[i].T[j]] = \
-                    one_step_in_cluster_covariance_update(
-                        S[temps,delta[i].T[j]], mS[temps, delta[i].T[j]], nS[temps, delta[i].T[j]],
-                        n, mus[i][temps, j], covs[i][temps, j]
-                        )
+                one_step_in_cluster_covariance_update(
+                    S[temps,delta[i].T[j]], mS[temps, delta[i].T[j]], nS[temps, delta[i].T[j]],
+                    n, mus[i][temps, j], covs[i][temps, j]
+                    )
+    return
+
+def cluster_covariance_update(S, mS, nS, n, delta, covs, mus, nexp, nclustmax, temps):
+    S[:]  = 0. 
+    mS[:] = 0.
+    nS[:] = 0.
+    mC = np.empty((temps.shape[0], S.shape[-1]))
+    nC = np.zeros((temps.shape[0],1))
+    for i in range(nexp):
+        for j in range(delta[i].shape[1]):
+            nC[:] = nS[temps, delta[i].T[j], None] + n
+            mC[:] = (nS[temps, delta[i].T[j],None] * mS[temps, delta[i].T[j]] + n * mus[i][temps, j]) / nC
+            S[temps, delta[i].T[j]] =  1 / nC[:,:,None] * (
+                + nS[temps, delta[i].T[j],None,None] * S[temps, delta[i].T[j]]
+                + n * covs[i][temps, j]
+                + np.einsum('t,tp,tq->tpq', nS[temps, delta[i].T[j]], 
+                                mS[temps, delta[i].T[j]] - mC, mS[temps, delta[i].T[j]] - mC)
+                + n * np.einsum('tp,tq->tpq', mus[i][temps, j] - mC, mus[i][temps, j] - mC)
+                )
+            mS[temps, delta[i].T[j]] = mC
+            nS[temps, delta[i].T[j]] = nC.ravel()
     S[:] += np.eye(S.shape[-1]) * 1e-9
     return
 
@@ -1052,7 +1073,7 @@ def calibClust(setup, parallel = False):
                         )
                     )
             cluster_covariance_update(
-                S, mS, nS, m - 1, curr_delta, cov, mu, 
+                S, mS, nS, m, curr_delta, cov, mu, 
                 setup.nexp, setup.nclustmax, temps,
                 )
         elif m == 300:
@@ -1060,7 +1081,7 @@ def calibClust(setup, parallel = False):
                 mu[i][:]  = theta_hist[i][:m].mean(axis = 0)
                 cov[i][:] = cov_4d_pcm(theta_hist[i][:m], mu[i])
             cluster_covariance_update(
-                S, mS, nS, m - 1, curr_delta, cov, mu, 
+                S, mS, nS, m, curr_delta, cov, mu, 
                 setup.nexp, setup.nclustmax, temps,
                 )
         else:
@@ -1113,7 +1134,6 @@ def calibClust(setup, parallel = False):
         for i in range(setup.nexp):
             theta_ext[theta_unravel, delta[i][m].ravel()] += True
         ntheta[:] = theta_ext.sum(axis = 1)
-        
         #------------------------------------------------------------------------------------------
         ## Gibbs update s2
         for i in range(setup.nexp):

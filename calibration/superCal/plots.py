@@ -130,7 +130,10 @@ class PTW_Plotter(object):
             ]
         for i in range(self.setup.nexp):
             pred_theta_raw[i] = self.setup.models[i].eval(
-                impala.tran(self.out.theta[sel,0], self.setup.bounds_mat, self.setup.bounds.keys()),
+                impala.tran(
+                    self.out.theta[sel,0].repeat(self.setup.ns2[i], axis = 0), 
+                    self.setup.bounds_mat, self.setup.bounds.keys(),
+                    ),
                 )
         
         real_strain = []

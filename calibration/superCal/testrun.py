@@ -6,7 +6,7 @@ import sqlite3 as sq
 import impala as impala
 import models as models
 np.seterr(under='ignore')
-nExp = 40
+nExp = 196
 ## get meta data
 con = sq.connect('./../py_calibration_hier/data/data_Ti64.db')
 meta = pd.read_sql('select * from meta;', con)
@@ -57,18 +57,18 @@ sd_est = np.array([.001]*nExp)
 s2_df = np.array([5]*nExp)
 s2_ind = np.hstack([[v]*len(dat_all[v]) for v in list(range(nExp))])
 
-#%%  Pooled Model 
-# model = models.ModelPTW(temps, edots, consts, sh, False) # True)
-# setup = impala.CalibSetup(bounds, cf)
-# setup.addVecExperiments(yobs, model, sd_est, s2_df, s2_ind)
-# setup.setTemperatureLadder(1.1**np.arange(20))
-# setup.setMCMC(30000,10000,1,100)
-# out = impala.calibPool(setup)
-# plot1 = plots.PTW_Plotter(setup, out)
-# plot1.ptw_prediction_plots('./pool_predictions.pdf')
-# plot1.pairwise_theta_plot('./pool_pairwise.pdf')
+# %%  Pooled Model 
+model = models.ModelPTW(temps, edots, consts, sh, False) # True)
+setup = impala.CalibSetup(bounds, cf)
+setup.addVecExperiments(yobs, model, sd_est, s2_df, s2_ind)
+setup.setTemperatureLadder(1.1**np.arange(20))
+setup.setMCMC(30000,10000,1,100)
+out = impala.calibPool(setup)
+plot1 = plots.PTW_Plotter(setup, out)
+plot1.ptw_prediction_plots('./pool_predictions.pdf')
+plot1.pairwise_theta_plot('./pool_pairwise.pdf')
 
-#%%  Hierarchical Model
+# %%  Hierarchical Model
 # model2 = models.ModelPTW(temps, edots, consts, sh, False)
 # setup2 = impala.CalibSetup(bounds, cf)
 # setup2.addVecExperiments(yobs, model2, sd_est, s2_df, s2_ind, theta_ind = s2_ind.copy())
@@ -80,25 +80,25 @@ s2_ind = np.hstack([[v]*len(dat_all[v]) for v in list(range(nExp))])
 # plot2.pairwise_theta_plot('./hier_pairwise.pdf')
 
 #%%  Clustered Model
-if __name__ == '__main__':
-    setup = impala.CalibSetup(bounds, cf)
-    model = models.ModelPTW(temps, edots, consts, sh, False)
-    setup.addVecExperiments(yobs, model, sd_est, s2_df, s2_ind, theta_ind = s2_ind.copy())
-    # for i in range(nExp):
-    #     model = models.ModelPTW(
-    #          temps[i:(i+1)], edots[i:(i+1)], consts, dat_all[i].T[0].reshape(1,-1), False
-    #           )
-    #     setup.addVecExperiments(
-    #           dat_all[i].T[1], model, np.array([0.001]), 
-    #           np.array([10]), np.zeros(dat_all[i].T[1].shape[0]),
-    #           )
-    setup.setTemperatureLadder(1.05**np.arange(10))
-    setup.setMCMC(30000, 10000, 1, 100)
-    setup.set_max_clusters(50)
-    out  = impala.calibClust(setup)
-    plot = plots.PTW_Plotter(setup, out)
-    plot.ptw_prediction_plots('./clust_predictions.pdf')
-    plot.pairwise_theta_plot('./clust_pairwise.pdf')
-    plot.cluster_matrix_plot('./clust_clusters.pdf')
+# if __name__ == '__main__':
+#     setup = impala.CalibSetup(bounds, cf)
+#     model = models.ModelPTW(temps, edots, consts, sh, False)
+#     setup.addVecExperiments(yobs, model, sd_est, s2_df, s2_ind, theta_ind = s2_ind.copy())
+#     # for i in range(nExp):
+#     #     model = models.ModelPTW(
+#     #          temps[i:(i+1)], edots[i:(i+1)], consts, dat_all[i].T[0].reshape(1,-1), False
+#     #           )
+#     #     setup.addVecExperiments(
+#     #           dat_all[i].T[1], model, np.array([0.001]), 
+#     #           np.array([10]), np.zeros(dat_all[i].T[1].shape[0]),
+#     #           )
+#     setup.setTemperatureLadder(1.05**np.arange(5))
+#     setup.setMCMC(30000, 10000, 1, 100)
+#     setup.set_max_clusters(40)
+#     out  = impala.calibClust(setup)
+#     plot = plots.PTW_Plotter(setup, out)
+#     plot.ptw_prediction_plots('./clust_predictions.pdf')
+#     plot.pairwise_theta_plot('./clust_pairwise.pdf')
+#     plot.cluster_matrix_plot('./clust_clusters.pdf')
 
 # EOF 
