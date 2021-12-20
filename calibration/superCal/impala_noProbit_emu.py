@@ -633,10 +633,10 @@ def calibPool(setup):
         (setup.s2_ind[i][:,None] == range(setup.ns2[i]))
         for i in range(setup.nexp)
         ]
-    theta_start = initfunc_probit(size=[setup.ntemps, setup.p])
+    theta_start = initfunc_unif(size=[setup.ntemps, setup.p])
     good = setup.checkConstraints(tran_probit(theta_start, setup.bounds_mat, setup.bounds.keys()), setup.bounds)
     while np.any(~good):
-        theta_start[np.where(~good)] = initfunc_probit(size = [(~good).sum(), setup.p])
+        theta_start[np.where(~good)] = initfunc_unif(size = [(~good).sum(), setup.p])
         good[np.where(~good)] = setup.checkConstraints(
             tran_probit(theta_start[np.where(~good)], setup.bounds_mat, setup.bounds.keys()),
             setup.bounds,
@@ -656,7 +656,7 @@ def calibPool(setup):
     sse_curr[:] = 0.
     for i in range(setup.nexp):
         pred_curr[i] = setup.models[i].eval(
-            tran_probit(theta[0], setup.bounds_mat, setup.bounds.keys()),
+            tran_unif(theta[0], setup.bounds_mat, setup.bounds.keys()),
             )
         # sse_curr[:, i] = np.sum((pred_curr[i] - setup.ys[i]) ** 2 / s2_vec_curr[i].T, 1)
         sse_curr += ((pred_curr[i] - setup.ys[i])**2 @ s2_ind_mat[i] / s2[i][0]).sum(axis = 1)
@@ -709,7 +709,7 @@ def calibPool(setup):
             + np.einsum('ijk,ik->ij', cholesky(S), normal(size = (setup.ntemps, setup.p)))
             )
         good_values = setup.checkConstraints(
-            tran_probit(theta_cand, setup.bounds_mat, setup.bounds.keys()), setup.bounds,
+            tran_unif(theta_cand, setup.bounds_mat, setup.bounds.keys()), setup.bounds,
             )
         #------------------------------------------------------------------------------------------
         # get predictions and SSE
@@ -719,14 +719,14 @@ def calibPool(setup):
             sse_cand[good_values] = 0.
             for i in range(setup.nexp):
                 pred_cand[i][good_values] = setup.models[i].eval(
-                    tran_probit(
+                    tran_unif(
                         theta_cand[good_values],#.repeat(setup.ns2[i], axis = 0), 
                         setup.bounds_mat, setup.bounds.keys()
                         )
                     )
                 sse_cand += (((pred_cand[i] - setup.ys[i])**2 @ s2_ind_mat[i]) / s2[i][m-1]).sum(axis = 1)
 
-        tsq_diff = ((theta_cand * theta_cand).sum(axis = 1) - (theta[m-1] * theta[m-1]).sum(axis = 1))[good_values]
+        tsq_diff = 0.#((theta_cand * theta_cand).sum(axis = 1) - (theta[m-1] * theta[m-1]).sum(axis = 1))[good_values]
         sse_diff = (sse_cand - sse_curr)[good_values] # sum over experiments
         #------------------------------------------------------------------------------------------
         # for each temperature, accept or reject
@@ -753,7 +753,7 @@ def calibPool(setup):
                 theta_cand = theta[m].copy()
                 theta_cand[:,k] = initfunc_probit(size = setup.ntemps) # independence proposal, will vectorize of columns
                 good_values = setup.checkConstraints(
-                    tran_probit(theta_cand, setup.bounds_mat, setup.bounds.keys()), setup.bounds,
+                    tran_unif(theta_cand, setup.bounds_mat, setup.bounds.keys()), setup.bounds,
                     )
                 pred_cand = [_.copy() for _ in pred_curr]
                 sse_cand[:] = sse_curr.copy()
@@ -762,13 +762,13 @@ def calibPool(setup):
                     sse_cand[good_values] = 0.
                     for i in range(setup.nexp):
                         pred_cand[i][good_values] = setup.models[i].eval(
-                            tran_probit(theta_cand[good_values],#.repeat(setup.ns2[i], axis = 0), 
+                            tran_unif(theta_cand[good_values],#.repeat(setup.ns2[i], axis = 0), 
                             setup.bounds_mat, setup.bounds.keys()),
                             )
                         sse_cand += (((pred_cand[i] - setup.ys[i])**2 @ s2_ind_mat[i]) / s2[i][m-1]).sum(axis = 1)
 
                 alpha[:] = -np.inf
-                tsq_diff = ((theta_cand * theta_cand).sum(axis = 1) - (theta[m] * theta[m]).sum(axis = 1))[good_values]
+                tsq_diff = 0.#((theta_cand * theta_cand).sum(axis = 1) - (theta[m] * theta[m]).sum(axis = 1))[good_values]
                 sse_diff = (sse_cand - sse_curr)[good_values]
                 alpha[good_values] = -0.5 * setup.itl[good_values] * (sse_diff + tsq_diff) + 0.5 * tsq_diff # last is for proposal, since this is an independence sampler step
                 for t in np.where(np.log(uniform(size = setup.ntemps)) < alpha)[0]:
