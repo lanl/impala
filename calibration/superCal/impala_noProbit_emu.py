@@ -10,7 +10,7 @@ from scipy.stats import invwishart
 from numpy.linalg import cholesky, slogdet
 from itertools import repeat
 import multiprocessing as mp
-
+#np.seterr(under='ignore')
 
 # no probit tranform for hierarchical and DP versions
 
@@ -49,14 +49,19 @@ class CalibSetup:
         self.ntheta = []
         self.theta_ind = []
         self.nswap = 5
+        self.s2_prior_kern = []
         return
-    def addVecExperiments(self, yobs, model, sd_est, s2_df, s2_ind, theta_ind=None):
+    def addVecExperiments(self, yobs, model, sd_est, s2_df, s2_ind, meas_error_cor=None, theta_ind=None):
         self.ys.append(np.array(yobs))
         self.y_lens.append(len(yobs))
         if theta_ind is None:
             theta_ind = [0]*len(yobs)
         self.theta_ind.append(theta_ind)
         self.ntheta.append(len(set(theta_ind)))
+        model.yobs = np.array(yobs)
+        model.meas_error_cor = np.eye(len(yobs))
+        if meas_error_cor is not None:
+            model.meas_error_cor = meas_error_cor
         self.models.append(model)
         self.nexp += 1
         self.sd_est.append(sd_est)
@@ -71,6 +76,10 @@ class CalibSetup:
             vec[i] = np.sum(s2_ind==i)
         self.ny_s2.append(vec)
         self.nclustmax = max(sum(self.ntheta), 10)
+        if np.any(s2_df == 0):
+            self.s2_prior_kern.append(ldhc_kern)
+        else:
+            self.s2_prior_kern.append(ldig_kern)
         return
     def setTemperatureLadder(self, temperature_ladder):
         self.tl = temperature_ladder
@@ -87,6 +96,7 @@ class CalibSetup:
     def set_max_clusters(self, nclustmax):
         self.nclustmax = nclustmax
     pass
+
 
 def normalize(x, bounds):
     """Normalize to 0-1 scale"""
@@ -172,6 +182,15 @@ def cov_4d_pcm(arr, mean):
     N = arr.shape[0]
     return np.einsum('ktij,ktil->tijl', arr - mean, arr - mean) / (N - 1)
 
+def cov_anyd_pcm(arr, mean):
+    """ Covariance Array from p dimensional Array (With pre-computed mean):
+    arr = p-dim array (e.g., nSamp x nTemp x nTheta x nCol)
+    mean = (p-1)-dim Array (e.g., nTemp x nCol)
+    out = p-dim Array (nTemp x nTheta x nCol x nCol)
+    """
+    N = arr.shape[0]
+    return np.einsum('...ij,...il->...ijl', arr - mean, arr - mean) / (N - 1)
+
 def mvnorm_logpdf(x, mean, Prec, ldet): # VALIDATED
     """
     # k = x.shape[-1]
@@ -247,9 +266,15 @@ def bincount2D_vectorized(a, max_count):
     a_offs = a + np.arange(a.shape[0])[:,None]*max_count
     return np.bincount(a_offs.ravel(), minlength=a.shape[0]*max_count).reshape(-1,max_count)
 
+def ldig_kern(x, a, b): # ig
+  return (-a - 1) * np.log(x) - b / x
+
+def ldhc_kern(x, a, b): # half cauchy
+  return -np.log(x + 1)
+
 from collections import namedtuple
 OutCalibPool = namedtuple(
-    'OutCalibPool', 'theta s2 count count_decor count_100 tau pred_curr',
+    'OutCalibPool', 'theta s2 count count_s2 count_decor cov_theta_cand cov_ls2_cand pred_curr',
     )
 OutCalibHier = namedtuple(
     'OutCalibHier', 'theta s2 count count_decor count_100 count_decor2 count_temper tau pred_curr theta0 Sigma0',
@@ -258,6 +283,112 @@ OutCalibClust = namedtuple(
     'OutCalibClust', 'theta theta_hist s2 count count_temper pred_curr theta0 Sigma0 delta eta nclustmax'
     )
 
+
+class AMcov_pool:
+    def __init__(self, ntemps, p, start_var=1e-4, start_adapt_iter=300):
+        self.eps = 1.0e-12
+        self.AM_SCALAR = 2.4**2 / p
+        self.tau  = np.repeat(0., ntemps)
+        self.S    = np.empty([ntemps, p, p])
+        self.S[:] = np.eye(p) * start_var
+        self.cov  = np.empty([ntemps, p, p])
+        self.mu   = np.empty([ntemps, p])
+        self.ntemps = ntemps
+        self.p = p
+        self.start_adapt_iter = start_adapt_iter
+        self.count_100 = np.zeros(ntemps, dtype = int)
+
+    def update(self, x, m):
+        if m > self.start_adapt_iter:
+            self.mu += (x[m-1] - self.mu) / m
+            self.cov = (
+                + ((m - 1) / m) * self.cov
+                + ((m - 1) / (m * m)) * np.einsum('ti,tj->tij', x[m-1] - self.mu, x[m-1] - self.mu)
+                )
+            self.S   = self.AM_SCALAR * np.einsum('ijk,i->ijk', self.cov + np.eye(self.p) * self.eps, np.exp(self.tau))
+            #S   = cc * np.einsum('ijk,i->ijk', cov_3d_pcm(theta[:m], theta[:m].mean(axis = 0)) + np.eye(setup.p) * eps, np.exp(tau))
+
+        elif m == self.start_adapt_iter:
+            self.mu  = x[:m].mean(axis = 0)
+            self.cov = cov_3d_pcm(x[:m], self.mu)
+            self.S   = self.AM_SCALAR * np.einsum('ijk,i->ijk', self.cov + np.eye(self.p) * self.eps, np.exp(self.tau))
+
+    def update_tau(self, m):
+        # diminishing adaptation based on acceptance rate for each temperature
+        if (m % 100 == 0) and (m > self.start_adapt_iter):
+            delta = min(0.1, 15 / sqrt(m + 1))
+            self.tau[np.where(self.count_100 < 23)] = self.tau[np.where(self.count_100 < 23)] - delta
+            self.tau[np.where(self.count_100 > 23)] = self.tau[np.where(self.count_100 > 23)] + delta
+            self.count_100 *= 0
+
+    def gen_cand(self, x, m):
+            x_cand  = (
+            + x[m-1]
+            + np.einsum('ijk,ik->ij', cholesky(self.S), normal(size = (self.ntemps, self.p)))
+            )
+            return x_cand
+
+
+class AMcov_hier:
+    def __init__(self, nexp, ntheta, ntemps, p, start_var=1e-4, start_adapt_iter=300): # ntheta is a vector of length nexp
+        self.eps = 1.0e-12
+        self.AM_SCALAR = 2.4**2 / p
+        self.tau = [-0 * np.ones((ntemps, ntheta[i])) for i in range(nexp)]
+        self.S   = [np.empty((ntemps, ntheta[i], p, p)) for i in range(nexp)]
+        for i in range(nexp):
+            self.S[i][:] = np.eye(p) * start_var
+        self.cov = [np.empty((ntemps, ntheta[i], p, p)) for i in range(nexp)]
+        self.mu  = [np.empty((ntemps, ntheta[i], p)) for i in range(nexp)]
+        self.nexp = nexp
+        self.ntemps = ntemps
+        self.p = p
+        self.start_adapt_iter = start_adapt_iter
+        self.count_100 = [np.zeros((ntemps, ntheta[i])) for i in range(nexp)]
+
+    def update(self, x, m): # called in mth iteration, so latest value is x[i][m-1]
+        if m > self.start_adapt_iter:
+            for i in range(self.nexp):
+                self.mu[i] += (x[i][m-1] - self.mu[i]) / m
+                self.cov[i][:] = (
+                    + ((m-1) / m) * self.cov[i]
+                    + ((m-1) / (m * m)) * np.einsum(
+                        'tej,tel->tejl', x[i][m-1] - self.mu[i], x[i][m-1] - self.mu[i],
+                        )
+                    )
+                self.S[i] = self.AM_SCALAR * np.einsum(
+                    'tejl,te->tejl', self.cov[i] + np.eye(self.p) * self.eps, np.exp(self.tau[i]),
+                    )
+
+        elif m == self.start_adapt_iter:
+            for i in range(self.nexp):
+                self.mu[i][:]  = x[i].mean(axis = 0)
+                self.cov[i][:] = cov_4d_pcm(x[i][:m], self.mu[i])
+                self.S[i][:]   = self.AM_SCALAR * np.einsum('tejl,te->tejl', self.cov[i] + np.eye(self.p) * self.eps, np.exp(self.tau[i]))
+
+    def update_tau(self, m):
+        # diminishing adaptation based on acceptance rate for each temperature
+        if m % 100 == 0 and m > self.start_adapt_iter:
+            delta = min(0.1, 5 / np.sqrt(m + 1))
+            for i in range(self.nexp):
+                self.tau[i][self.count_100[i] < 23] -= delta
+                self.tau[i][self.count_100[i] > 23] += delta
+                self.count_100[i] *= 0
+
+    def gen_cand(self, x, m):
+        x_cand = [chol_sample_1per(x[i][m-1], self.S[i]) for i in range(self.nexp)]
+        return x_cand
+
+class AMcov_clust:
+    def __init__(self):
+        pass
+
+    def update(self, x, m):
+        pass
+
+    def update_tau(self, m):
+        pass
+
+##############################################################################################################################################################################
 ## Hierarchical Calibration
 
 def calibHier(setup):
@@ -621,14 +752,24 @@ def calibHier(setup):
                             count_temper, tau, pred_curr, theta0, Sigma0)
     return(out)
 
+
+
+
+
+
+
+##############################################################################################################################################################################
 ## Pooled Calibration
+
+
+
 #@profile
 def calibPool(setup):
     t0 = time.time()
     theta = np.empty([setup.nmcmc, setup.ntemps, setup.p])
     n_s2 = np.sum(setup.ns2)
-    s2 = [np.ones([setup.nmcmc, setup.ntemps, setup.ns2[i]]) for i in range(setup.nexp)]
-    # s2_vec_curr = [s2[i][0,:,setup.s2_ind[i]] for i in range(setup.nexp)]
+    log_s2 = [np.ones([setup.nmcmc, setup.ntemps, setup.ns2[i]]) for i in range(setup.nexp)]
+    #s2_vec_curr = [s2[i][0,:,setup.s2_ind[i]] for i in range(setup.nexp)]
     s2_ind_mat = [
         (setup.s2_ind[i][:,None] == range(setup.ns2[i]))
         for i in range(setup.nexp)
@@ -650,73 +791,98 @@ def calibPool(setup):
 
     pred_curr = [None] * setup.nexp
     # sse_curr = np.empty([setup.ntemps, setup.nexp])
-    sse_curr = np.empty([setup.ntemps])
-    dev_sq = [np.empty((setup.ntemps, setup.ns2[i])) for i in range(setup.nexp)]
+    llik_curr = np.empty([setup.ntemps])
+    #dev_sq = [np.empty((setup.ntemps, setup.ns2[i])) for i in range(setup.nexp)]
+    marg_lik_cov_curr = [None] * setup.nexp
+    for i in range(setup.nexp):
+        marg_lik_cov_curr[i] = [None] * setup.ntemps
+        for t in range(setup.ntemps):
+            marg_lik_cov_curr[i][t] = setup.models[i].lik_cov_inv(np.exp(log_s2[i][0, t, setup.s2_ind[i]])[setup.s2_ind[i]])
+            # ask around: is list of lists lookup slow?? ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    sse_curr[:] = 0.
+    llik_curr[:] = 0.
     for i in range(setup.nexp):
         pred_curr[i] = setup.models[i].eval(
             tran_unif(theta[0], setup.bounds_mat, setup.bounds.keys()),
             )
         # sse_curr[:, i] = np.sum((pred_curr[i] - setup.ys[i]) ** 2 / s2_vec_curr[i].T, 1)
-        sse_curr += ((pred_curr[i] - setup.ys[i])**2 @ s2_ind_mat[i] / s2[i][0]).sum(axis = 1)
+        #((pred_curr[i] - setup.ys[i])**2 @ s2_ind_mat[i] / s2[i][0]).sum(axis = 1)
+        for t in range(setup.ntemps):
+            llik_curr[t] += setup.models[i].llik(pred_curr[i][t], marg_lik_cov_curr[i][t])
 
-    eps  = 1.0e-13
-    tau  = np.repeat(-4.0, setup.ntemps)
-    AM_const   = 2.4**2/setup.p
-    S    = np.empty([setup.ntemps, setup.p, setup.p])
-    S[:] = np.eye(setup.p)*1e-6
+    #eps  = 1.0e-13
+    #tau  = np.repeat(-4.0, setup.ntemps)
+    #AM_const   = 2.4**2/setup.p
+    #S    = np.empty([setup.ntemps, setup.p, setup.p])
+    #S[:] = np.eye(setup.p)*1e-6
     cov  = np.empty([setup.ntemps, setup.p, setup.p])
     mu   = np.empty([setup.ntemps, setup.p])
 
+    cov_theta_cand = AMcov_pool(setup.ntemps, setup.p)
+    cov_ls2_cand = [AMcov_pool(setup.ntemps, setup.ns2[i]) for i in range(setup.nexp)]
+
     count = np.zeros([setup.ntemps, setup.ntemps], dtype = int)
+    count_s2 = np.zeros([setup.ntemps, setup.ntemps], dtype = int)
     count_decor = np.zeros([setup.p, setup.ntemps], dtype = int)
-    count_100 = np.zeros(setup.ntemps, dtype = int)
+    #count_100 = np.zeros(setup.ntemps, dtype = int)
 
     pred_cand = [_.copy() for _ in pred_curr]
-    sse_cand = sse_curr.copy()
+    llik_cand = llik_curr.copy()
 
     alpha    = np.ones(setup.ntemps) * (-np.inf)
     sw_alpha = np.zeros(setup.nswap_per)
 
+
+
     ## start MCMC
     for m in range(1,setup.nmcmc):
+        
+
         theta[m] = theta[m-1].copy() # current set to previous, will change if accepted
+        for i in range(setup.nexp):
+            log_s2[i][m] = log_s2[i][m-1].copy()
+            setup.models[i].step()
+
         #----------------------------------------------------------
         ## adaptive Metropolis for each temperature
 
-        if m > 300:
-            mu += (theta[m-1] - mu) / m
-            cov = (
-                + ((m - 1) / m) * cov
-                + ((m - 1) / (m * m)) * np.einsum('ti,tj->tij', theta[m-1] - mu, theta[m-1] - mu)
-                )
-            S   = AM_const * np.einsum('ijk,i->ijk', cov + np.eye(setup.p) * eps, np.exp(tau))
+        cov_theta_cand.update(theta, m)
+
+        # if m > 300:
+        #     mu += (theta[m-1] - mu) / m
+        #     cov = (
+        #         + (m - 1) / m * cov
+        #         + (m - 1) / m**2 * np.einsum('ti,tj->tij', theta[m-1] - mu, theta[m-1] - mu)
+        #         )
+        #     if m>10000:
+        #         1+1
+            #S   = AM_const * np.einsum('ijk,i->ijk', cov + np.eye(setup.p) * eps, np.exp(tau))
             #S   = cc * np.einsum('ijk,i->ijk', cov_3d_pcm(theta[:m], theta[:m].mean(axis = 0)) + np.eye(setup.p) * eps, np.exp(tau))
 
-        elif m == 300:
-            mu  = theta[:m].mean(axis = 0)
-            cov = cov_3d_pcm(theta[:m], mu)
-            S   = AM_const * np.einsum('ijk,i->ijk', cov + np.eye(setup.p) * eps, np.exp(tau))
+        # elif m == 300:
+        #     mu  = theta[:m].mean(axis = 0)
+        #     cov = cov_3d_pcm(theta[:m], mu)
+            #S   = AM_const * np.einsum('ijk,i->ijk', cov + np.eye(setup.p) * eps, np.exp(tau))
         
-        else:
-            pass
-        
+        # else:
+        #     pass
+
         #------------------------------------------------------------------------------------------
         # generate proposal
-        theta_cand  = (
-            + theta[m-1]
-            + np.einsum('ijk,ik->ij', cholesky(S), normal(size = (setup.ntemps, setup.p)))
-            )
+        theta_cand = cov_theta_cand.gen_cand(theta, m)
+        # theta_cand  = (
+        #     + theta[m-1]
+        #     + np.einsum('ijk,ik->ij', cholesky(cov_theta_cand.S), normal(size = (setup.ntemps, setup.p)))
+        #     )
         good_values = setup.checkConstraints(
             tran_unif(theta_cand, setup.bounds_mat, setup.bounds.keys()), setup.bounds,
             )
         #------------------------------------------------------------------------------------------
         # get predictions and SSE
         pred_cand = [_.copy() for _ in pred_curr]
-        sse_cand[:] = sse_curr.copy()
+        llik_cand[:] = llik_curr.copy()
         if np.any(good_values):
-            sse_cand[good_values] = 0.
+            llik_cand[good_values] = 0.
             for i in range(setup.nexp):
                 pred_cand[i][good_values] = setup.models[i].eval(
                     tran_unif(
@@ -724,28 +890,35 @@ def calibPool(setup):
                         setup.bounds_mat, setup.bounds.keys()
                         )
                     )
-                sse_cand += (((pred_cand[i] - setup.ys[i])**2 @ s2_ind_mat[i]) / s2[i][m-1]).sum(axis = 1)
+                for t in range(setup.ntemps):
+                    llik_cand[t] += setup.models[i].llik(pred_cand[i][t], marg_lik_cov_curr[i][t])#(((pred_cand[i] - setup.ys[i])**2 @ s2_ind_mat[i]) / s2[i][m-1]).sum(axis = 1)
 
-        tsq_diff = 0.#((theta_cand * theta_cand).sum(axis = 1) - (theta[m-1] * theta[m-1]).sum(axis = 1))[good_values]
-        sse_diff = (sse_cand - sse_curr)[good_values] # sum over experiments
+        #tsq_diff = 0.#((theta_cand * theta_cand).sum(axis = 1) - (theta[m-1] * theta[m-1]).sum(axis = 1))[good_values]
+        llik_diff = (llik_cand - llik_curr)[good_values] # sum over experiments
         #------------------------------------------------------------------------------------------
         # for each temperature, accept or reject
         alpha[:] = - np.inf
-        alpha[good_values] = - 0.5 * setup.itl[good_values] * (sse_diff + tsq_diff)
+        alpha[good_values] = setup.itl[good_values] * (llik_diff)
         for t in np.where(np.log(uniform(size=setup.ntemps)) < alpha)[0]:
-            theta[m,t] = theta_cand[t]
+            theta[m,t] = theta_cand[t].copy()
             count[t,t] += 1
-            sse_curr[t] = sse_cand[t]
+            llik_curr[t] = llik_cand[t].copy()
             for i in range(setup.nexp):
-                pred_curr[i][t] = pred_cand[i][t]
-            count_100[t] += 1
+                pred_curr[i][t] = pred_cand[i][t].copy()
+            cov_theta_cand.count_100[t] += 1
         #------------------------------------------------------------------------------------------
         # diminishing adaptation based on acceptance rate for each temperature
-        if (m % 100 == 0) and (m > 300):
-            delta = min(0.1, 5 / sqrt(m + 1))
-            tau[np.where(count_100 < 23)] = tau[np.where(count_100 < 23)] - delta
-            tau[np.where(count_100 > 23)] = tau[np.where(count_100 > 23)] + delta
-            count_100 *= 0
+        #if m>2000:
+        #    print('a')
+
+
+        cov_theta_cand.update_tau(m)
+
+        # if (m % 100 == 0) and (m > 300):
+        #     delta = min(0.1, 5 / sqrt(m + 1))
+        #     tau[np.where(count_100 < 23)] = tau[np.where(count_100 < 23)] - delta
+        #     tau[np.where(count_100 > 23)] = tau[np.where(count_100 > 23)] + delta
+        #     count_100 *= 0
         #------------------------------------------------------------------------------------------
         # decorrelation step
         if m % setup.decor == 0:
@@ -756,73 +929,130 @@ def calibPool(setup):
                     tran_unif(theta_cand, setup.bounds_mat, setup.bounds.keys()), setup.bounds,
                     )
                 pred_cand = [_.copy() for _ in pred_curr]
-                sse_cand[:] = sse_curr.copy()
+                llik_cand[:] = llik_curr.copy()
 
                 if np.any(good_values):
-                    sse_cand[good_values] = 0.
+                    llik_cand[good_values] = 0.
                     for i in range(setup.nexp):
                         pred_cand[i][good_values] = setup.models[i].eval(
                             tran_unif(theta_cand[good_values],#.repeat(setup.ns2[i], axis = 0), 
                             setup.bounds_mat, setup.bounds.keys()),
                             )
-                        sse_cand += (((pred_cand[i] - setup.ys[i])**2 @ s2_ind_mat[i]) / s2[i][m-1]).sum(axis = 1)
+                        for t in range(setup.ntemps):
+                            llik_cand[t] += setup.models[i].llik(pred_cand[i][t], marg_lik_cov_curr[i][t])#(((pred_cand[i] - setup.ys[i])**2 @ s2_ind_mat[i]) / s2[i][m-1]).sum(axis = 1)
 
                 alpha[:] = -np.inf
-                tsq_diff = 0.#((theta_cand * theta_cand).sum(axis = 1) - (theta[m] * theta[m]).sum(axis = 1))[good_values]
-                sse_diff = (sse_cand - sse_curr)[good_values]
-                alpha[good_values] = -0.5 * setup.itl[good_values] * (sse_diff + tsq_diff) + 0.5 * tsq_diff # last is for proposal, since this is an independence sampler step
+                #tsq_diff = 0.#((theta_cand * theta_cand).sum(axis = 1) - (theta[m] * theta[m]).sum(axis = 1))[good_values]
+                llik_diff = (llik_cand - llik_curr)[good_values]
+                alpha[good_values] = setup.itl[good_values] * (llik_diff)# + tsq_diff) + 0.5 * tsq_diff # last is for proposal, since this is an independence sampler step
                 for t in np.where(np.log(uniform(size = setup.ntemps)) < alpha)[0]:
-                    theta[m,t,k] = theta_cand[t,k]
+                    theta[m,t,k] = theta_cand[t,k].copy()
                     count_decor[k,t] += 1
                     for i in range(setup.nexp):
-                        pred_curr[i][t] = pred_cand[i][t]
-                    sse_curr[t] = sse_cand[t]
+                        pred_curr[i][t] = pred_cand[i][t].copy()
+                    llik_curr[t] = llik_cand[t].copy()
+
+
         #------------------------------------------------------------------------------------------
-        ## Gibbs update s2
-        sse_curr[:] = 0.
+        ## M-H update s2
+
         for i in range(setup.nexp):
-            dev_sq[i][:] = (pred_curr[i] - setup.ys[i])**2 @ s2_ind_mat[i] # squared deviations
-            s2[i][m] = 1 / np.random.gamma(
-                    itl_mat[i] * (setup.ny_s2[i] / 2 + setup.ig_a[i] + 1) - 1,
-                    1 / (itl_mat[i] * (setup.ig_b[i] + dev_sq[i] / 2)),
-                    )
-            sse_curr += (dev_sq[i] / s2[i][m]).sum(axis = 1)
+            cov_ls2_cand[i].update(log_s2[i], m)
+
+        ls2_cand = [cov_ls2_cand[i].gen_cand(log_s2[i], m) for i in range(setup.nexp)]
+        
+        llik_cand[:] = 0.
+        marg_lik_cov_cand = [None] * setup.nexp
+        for i in range(setup.nexp):
+            marg_lik_cov_cand[i] = [None] * setup.ntemps
+            for t in range(setup.ntemps):
+                marg_lik_cov_cand[i][t] = setup.models[i].lik_cov_inv(np.exp(ls2_cand[i][t])[setup.s2_ind[i]])#s2[i][0, t, setup.s2_ind[i]])
+                llik_cand[t] += setup.models[i].llik(pred_curr[i][t], marg_lik_cov_cand[i][t])
+        
+        llik_diff = (llik_cand - llik_curr)
+        alpha[:] = - np.inf
+        alpha = setup.itl * (llik_diff)
+        for i in range(setup.nexp):
+            alpha += setup.s2_prior_kern[i](np.exp(ls2_cand[i]), setup.ig_a[i], setup.ig_b[i]).sum(axis=1)#ldhc_kern(np.exp(ls2_cand[i])).sum(axis=1)#ldig_kern(np.exp(ls2_cand[i]),setup.ig_a[i],setup.ig_b[i]).sum(axis=1)
+            alpha += ls2_cand[i].sum(axis=1)
+            alpha -= setup.s2_prior_kern[i](np.exp(log_s2[i][m-1]), setup.ig_a[i], setup.ig_b[i]).sum(axis=1)#ldhc_kern(np.exp(log_s2[i][m-1])).sum(axis=1)#ldig_kern(np.exp(log_s2[i][m-1]),setup.ig_a[i],setup.ig_b[i]).sum(axis=1)
+            alpha -= log_s2[i][m-1].sum(axis=1)
+
+        for t in np.where(np.log(uniform(size=setup.ntemps)) < alpha)[0]:
+            count_s2[t,t] += 1
+            llik_curr[t] = llik_cand[t].copy()
+            for i in range(setup.nexp):
+                log_s2[i][m][t] = ls2_cand[i][t].copy()
+                marg_lik_cov_curr[i][t] = marg_lik_cov_cand[i][t].copy()
+                cov_ls2_cand[i].count_100[t] += 1
+
+        #else: 
+            #print(log_s2[i][m][0])
+
+        for i in range(setup.nexp):
+            cov_ls2_cand[i].update_tau(m)
+
+        # sse_curr[:] = 0.
+        # for i in range(setup.nexp):
+        #     dev_sq[i][:] = (pred_curr[i] - setup.ys[i])**2 @ s2_ind_mat[i] # squared deviations
+        #     s2[i][m] = 1 / np.random.gamma(
+        #             itl_mat[i] * (setup.ny_s2[i] / 2 + setup.ig_a[i] + 1) - 1,
+        #             1 / (itl_mat[i] * (setup.ig_b[i] + dev_sq[i] / 2)),
+        #             )
+        #     sse_curr += (dev_sq[i] / s2[i][m]).sum(axis = 1)
         #------------------------------------------------------------------------------------------
+        
         ## tempering swaps
         if m > 1000 and setup.ntemps > 1:
             for _ in range(setup.nswap):
                 sw = np.random.choice(setup.ntemps, 2 * setup.nswap_per, replace = False).reshape(-1,2)
                 sw_alpha[:] = 0.  # Log Probability of Swap
-                sw_alpha += 0.5 * (setup.itl[sw.T[1]] - setup.itl[sw.T[0]])*(sse_curr[sw.T[1]] - sse_curr[sw.T[0]])
+                sw_alpha += (setup.itl[sw.T[1]] - setup.itl[sw.T[0]])*(llik_curr[sw.T[0]] - llik_curr[sw.T[1]])
                 for i in range(setup.nexp):
                     sw_alpha += (setup.itl[sw.T[1]] - setup.itl[sw.T[0]])*(
-                        - 0.5 * (setup.ny_s2[i] * np.log(s2[i][m][sw.T[0]])).sum(axis = 1)
-                        - ((setup.ig_a[i] + 1) * np.log(s2[i][m][sw.T[0]])).sum(axis = 1)
-                        - (setup.ig_b[i] / s2[i][m][sw.T[0]]).sum(axis = 1)
-                        + 0.5 * (setup.ny_s2[i] * np.log(s2[i][m][sw.T[1]])).sum(axis = 1)
-                        + ((setup.ig_a[i] + 1) * np.log(s2[i][m][sw.T[1]])).sum(axis = 1)
-                        + (setup.ig_b[i] / s2[i][m][sw.T[1]]).sum(axis = 1)
+                     #   - 0.5 * (setup.ny_s2[i] * np.log(s2[i][m][sw.T[0]])).sum(axis = 1)
+                        setup.s2_prior_kern[i](np.exp(log_s2[i][m][sw.T[0]]), setup.ig_a[i], setup.ig_b[i]).sum(axis = 1)#ldig_kern(np.exp(log_s2[i][m][sw.T[0]]), setup.ig_a[i], setup.ig_b[i]).sum(axis = 1)
+                        -setup.s2_prior_kern[i](np.exp(log_s2[i][m][sw.T[1]]), setup.ig_a[i], setup.ig_b[i]).sum(axis = 1)#-ldig_kern(np.exp(log_s2[i][m][sw.T[1]]), setup.ig_a[i], setup.ig_b[i]).sum(axis = 1)
+                        
+                        # - ((setup.ig_a[i] + 1) * np.log(s2[i][m][sw.T[0]])).sum(axis = 1)
+                        # - (setup.ig_b[i] / s2[i][m][sw.T[0]]).sum(axis = 1)
+                        # + 0.5 * (setup.ny_s2[i] * np.log(s2[i][m][sw.T[1]])).sum(axis = 1)
+                        # + ((setup.ig_a[i] + 1) * np.log(s2[i][m][sw.T[1]])).sum(axis = 1)
+                        # + (setup.ig_b[i] / s2[i][m][sw.T[1]]).sum(axis = 1)
                         )
-                sw_alpha = sw_alpha + (setup.itl[sw.T[1]] - setup.itl[sw.T[0]]) * ( # probit transform jacobian
-                     - 0.5 * (theta[m][sw.T[0]]**2).sum(axis = 1)
-                     + 0.5 * (theta[m][sw.T[1]]**2).sum(axis = 1)
-                     )
+                # sw_alpha = sw_alpha + (setup.itl[sw.T[1]] - setup.itl[sw.T[0]]) * ( # probit transform jacobian
+                #      - 0.5 * (theta[m][sw.T[0]]**2).sum(axis = 1)
+                #      + 0.5 * (theta[m][sw.T[1]]**2).sum(axis = 1)
+                #      )
                 for tt in sw[np.where(np.log(uniform(size = setup.nswap_per)) < sw_alpha)[0]]:
+
+                    for i in range(setup.nexp):
+                        log_s2[i][m][tt[0]], log_s2[i][m][tt[1]] = log_s2[i][m][tt[1]].copy(), log_s2[i][m][tt[0]].copy()
+                        marg_lik_cov_curr[i][tt[0]], marg_lik_cov_curr[i][tt[1]] = marg_lik_cov_curr[i][tt[1]].copy(), marg_lik_cov_curr[i][tt[0]].copy()
+                        pred_curr[i][tt[0]], pred_curr[i][tt[1]] = pred_curr[i][tt[1]].copy(), pred_curr[i][tt[0]].copy()
+                    
                     count[tt[0],tt[1]] += 1
                     theta[m][tt[0]], theta[m][tt[1]] = theta[m][tt[1]].copy(), theta[m][tt[0]].copy()
-                    sse_curr[tt[0]], sse_curr[tt[1]] = sse_curr[tt[1]].copy(), sse_curr[tt[0]].copy()
-                    for i in range(setup.nexp):
-                        s2[i][m][tt[0]], s2[i][m][tt[1]] = s2[i][m][tt[1]].copy(), s2[i][m][tt[0]].copy()
-                        pred_curr[i][tt[0]], pred_curr[i][tt[1]] = pred_curr[i][tt[1]].copy(), pred_curr[i][tt[0]].copy()
+                    llik_curr[tt[0]], llik_curr[tt[1]] = llik_curr[tt[1]].copy(), llik_curr[tt[0]].copy()
                     # s2_vec_curr = [s2[i][m,:,setup.s2_ind[i]] for i in range(setup.nexp)]
+                    if np.exp(log_s2[i][m][0])>1 and m>1000:
+                        print('asdf')
             
         print('\rCalibration MCMC {:.01%} Complete'.format(m / setup.nmcmc), end='')
+
+    s2 = log_s2.copy()
+    for i in range(setup.nexp):
+        s2[i] = np.exp(log_s2[i])
 
     t1 = time.time()
     print('\rCalibration MCMC Complete. Time: {:f} seconds.'.format(t1 - t0))
     count = count + count.T - np.diag(np.diag(count))
-    out = OutCalibPool(theta, s2, count, count_decor, count_100, tau, pred_curr)
+    out = OutCalibPool(theta, s2, count, count_s2, count_decor, cov_theta_cand, cov_ls2_cand, pred_curr)
     return(out)
+
+
+##############################################################################################################################################################################
+
 
 def sample_delta_per_temperature(curr_delta_t, njs_t, log_posts_t, inv_temp_t, eta_t):
     """ Given log-posteriors, current delta -- 
