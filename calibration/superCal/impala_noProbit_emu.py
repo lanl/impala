@@ -316,7 +316,7 @@ class AMcov_pool:
     def update_tau(self, m):
         # diminishing adaptation based on acceptance rate for each temperature
         if (m % 100 == 0) and (m > self.start_adapt_iter):
-            delta = min(0.1, 15 / sqrt(m + 1))
+            delta = min(0.1, 5 / sqrt(m + 1))
             self.tau[np.where(self.count_100 < 23)] = self.tau[np.where(self.count_100 < 23)] - delta
             self.tau[np.where(self.count_100 > 23)] = self.tau[np.where(self.count_100 > 23)] + delta
             self.count_100 *= 0
@@ -791,7 +791,7 @@ def calibPool(setup):
 
     pred_curr = [None] * setup.nexp
     # sse_curr = np.empty([setup.ntemps, setup.nexp])
-    llik_curr = np.empty([setup.ntemps])
+    llik_curr = np.empty([setup.nexp, setup.ntemps])
     #dev_sq = [np.empty((setup.ntemps, setup.ns2[i])) for i in range(setup.nexp)]
     marg_lik_cov_curr = [None] * setup.nexp
     for i in range(setup.nexp):
@@ -808,21 +808,21 @@ def calibPool(setup):
         # sse_curr[:, i] = np.sum((pred_curr[i] - setup.ys[i]) ** 2 / s2_vec_curr[i].T, 1)
         #((pred_curr[i] - setup.ys[i])**2 @ s2_ind_mat[i] / s2[i][0]).sum(axis = 1)
         for t in range(setup.ntemps):
-            llik_curr[t] += setup.models[i].llik(pred_curr[i][t], marg_lik_cov_curr[i][t])
+            llik_curr[i, t] = setup.models[i].llik(pred_curr[i][t], marg_lik_cov_curr[i][t])
 
     #eps  = 1.0e-13
     #tau  = np.repeat(-4.0, setup.ntemps)
     #AM_const   = 2.4**2/setup.p
     #S    = np.empty([setup.ntemps, setup.p, setup.p])
     #S[:] = np.eye(setup.p)*1e-6
-    cov  = np.empty([setup.ntemps, setup.p, setup.p])
-    mu   = np.empty([setup.ntemps, setup.p])
+    #cov  = np.empty([setup.ntemps, setup.p, setup.p])
+    #mu   = np.empty([setup.ntemps, setup.p])
 
     cov_theta_cand = AMcov_pool(setup.ntemps, setup.p)
-    cov_ls2_cand = [AMcov_pool(setup.ntemps, setup.ns2[i]) for i in range(setup.nexp)]
+    cov_ls2_cand = [AMcov_pool(setup.ntemps, setup.ns2[i], start_var=1e-5) for i in range(setup.nexp)]
 
     count = np.zeros([setup.ntemps, setup.ntemps], dtype = int)
-    count_s2 = np.zeros([setup.ntemps, setup.ntemps], dtype = int)
+    count_s2 = np.zeros([setup.nexp, setup.ntemps], dtype = int)
     count_decor = np.zeros([setup.p, setup.ntemps], dtype = int)
     #count_100 = np.zeros(setup.ntemps, dtype = int)
 
@@ -830,12 +830,13 @@ def calibPool(setup):
     llik_cand = llik_curr.copy()
 
     alpha    = np.ones(setup.ntemps) * (-np.inf)
+    alpha_s2 = np.ones([setup.nexp, setup.ntemps]) * (-np.inf)
     sw_alpha = np.zeros(setup.nswap_per)
 
 
 
     ## start MCMC
-    for m in range(1,setup.nmcmc):
+    for m in range(1, setup.nmcmc):
         
 
         theta[m] = theta[m-1].copy() # current set to previous, will change if accepted
@@ -882,7 +883,7 @@ def calibPool(setup):
         pred_cand = [_.copy() for _ in pred_curr]
         llik_cand[:] = llik_curr.copy()
         if np.any(good_values):
-            llik_cand[good_values] = 0.
+            llik_cand[:, good_values] = 0.
             for i in range(setup.nexp):
                 pred_cand[i][good_values] = setup.models[i].eval(
                     tran_unif(
@@ -891,10 +892,10 @@ def calibPool(setup):
                         )
                     )
                 for t in range(setup.ntemps):
-                    llik_cand[t] += setup.models[i].llik(pred_cand[i][t], marg_lik_cov_curr[i][t])#(((pred_cand[i] - setup.ys[i])**2 @ s2_ind_mat[i]) / s2[i][m-1]).sum(axis = 1)
+                    llik_cand[i, t] = setup.models[i].llik(pred_cand[i][t], marg_lik_cov_curr[i][t])#(((pred_cand[i] - setup.ys[i])**2 @ s2_ind_mat[i]) / s2[i][m-1]).sum(axis = 1)
 
         #tsq_diff = 0.#((theta_cand * theta_cand).sum(axis = 1) - (theta[m-1] * theta[m-1]).sum(axis = 1))[good_values]
-        llik_diff = (llik_cand - llik_curr)[good_values] # sum over experiments
+        llik_diff = (llik_cand.sum(axis=0) - llik_curr.sum(axis=0))[good_values] # sum over experiments
         #------------------------------------------------------------------------------------------
         # for each temperature, accept or reject
         alpha[:] = - np.inf
@@ -902,8 +903,8 @@ def calibPool(setup):
         for t in np.where(np.log(uniform(size=setup.ntemps)) < alpha)[0]:
             theta[m,t] = theta_cand[t].copy()
             count[t,t] += 1
-            llik_curr[t] = llik_cand[t].copy()
             for i in range(setup.nexp):
+                llik_curr[i, t] = llik_cand[i, t].copy()
                 pred_curr[i][t] = pred_cand[i][t].copy()
             cov_theta_cand.count_100[t] += 1
         #------------------------------------------------------------------------------------------
@@ -932,25 +933,25 @@ def calibPool(setup):
                 llik_cand[:] = llik_curr.copy()
 
                 if np.any(good_values):
-                    llik_cand[good_values] = 0.
+                    llik_cand[:, good_values] = 0.
                     for i in range(setup.nexp):
                         pred_cand[i][good_values] = setup.models[i].eval(
                             tran_unif(theta_cand[good_values],#.repeat(setup.ns2[i], axis = 0), 
                             setup.bounds_mat, setup.bounds.keys()),
                             )
                         for t in range(setup.ntemps):
-                            llik_cand[t] += setup.models[i].llik(pred_cand[i][t], marg_lik_cov_curr[i][t])#(((pred_cand[i] - setup.ys[i])**2 @ s2_ind_mat[i]) / s2[i][m-1]).sum(axis = 1)
+                            llik_cand[i, t] = setup.models[i].llik(pred_cand[i][t], marg_lik_cov_curr[i][t])#(((pred_cand[i] - setup.ys[i])**2 @ s2_ind_mat[i]) / s2[i][m-1]).sum(axis = 1)
 
                 alpha[:] = -np.inf
                 #tsq_diff = 0.#((theta_cand * theta_cand).sum(axis = 1) - (theta[m] * theta[m]).sum(axis = 1))[good_values]
-                llik_diff = (llik_cand - llik_curr)[good_values]
+                llik_diff = (llik_cand.sum(axis=0) - llik_curr.sum(axis=0))[good_values]
                 alpha[good_values] = setup.itl[good_values] * (llik_diff)# + tsq_diff) + 0.5 * tsq_diff # last is for proposal, since this is an independence sampler step
                 for t in np.where(np.log(uniform(size = setup.ntemps)) < alpha)[0]:
                     theta[m,t,k] = theta_cand[t,k].copy()
                     count_decor[k,t] += 1
                     for i in range(setup.nexp):
                         pred_curr[i][t] = pred_cand[i][t].copy()
-                    llik_curr[t] = llik_cand[t].copy()
+                        llik_curr[i, t] = llik_cand[i, t].copy()
 
 
         #------------------------------------------------------------------------------------------
@@ -967,76 +968,50 @@ def calibPool(setup):
             marg_lik_cov_cand[i] = [None] * setup.ntemps
             for t in range(setup.ntemps):
                 marg_lik_cov_cand[i][t] = setup.models[i].lik_cov_inv(np.exp(ls2_cand[i][t])[setup.s2_ind[i]])#s2[i][0, t, setup.s2_ind[i]])
-                llik_cand[t] += setup.models[i].llik(pred_curr[i][t], marg_lik_cov_cand[i][t])
+                llik_cand[i, t] = setup.models[i].llik(pred_curr[i][t], marg_lik_cov_cand[i][t])
         
         llik_diff = (llik_cand - llik_curr)
-        alpha[:] = - np.inf
-        alpha = setup.itl * (llik_diff)
+        alpha_s2[:] = - np.inf
+        alpha_s2 = setup.itl * (llik_diff)       
         for i in range(setup.nexp):
-            alpha += setup.s2_prior_kern[i](np.exp(ls2_cand[i]), setup.ig_a[i], setup.ig_b[i]).sum(axis=1)#ldhc_kern(np.exp(ls2_cand[i])).sum(axis=1)#ldig_kern(np.exp(ls2_cand[i]),setup.ig_a[i],setup.ig_b[i]).sum(axis=1)
-            alpha += ls2_cand[i].sum(axis=1)
-            alpha -= setup.s2_prior_kern[i](np.exp(log_s2[i][m-1]), setup.ig_a[i], setup.ig_b[i]).sum(axis=1)#ldhc_kern(np.exp(log_s2[i][m-1])).sum(axis=1)#ldig_kern(np.exp(log_s2[i][m-1]),setup.ig_a[i],setup.ig_b[i]).sum(axis=1)
-            alpha -= log_s2[i][m-1].sum(axis=1)
+            alpha_s2[i,:] += setup.itl * setup.s2_prior_kern[i](np.exp(ls2_cand[i]), setup.ig_a[i], setup.ig_b[i]).sum(axis=1)#ldhc_kern(np.exp(ls2_cand[i])).sum(axis=1)#ldig_kern(np.exp(ls2_cand[i]),setup.ig_a[i],setup.ig_b[i]).sum(axis=1)
+            alpha_s2[i,:] += setup.itl * ls2_cand[i].sum(axis=1)
+            alpha_s2[i,:] -= setup.itl * setup.s2_prior_kern[i](np.exp(log_s2[i][m-1]), setup.ig_a[i], setup.ig_b[i]).sum(axis=1)#ldhc_kern(np.exp(log_s2[i][m-1])).sum(axis=1)#ldig_kern(np.exp(log_s2[i][m-1]),setup.ig_a[i],setup.ig_b[i]).sum(axis=1)
+            alpha_s2[i,:] -= setup.itl * log_s2[i][m-1].sum(axis=1)
 
-        for t in np.where(np.log(uniform(size=setup.ntemps)) < alpha)[0]:
-            count_s2[t,t] += 1
-            llik_curr[t] = llik_cand[t].copy()
-            for i in range(setup.nexp):
+        runif = np.log(uniform(size=[setup.nexp, setup.ntemps]))
+        for i in range(setup.nexp):
+            for t in np.where(runif[i] < alpha_s2[i])[0]:
+                count_s2[i, t] += 1
+                llik_curr[i, t] = llik_cand[i, t].copy()
                 log_s2[i][m][t] = ls2_cand[i][t].copy()
                 marg_lik_cov_curr[i][t] = marg_lik_cov_cand[i][t].copy()
                 cov_ls2_cand[i].count_100[t] += 1
 
-        #else: 
-            #print(log_s2[i][m][0])
-
         for i in range(setup.nexp):
             cov_ls2_cand[i].update_tau(m)
-
-        # sse_curr[:] = 0.
-        # for i in range(setup.nexp):
-        #     dev_sq[i][:] = (pred_curr[i] - setup.ys[i])**2 @ s2_ind_mat[i] # squared deviations
-        #     s2[i][m] = 1 / np.random.gamma(
-        #             itl_mat[i] * (setup.ny_s2[i] / 2 + setup.ig_a[i] + 1) - 1,
-        #             1 / (itl_mat[i] * (setup.ig_b[i] + dev_sq[i] / 2)),
-        #             )
-        #     sse_curr += (dev_sq[i] / s2[i][m]).sum(axis = 1)
-        #------------------------------------------------------------------------------------------
         
         ## tempering swaps
         if m > 1000 and setup.ntemps > 1:
             for _ in range(setup.nswap):
                 sw = np.random.choice(setup.ntemps, 2 * setup.nswap_per, replace = False).reshape(-1,2)
                 sw_alpha[:] = 0.  # Log Probability of Swap
-                sw_alpha += (setup.itl[sw.T[1]] - setup.itl[sw.T[0]])*(llik_curr[sw.T[0]] - llik_curr[sw.T[1]])
+                sw_alpha += (setup.itl[sw.T[1]] - setup.itl[sw.T[0]])*(llik_curr[:, sw.T[0]].sum(axis=0) - llik_curr[:, sw.T[1]].sum(axis=0))
                 for i in range(setup.nexp):
                     sw_alpha += (setup.itl[sw.T[1]] - setup.itl[sw.T[0]])*(
-                     #   - 0.5 * (setup.ny_s2[i] * np.log(s2[i][m][sw.T[0]])).sum(axis = 1)
-                        setup.s2_prior_kern[i](np.exp(log_s2[i][m][sw.T[0]]), setup.ig_a[i], setup.ig_b[i]).sum(axis = 1)#ldig_kern(np.exp(log_s2[i][m][sw.T[0]]), setup.ig_a[i], setup.ig_b[i]).sum(axis = 1)
-                        -setup.s2_prior_kern[i](np.exp(log_s2[i][m][sw.T[1]]), setup.ig_a[i], setup.ig_b[i]).sum(axis = 1)#-ldig_kern(np.exp(log_s2[i][m][sw.T[1]]), setup.ig_a[i], setup.ig_b[i]).sum(axis = 1)
-                        
-                        # - ((setup.ig_a[i] + 1) * np.log(s2[i][m][sw.T[0]])).sum(axis = 1)
-                        # - (setup.ig_b[i] / s2[i][m][sw.T[0]]).sum(axis = 1)
-                        # + 0.5 * (setup.ny_s2[i] * np.log(s2[i][m][sw.T[1]])).sum(axis = 1)
-                        # + ((setup.ig_a[i] + 1) * np.log(s2[i][m][sw.T[1]])).sum(axis = 1)
-                        # + (setup.ig_b[i] / s2[i][m][sw.T[1]]).sum(axis = 1)
+                        setup.s2_prior_kern[i](np.exp(log_s2[i][m][sw.T[0]]), setup.ig_a[i], setup.ig_b[i]).sum(axis = 1)
+                        -setup.s2_prior_kern[i](np.exp(log_s2[i][m][sw.T[1]]), setup.ig_a[i], setup.ig_b[i]).sum(axis = 1)
                         )
-                # sw_alpha = sw_alpha + (setup.itl[sw.T[1]] - setup.itl[sw.T[0]]) * ( # probit transform jacobian
-                #      - 0.5 * (theta[m][sw.T[0]]**2).sum(axis = 1)
-                #      + 0.5 * (theta[m][sw.T[1]]**2).sum(axis = 1)
-                #      )
                 for tt in sw[np.where(np.log(uniform(size = setup.nswap_per)) < sw_alpha)[0]]:
-
                     for i in range(setup.nexp):
                         log_s2[i][m][tt[0]], log_s2[i][m][tt[1]] = log_s2[i][m][tt[1]].copy(), log_s2[i][m][tt[0]].copy()
                         marg_lik_cov_curr[i][tt[0]], marg_lik_cov_curr[i][tt[1]] = marg_lik_cov_curr[i][tt[1]].copy(), marg_lik_cov_curr[i][tt[0]].copy()
                         pred_curr[i][tt[0]], pred_curr[i][tt[1]] = pred_curr[i][tt[1]].copy(), pred_curr[i][tt[0]].copy()
-                    
+                        llik_curr[i, tt[0]], llik_curr[i, tt[1]] = llik_curr[i, tt[1]].copy(), llik_curr[i, tt[0]].copy()
+                        #if np.any(np.exp(log_s2[i][m][0]) > 10*np.exp(log_s2[i][m-1][0])):
+                        #    print('bummer2')
                     count[tt[0],tt[1]] += 1
                     theta[m][tt[0]], theta[m][tt[1]] = theta[m][tt[1]].copy(), theta[m][tt[0]].copy()
-                    llik_curr[tt[0]], llik_curr[tt[1]] = llik_curr[tt[1]].copy(), llik_curr[tt[0]].copy()
-                    # s2_vec_curr = [s2[i][m,:,setup.s2_ind[i]] for i in range(setup.nexp)]
-                    if np.exp(log_s2[i][m][0])>1 and m>1000:
-                        print('asdf')
             
         print('\rCalibration MCMC {:.01%} Complete'.format(m / setup.nmcmc), end='')
 
