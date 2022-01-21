@@ -1,11 +1,11 @@
 import setuptools
 from setuptools import setup
 
-setup(name='pyBASS',
+setup(name='impala',
       version='0.1',
-      description='Bayesian Adaptive Spline Surfaces',
-      url='http://www.github.com/lanl/pyBASS',
-      author='Devin Francom',
+      description='Bayesian model calibration',
+      url='http://www.github.com/lanl/impala',
+      author='Devin Francom, others',
       author_email='',
       license='BSD-3',
       packages=setuptools.find_packages(),
@@ -15,6 +15,7 @@ setup(name='pyBASS',
           'numpy',
           'matplotlib',
           'scipy',
-          'pathos'
+          'pyBASS',
+          'multiprocessing'
       ]
       )

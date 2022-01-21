@@ -29,7 +29,7 @@ others to do so.
 
 LANL software release C19112
 
-Author: Devin Francom
+Authors: Devin Francom, Peter Trubey, others
 
 [build-status-img]: https://github.com/lanl/impala/workflows/Build/badge.svg
 
