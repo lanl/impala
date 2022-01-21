@@ -15,7 +15,6 @@ setup(name='impala',
           'numpy',
           'matplotlib',
           'scipy',
-          'pyBASS',
-          'multiprocessing'
+          'pyBASS'
       ]
       )
