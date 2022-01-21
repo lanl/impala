@@ -1,6 +1,7 @@
 import numpy as np
 import pyBASS as pb
-import physical_models_vec as pm_vec
+#import physical_models_vec as pm_vec
+from impala import physics as pm_vec
 from itertools import cycle
 from scipy.interpolate import interp1d
 from scipy.linalg import cho_factor, cho_solve, cholesky
