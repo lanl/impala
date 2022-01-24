@@ -1033,7 +1033,7 @@ def calibPool(setup):
         if m % setup.decor == 0:
             for k in range(setup.p):
                 theta_cand = theta[m].copy()
-                theta_cand[:,k] = initfunc_probit(size = setup.ntemps) # independence proposal, will vectorize of columns
+                theta_cand[:,k] = initfunc_unif(size = setup.ntemps) # independence proposal, will vectorize of columns
                 good_values = setup.checkConstraints(
                     tran_unif(theta_cand, setup.bounds_mat, setup.bounds.keys()), setup.bounds,
                     )
