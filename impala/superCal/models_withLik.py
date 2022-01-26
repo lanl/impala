@@ -67,6 +67,7 @@ class ModelBassPca_mult(AbstractModel):
         self.emu_vars = self.mod_s2[self.ii]
         self.yobs = None
         self.marg_lik_cov = None
+        self.nd = 0
         return
 
     def step(self):

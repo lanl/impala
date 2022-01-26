@@ -327,6 +327,7 @@ class AMcov_pool:
             self.tau[np.where(self.count_100 < 23)] = self.tau[np.where(self.count_100 < 23)] - delta
             self.tau[np.where(self.count_100 > 23)] = self.tau[np.where(self.count_100 > 23)] + delta
             self.count_100 *= 0
+            # note, e^tau scales whole covariance matrix, so it shrinks covariance for inert inputs too much...need decor for those.
 
     def gen_cand(self, x, m):
             x_cand  = (
