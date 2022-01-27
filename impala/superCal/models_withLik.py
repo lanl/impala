@@ -231,7 +231,7 @@ class ModelPTW(AbstractModel):
         self.stochastic = False
         self.pool = pool
         self.yobs = None
-        self.meas_error_cor = np.diag(self.basis.shape[0])
+        #self.meas_error_cor = np.diag(self.basis.shape[0])
         return
 
 
