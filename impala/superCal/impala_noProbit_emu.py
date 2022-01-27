@@ -519,6 +519,9 @@ def calibHier(setup):
             theta[i][m] = theta[i][m-1].copy() # current set to previous, will change if accepted
             log_s2[i][m] = log_s2[i][m-1].copy()
             setup.models[i].step()
+            #if setup.models[i].stochastic:
+
+            # BUG: need to update pred_curr here??
 
         #------------------------------------------------------------------------------------------
         ## adaptive Metropolis for each temperature / experiment
@@ -947,11 +950,24 @@ def calibPool(setup):
         theta[m] = theta[m-1].copy() # current set to previous, will change if accepted
         for i in range(setup.nexp):
             log_s2[i][m] = log_s2[i][m-1].copy()
-            setup.models[i].step()
-            if setup.models[i].nd>0:
+            if setup.models[i].nd>0: # update discrepancy
                 for t in range(setup.ntemps):
                     discrep_vars[i][m][t] = setup.models[i].discrep_sample(setup.ys[i], pred_curr[i][t], marg_lik_cov_curr[i][t], setup.itl[t])
                     discrep_curr[i][t] = setup.models[i].D @ discrep_vars[i][m][t]
+            
+            setup.models[i].step()
+            if setup.models[i].stochastic: # update emulator
+                pred_curr[i] = setup.models[i].eval(
+                    tran_unif(
+                        theta[m], 
+                        setup.bounds_mat, setup.bounds.keys()
+                        )
+                    )
+            if setup.models[i].nd>0 or setup.models[i].stochastic:
+                for t in range(setup.ntemps):
+                    llik_curr[i, t] = setup.models[i].llik(setup.ys[i] - discrep_curr[i][t], pred_curr[i][t], marg_lik_cov_curr[i][t])
+
+
 
         #----------------------------------------------------------
         ## adaptive Metropolis for each temperature
