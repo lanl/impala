@@ -88,17 +88,23 @@ class CalibSetup:
         else:
             self.s2_prior_kern.append(ldig_kern)
         return
-    def setTemperatureLadder(self, temperature_ladder):
+    def setTemperatureLadder(self, temperature_ladder, start_temper=1000):
         self.tl = temperature_ladder
         self.itl = 1/self.tl
         self.ntemps = len(self.tl)
         self.nswap_per = floor(self.ntemps // 2)
+        self.start_temper = start_temper
         return
-    def setMCMC(self, nmcmc, nburn, thin, decor):
+    def setMCMC(self, nmcmc, nburn=0, thin=1, decor=100, start_var_theta=1e-8, start_tau_theta = 0., start_var_ls2=1e-5, start_tau_ls2=0., start_adapt_iter=300):
         self.nmcmc = nmcmc
         self.nburn = nburn
         self.thin = thin
         self.decor = decor
+        self.start_var_theta = start_var_theta
+        self.start_tau_theta = start_tau_theta
+        self.start_var_ls2 = start_var_ls2
+        self.start_tau_ls2 = start_tau_ls2
+        self.start_adapt_iter = start_adapt_iter
         return
     def set_max_clusters(self, nclustmax):
         self.nclustmax = nclustmax
@@ -281,7 +287,7 @@ def ldhc_kern(x, a, b): # half cauchy
 
 from collections import namedtuple
 OutCalibPool = namedtuple(
-    'OutCalibPool', 'theta s2 count count_s2 count_decor cov_theta_cand cov_ls2_cand pred_curr discrep_vars',
+    'OutCalibPool', 'theta s2 count count_s2 count_decor cov_theta_cand cov_ls2_cand pred_curr discrep_vars llik',
     )
 OutCalibHier = namedtuple(
     'OutCalibHier', 'theta s2 count count_s2 count_decor2 cov_theta_cand cov_ls2_cand count_temper pred_curr theta0 Sigma0',
@@ -292,10 +298,10 @@ OutCalibClust = namedtuple(
 
 
 class AMcov_pool:
-    def __init__(self, ntemps, p, start_var=1e-4, start_adapt_iter=300):
+    def __init__(self, ntemps, p, start_var=1e-4, start_adapt_iter=300, tau_start=0.):
         self.eps = 1.0e-12
         self.AM_SCALAR = 2.4**2 / p
-        self.tau  = np.repeat(0., ntemps)
+        self.tau  = np.repeat(tau_start, ntemps)
         self.S    = np.empty([ntemps, p, p])
         self.S[:] = np.eye(p) * start_var
         self.cov  = np.empty([ntemps, p, p])
@@ -323,7 +329,7 @@ class AMcov_pool:
     def update_tau(self, m):
         # diminishing adaptation based on acceptance rate for each temperature
         if (m % 100 == 0) and (m > self.start_adapt_iter):
-            delta = min(0.1, 5 / sqrt(m + 1))
+            delta = min(0.5, 5 / sqrt(m + 1))
             self.tau[np.where(self.count_100 < 23)] = self.tau[np.where(self.count_100 < 23)] - delta
             self.tau[np.where(self.count_100 > 23)] = self.tau[np.where(self.count_100 > 23)] + delta
             self.count_100 *= 0
@@ -1117,7 +1123,7 @@ def calibPool(setup):
             cov_ls2_cand[i].update_tau(m)
         
         ## tempering swaps
-        if m > 1000 and setup.ntemps > 1:
+        if m > setup.start_temper and setup.ntemps > 1:
             for _ in range(setup.nswap):
                 sw = np.random.choice(setup.ntemps, 2 * setup.nswap_per, replace = False).reshape(-1,2)
                 sw_alpha[:] = 0.  # Log Probability of Swap
@@ -1144,7 +1150,8 @@ def calibPool(setup):
                         #    print('bummer2')
                     count[tt[0],tt[1]] += 1
                     theta[m][tt[0]], theta[m][tt[1]] = theta[m][tt[1]].copy(), theta[m][tt[0]].copy()
-            
+   
+        llik[m] = llik_curr[:, 0].sum()
         print('\rCalibration MCMC {:.01%} Complete'.format(m / setup.nmcmc), end='')
 
     s2 = log_s2.copy()
@@ -1154,7 +1161,7 @@ def calibPool(setup):
     t1 = time.time()
     print('\rCalibration MCMC Complete. Time: {:f} seconds.'.format(t1 - t0))
     count = count + count.T - np.diag(np.diag(count))
-    out = OutCalibPool(theta, s2, count, count_s2, count_decor, cov_theta_cand, cov_ls2_cand, pred_curr, discrep_vars)
+    out = OutCalibPool(theta, s2, count, count_s2, count_decor, cov_theta_cand, cov_ls2_cand, pred_curr, discrep_vars, llik)
     return(out)
 
 

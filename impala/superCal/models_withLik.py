@@ -239,7 +239,7 @@ class ModelPTW(AbstractModel):
         """ parmat:  dictionary of parameters """
         if (pool is True) or self.pool:  # Pooled Case
             nrep = parmat['p'].shape[0]  # number of temper temps
-            parmat_big = {key : np.kron(np.ones(self.nexp), parm) for key, parm in parmat.items()}
+            parmat_big = {key : np.kron(parm, np.ones(self.nexp)) for key, parm in parmat.items()}
         else: # hierarchical case
             nrep = parmat['p'].shape[0] // self.nexp # number of temper temps
             parmat_big = parmat
