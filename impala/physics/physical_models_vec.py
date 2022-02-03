@@ -220,6 +220,17 @@ class Constant_Yield_Stress(BaseModel):
     def value(self, *args):
         return self.parent.parameters.yield_stress
 
+def fast_pow(a, b):
+    """
+    Numpy power is slow, this is faster.  Gets a**b for a and b np arrays.
+    """
+    cond = a>0
+    out = a * 0.
+    out[cond] = np.exp(b[cond] * np.log(a[cond]))
+    return out
+
+pos = lambda a: (abs(a) + a) / 2 # same as max(0,a)
+
 class JC_Yield_Stress(BaseModel):
     params = ['A','B','C','n','m']
     consts = ['Tref','edot0','chi']
@@ -230,12 +241,13 @@ class JC_Yield_Stress(BaseModel):
         t     = self.parent.state.T
         tmelt = self.parent.state.Tmelt
 
-        th = np.max([(t - mp.Tref) / (tmelt - mp.Tref), 0.])
+        #th = np.max([(t - mp.Tref) / (tmelt - mp.Tref), 0.])
+        th = pos((t - mp.Tref) / (tmelt - mp.Tref))
 
         Y = (
-            (mp.A + mp.B * eps ** mp.n) *
+            (mp.A + mp.B * fast_pow(eps, mp.n)) *
             (1. + mp.C * np.log(edot / mp.edot0)) *
-            (1. - th ** mp.m)
+            (1. - fast_pow(th, mp.m))
             )
         return Y
 
@@ -385,9 +397,15 @@ class Stein_Flow_Stress(BaseModel):
         tmelt = self.parent.state.Tmelt
         shear = self.parent.state.G
         eps   = self.parent.state.strain
-        fnow  = (1.0+mp.beta*(mp.epsi+eps))**mp.n
-        if fnow*mp.y0 > mp.ymax: fnow = mp.ymax/mp.y0
-        if temp > tmelt: fnow = 0.0
+        fnow  = fast_pow((1.0+mp.beta*(mp.epsi+eps)), mp.n)
+        
+        cond1 = fnow*mp.y0 > mp.ymax
+        fnow[cond1] = (mp.ymax/mp.y0)[cond1]
+        cond2 = temp > tmelt
+        fnow[cond2] = 0.0
+
+        #if fnow*mp.y0 > mp.ymax: fnow = mp.ymax/mp.y0
+        #if temp > tmelt: fnow = 0.0
         return mp.y0*fnow*shear/mp.G0
 
 ## Parameters Definition
