@@ -207,9 +207,9 @@ class ModelF(AbstractModel):
 
 
 
-class ModelPTW(AbstractModel):
+class ModelMaterialStrength(AbstractModel):
     """ PTW Model for Hoppy-Bar / Quasistatic Experiments """
-    def __init__(self, temps, edots, consts, strain_histories, pool=True):
+    def __init__(self, temps, edots, consts, strain_histories, flow_stress_model, melt_model, shear_model, specific_heat_model, density_model, pool=True):
         """
         temps  : ~
         edots  : ~
@@ -221,7 +221,11 @@ class ModelPTW(AbstractModel):
         self.strain_max = self.meas_strain_max.max()
         self.nhists = sum([len(v) for v in strain_histories])
         self.model = pm_vec.MaterialModel(
-            flow_stress_model=pm_vec.PTW_Yield_Stress, shear_modulus_model=pm_vec.Stein_Shear_Modulus,
+            flow_stress_model=eval('pm_vec.' + flow_stress_model), 
+            shear_modulus_model=eval('pm_vec.' + shear_model),
+            specific_heat_model=eval('pm_vec.' + specific_heat_model),
+            melt_model=eval('pm_vec.' + melt_model),
+            density_model=eval('pm_vec.' + density_model)
             )
         self.constants = consts
         self.temps = temps
@@ -231,6 +235,7 @@ class ModelPTW(AbstractModel):
         self.stochastic = False
         self.pool = pool
         self.yobs = None
+        self.nd = 0
         #self.meas_error_cor = np.diag(self.basis.shape[0])
         return
 
@@ -238,10 +243,11 @@ class ModelPTW(AbstractModel):
     def eval(self, parmat, pool = None): # note: extra parameters ignored
         """ parmat:  dictionary of parameters """
         if (pool is True) or self.pool:  # Pooled Case
-            nrep = parmat['p'].shape[0]  # number of temper temps
+            #nrep = parmat['p'].shape[0]  # number of temper temps
+            nrep = list(parmat.values())[0].shape[0]
             parmat_big = {key : np.kron(parm, np.ones(self.nexp)) for key, parm in parmat.items()}
         else: # hierarchical case
-            nrep = parmat['p'].shape[0] // self.nexp # number of temper temps
+            nrep = list(parmat.values())[0].shape[0] // self.nexp # number of temper temps
             parmat_big = parmat
 
         edots = np.kron(np.ones(nrep), self.edots) # 1d vector, nexp * temper_temps
