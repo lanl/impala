@@ -51,7 +51,8 @@ class CalibSetup:
         self.nswap = 5
         self.s2_prior_kern = []
         return
-    def addVecExperiments(self, yobs, model, sd_est, s2_df, s2_ind, meas_error_cor=None, theta_ind=None, D=None):
+    def addVecExperiments(self, yobs, model, sd_est, s2_df, s2_ind, meas_error_cor=None, theta_ind=None, D=None, discrep_tau=1):
+        # if theta_ind specified, s2_ind is?
         self.ys.append(np.array(yobs))
         self.y_lens.append(len(yobs))
         if theta_ind is None:
@@ -68,6 +69,7 @@ class CalibSetup:
         if D is not None:
             model.D = D
             model.nd = D.shape[1]
+            model.discrep_tau = discrep_tau
 
         self.models.append(model)
         self.nexp += 1
@@ -886,11 +888,11 @@ def calibPool(setup):
         for i in range(setup.nexp)
         ]
     theta_start = initfunc_unif(size=[setup.ntemps, setup.p])
-    good = setup.checkConstraints(tran_probit(theta_start, setup.bounds_mat, setup.bounds.keys()), setup.bounds)
+    good = setup.checkConstraints(tran_unif(theta_start, setup.bounds_mat, setup.bounds.keys()), setup.bounds)
     while np.any(~good):
         theta_start[np.where(~good)] = initfunc_unif(size = [(~good).sum(), setup.p])
         good[np.where(~good)] = setup.checkConstraints(
-            tran_probit(theta_start[np.where(~good)], setup.bounds_mat, setup.bounds.keys()),
+            tran_unif(theta_start[np.where(~good)], setup.bounds_mat, setup.bounds.keys()),
             setup.bounds,
             )
     theta[0] = theta_start
@@ -929,8 +931,8 @@ def calibPool(setup):
     #cov  = np.empty([setup.ntemps, setup.p, setup.p])
     #mu   = np.empty([setup.ntemps, setup.p])
 
-    cov_theta_cand = AMcov_pool(setup.ntemps, setup.p)
-    cov_ls2_cand = [AMcov_pool(setup.ntemps, setup.ns2[i], start_var=1e-5) for i in range(setup.nexp)]
+    cov_theta_cand = AMcov_pool(ntemps = setup.ntemps, p = setup.p, start_var=setup.start_var_theta, tau_start=setup.start_tau_theta, start_adapt_iter=setup.start_adapt_iter)
+    cov_ls2_cand = [AMcov_pool(ntemps = setup.ntemps, p = setup.ns2[i], start_var=setup.start_var_ls2, tau_start=setup.start_tau_ls2, start_adapt_iter=setup.start_adapt_iter) for i in range(setup.nexp)]
 
     count = np.zeros([setup.ntemps, setup.ntemps], dtype = int)
     count_s2 = np.zeros([setup.nexp, setup.ntemps], dtype = int)
@@ -947,7 +949,7 @@ def calibPool(setup):
     alpha_s2 = np.ones([setup.nexp, setup.ntemps]) * (-np.inf)
     sw_alpha = np.zeros(setup.nswap_per)
 
-
+    llik = np.empty(setup.nmcmc)
 
     ## start MCMC
     for m in range(1, setup.nmcmc):
