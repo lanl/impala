@@ -1,7 +1,6 @@
 # impala
-[![Build Status][build-status-img]](https://github.com/lanl/impala/actions)
 
-blah
+Python tools for modular Bayesian model calibration.  Posterior exploration includes tempering and adaptive MCMC.
 
 ## Installation
 Use
