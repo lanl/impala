@@ -916,7 +916,7 @@ def calibPool(setup):
     llik_curr[:] = 0.
     for i in range(setup.nexp):
         pred_curr[i] = setup.models[i].eval(
-            tran_unif(theta[0], setup.bounds_mat, setup.bounds.keys()),
+            tran_unif(theta[0], setup.bounds_mat, setup.bounds.keys()), pool=True
             )
         # sse_curr[:, i] = np.sum((pred_curr[i] - setup.ys[i]) ** 2 / s2_vec_curr[i].T, 1)
         #((pred_curr[i] - setup.ys[i])**2 @ s2_ind_mat[i] / s2[i][0]).sum(axis = 1)
@@ -969,7 +969,7 @@ def calibPool(setup):
                     tran_unif(
                         theta[m], 
                         setup.bounds_mat, setup.bounds.keys()
-                        )
+                        ), pool=True
                     )
             if setup.models[i].nd>0 or setup.models[i].stochastic:
                 for t in range(setup.ntemps):
@@ -1022,7 +1022,7 @@ def calibPool(setup):
                     tran_unif(
                         theta_cand[good_values],#.repeat(setup.ns2[i], axis = 0), 
                         setup.bounds_mat, setup.bounds.keys()
-                        )
+                        ), pool=True
                     )
                 for t in range(setup.ntemps):
                     llik_cand[i, t] = setup.models[i].llik(setup.ys[i] - discrep_curr[i][t], pred_cand[i][t], marg_lik_cov_curr[i][t])#(((pred_cand[i] - setup.ys[i])**2 @ s2_ind_mat[i]) / s2[i][m-1]).sum(axis = 1)
@@ -1070,7 +1070,7 @@ def calibPool(setup):
                     for i in range(setup.nexp):
                         pred_cand[i][good_values] = setup.models[i].eval(
                             tran_unif(theta_cand[good_values],#.repeat(setup.ns2[i], axis = 0), 
-                            setup.bounds_mat, setup.bounds.keys()),
+                            setup.bounds_mat, setup.bounds.keys()), pool=True
                             )
                         for t in range(setup.ntemps):
                             llik_cand[i, t] = setup.models[i].llik(setup.ys[i] - discrep_curr[i][t], pred_cand[i][t], marg_lik_cov_curr[i][t])#(((pred_cand[i] - setup.ys[i])**2 @ s2_ind_mat[i]) / s2[i][m-1]).sum(axis = 1)
