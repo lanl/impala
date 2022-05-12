@@ -477,21 +477,24 @@ def calibHier(setup):
                 )
         pred_curr[i] = setup.models[i].eval(
                 tran_unif(theta[i][0].reshape(setup.ntemps * setup.ntheta[i], setup.p),
-                    setup.bounds_mat, setup.bounds.keys()),
-                ).reshape(setup.ntemps, setup.ntheta[i], setup.y_lens[i])
+                    setup.bounds_mat, setup.bounds.keys()), pool=False
+                )#.reshape(setup.ntemps, setup.y_lens[i])
         pred_cand[i] = pred_curr[i].copy()
 
         marg_lik_cov_curr[i] = [None] * setup.ntemps
+        llik_curr[i] = np.empty([setup.ntemps, setup.ntheta[i]])
         for t in range(setup.ntemps):
             marg_lik_cov_curr[i][t] = [None] * setup.ntheta[i]
-            llik_curr[i] = np.empty([setup.ntemps, setup.ntheta[i]])
+            s2_stretched = log_s2[i][0][t,setup.theta_ind[i]]
             for j in range(setup.ntheta[i]):
-                marg_lik_cov_curr[i][t][j] = setup.models[i].lik_cov_inv(np.exp(log_s2[i][0, t, setup.s2_ind[i]])[setup.s2_ind[i]==j])
+                #marg_lik_cov_curr[i][t][j] = setup.models[i].lik_cov_inv(np.exp(log_s2[i][0, t, setup.s2_ind[i]])[setup.s2_ind[i]==j])
+                marg_lik_cov_curr[i][t][j] = setup.models[i].lik_cov_inv(np.exp(s2_stretched[s2_which_mat[i][j]]))
                 # right now, assuming for vectorized models that new theta means new s2.
                 # if you wanted to have multiple s2 for one theta, you would have to update thetas 
                 # jointly or sequentially (not independently), unless working with diagonal
                 # many possible cases, for now make it work for strength project, generalize later
-                llik_curr[i][t][j] = setup.models[i].llik(setup.ys[i][setup.theta_ind[i]==j], pred_curr[i][t][j][setup.theta_ind[i]==j], marg_lik_cov_curr[i][t][j]) 
+                #llik_curr[i][t][j] = setup.models[i].llik(setup.ys[i][setup.theta_ind[i]==j], pred_curr[i][t][setup.theta_ind[i]==j], marg_lik_cov_curr[i][t][j]) 
+                llik_curr[i][t][j] = setup.models[i].llik(setup.ys[i][theta_which_mat[i][j]], pred_curr[i][t][theta_which_mat[i][j]], marg_lik_cov_curr[i][t][j]) 
                 #this isnt getting nthetas correct, probably need to change models script...
                 # there should be a separate likelihood evaluation (with separate covariance) 
                 # for every i, t, ntheta. In diagonal case, we could vectorize over t ntheta...
