@@ -609,8 +609,8 @@ def calibHier(setup):
             # Generate Predictions at new Theta values
             theta_eval_mat[i][good_values_mat[i]] = theta_cand_mat[i][good_values_mat[i]]
             pred_cand[i][:] = setup.models[i].eval(
-                    tran_unif(theta_eval_mat[i], setup.bounds_mat, setup.bounds.keys())
-                    ).reshape(setup.ntemps, setup.ntheta[i], setup.y_lens[i])
+                    tran_unif(theta_eval_mat[i], setup.bounds_mat, setup.bounds.keys()), pool=False
+                    )#.reshape(setup.ntemps, setup.y_lens[i])
 
 
 
@@ -618,7 +618,7 @@ def calibHier(setup):
             for t in range(setup.ntemps):
                 for j in range(setup.ntheta[i]):
                     #marg_lik_cov_curr[i][t][j] = setup.models[i].lik_cov_inv(np.exp(log_s2[i][0, t, setup.s2_ind[i]])[setup.s2_ind[i]==j])
-                    llik_cand[i][t][j] = setup.models[i].llik(setup.ys[i][setup.theta_ind[i]==j], pred_cand[i][t][j][setup.theta_ind[i]==j], marg_lik_cov_curr[i][t][j]) 
+                    llik_cand[i][t][j] = setup.models[i].llik(setup.ys[i][theta_which_mat[i][j]], pred_cand[i][t][theta_which_mat[i][j]], marg_lik_cov_curr[i][t][j]) 
 
 
             #sse_cand[i][:] = ((pred_cand[i] - setup.ys[i])**2 @ s2_ind_mat[i]) / s2[i][m-1]
@@ -636,8 +636,16 @@ def calibHier(setup):
             accept[i][:] = np.log(uniform(size = alpha[i].shape)) < alpha[i]
             # Where accept, make changes
             theta[i][m][accept[i]]  = theta_cand[i][accept[i]].copy()
-            pred_curr[i][accept[i]] = \
-                             pred_cand[i][accept[i]].copy()
+            #ind = accept[i] @ theta_ind_mat[i].T
+            #pred_curr[i][ind] = pred_cand[i][ind].copy()
+
+            for t in range(setup.ntemps):
+                accept_t = np.where(accept[i][t])[0]
+                if accept_t.shape[0] > 0:
+                    ind = np.hstack([theta_which_mat[i][j] for j in accept_t])
+                    pred_curr[i][t][ind] = pred_cand[i][t][ind].copy()
+                #for j in np.where(accept[i][t])[0]:
+                #    pred_curr[i][t][theta_which_mat[i][j]] = pred_cand[i][t][theta_which_mat[i][j]]
             llik_curr[i][accept[i]] = llik_cand[i][accept[i]].copy()
             count[i][accept[i]] += 1
             cov_theta_cand.count_100[i][accept[i]] += 1
