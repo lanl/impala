@@ -681,46 +681,122 @@ def calibHier(setup):
                     sse_curr[i][accept[i]] = sse_cand[i][accept[i]].copy()
                     count_decor[i][accept[i], k] = count_decor[i][accept[i], k] + 1
 
-        ## MH update s2
-        for i in range(setup.nexp):
-            cov_ls2_cand[i].update(log_s2[i], m)
-            llik_cand[i][:] = 0.
 
-        ls2_cand = [cov_ls2_cand[i].gen_cand(log_s2[i], m) for i in range(setup.nexp)]
-        
 
-        
-        marg_lik_cov_cand = [None] * setup.nexp
-        for i in range(setup.nexp):
-            marg_lik_cov_cand[i] = [None] * setup.ntemps
-            for t in range(setup.ntemps):
-                marg_lik_cov_cand[i][t] = [None] * setup.ntheta[i]
-                for j in range(setup.ntheta[i]):
-                    marg_lik_cov_cand[i][t][j] = setup.models[i].lik_cov_inv(np.exp(ls2_cand[i][t, setup.s2_ind[i]])[setup.s2_ind[i]==j])#s2[i][0, t, setup.s2_ind[i]])
-                    llik_cand[i][t][j] = setup.models[i].llik(setup.ys[i][setup.theta_ind[i]==j], pred_curr[i][t][j][setup.theta_ind[i]==j], marg_lik_cov_cand[i][t][j])
-        
-        ## joint update for ntheta[i] s2s
-        #llik_diff = (llik_cand.sum(axis=2) - llik_curr.sum(axis=2)) # should be summing over the nthera axis
-        alpha_s2[:] = - np.inf
-        #alpha_s2 = setup.itl * (llik_diff)       
-        for i in range(setup.nexp): # this needs help...sum over ntheta axis
-            alpha_s2[i,:] = setup.itl * (llik_cand[i].sum(axis=1) - llik_curr[i].sum(axis=1))
-            alpha_s2[i,:] += setup.itl * setup.s2_prior_kern[i](np.exp(ls2_cand[i]), setup.ig_a[i], setup.ig_b[i]).sum(axis=1)
-            alpha_s2[i,:] += setup.itl * ls2_cand[i].sum(axis=1)
-            alpha_s2[i,:] -= setup.itl * setup.s2_prior_kern[i](np.exp(log_s2[i][m-1]), setup.ig_a[i], setup.ig_b[i]).sum(axis=1)
-            alpha_s2[i,:] -= setup.itl * log_s2[i][m-1].sum(axis=1)
 
-        runif = np.log(uniform(size=[setup.nexp, setup.ntemps]))
+        #------------------------------------------------------------------------------------------
+        ## update s2
         for i in range(setup.nexp):
-            for t in np.where(runif[i] < alpha_s2[i])[0]:
-                count_s2[i, t] += 1
-                llik_curr[i][t] = llik_cand[i][t].copy()
-                log_s2[i][m][t] = ls2_cand[i][t].copy()
-                marg_lik_cov_curr[i][t] = marg_lik_cov_cand[i][t].copy()
-                cov_ls2_cand[i].count_100[t] += 1
 
-        for i in range(setup.nexp):
-            cov_ls2_cand[i].update_tau(m)
+            if setup.models[i].s2=='gibbs':
+                ## gibbs update s2       
+                dev_sq = (pred_curr[i] - setup.ys[i])**2 @ s2_ind_mat[i] # squared deviations
+                log_s2[i][m] = np.log(1 / np.random.gamma(
+                        itl_mat[i] * (setup.ny_s2[i] / 2 + setup.ig_a[i] + 1) - 1,
+                        1 / (itl_mat[i] * (setup.ig_b[i] + dev_sq / 2)),
+                        ))
+                for t in range(setup.ntemps):
+                    s2_stretched = log_s2[i][m][t,setup.theta_ind[i]]
+                    for j in range(setup.ntheta[i]):
+                        marg_lik_cov_curr[i][t][j] = setup.models[i].lik_cov_inv(np.exp(s2_stretched[s2_which_mat[i][j]]))
+                        llik_curr[i][t][j] = setup.models[i].llik(setup.ys[i][s2_which_mat[i][j]], pred_curr[i][t][s2_which_mat[i][j]], marg_lik_cov_curr[i][t][j])
+                
+            elif setup.models[i].s2=='fix':
+                    log_s2[i][m] = np.log(setup.sd_est[i]**2)
+
+                    #for t in range(setup.ntemps):
+                    #    for j in range(setup.ntheta[i]):
+                    #        marg_lik_cov_curr[i][t][j] = setup.models[i].lik_cov_inv(np.exp(log_s2[i][m][t, setup.s2_ind[i]])[setup.s2_ind[i]==j])
+                    #        llik_curr[i][t][j] = setup.models[i].llik(setup.ys[i][setup.theta_ind[i]==j], pred_curr[i][t][setup.theta_ind[i]==j], marg_lik_cov_curr[i][t][j])
+
+            else: # this needs to be fixed ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                # this needs to be fixed ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                # this needs to be fixed ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                # this needs to be fixed ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                # this needs to be fixed ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                # this needs to be fixed ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                # this needs to be fixed ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                ## M-H update s2
+                    # NOTE: there is something wrong with this...with no tempering, 10 kolski experiments, 
+                    # reasonable priors, s2 can diverge for some experiments (not a random walk, has weird patterns).  
+                    # This seems to be because of the joint update, but is strange.  Could be that individual updates 
+                    # would make it go away, but it shouldn't be there anyway.
+
+                cov_ls2_cand[i].update(log_s2[i], m)
+                ls2_candi = cov_ls2_cand[i].gen_cand(log_s2[i], m)
+                
+                llik_candi = np.zeros([setup.ntemps, setup.ntheta[i]])
+                marg_lik_cov_candi = [None] * setup.ntemps
+                for t in range(setup.ntemps):
+                    marg_lik_cov_candi[t] = [None] * setup.ntheta[i]
+                    for j in range(setup.ntheta[i]):
+                        marg_lik_cov_candi[t][j] = setup.models[i].lik_cov_inv(np.exp(ls2_candi[t, setup.s2_ind[i]])[setup.s2_ind[i]==j])#s2[i][0, t, setup.s2_ind[i]])
+                        llik_candi[t][j] = setup.models[i].llik(setup.ys[i][setup.theta_ind[i]==j], pred_curr[i][t][setup.theta_ind[i]==j], marg_lik_cov_candi[t][j])
+                        # something wrong still, getting way too large of variance
+                    #marg_lik_cov_candi[t] = setup.models[i].lik_cov_inv(np.exp(ls2_candi[t])[setup.s2_ind[i]])#s2[i][0, t, setup.s2_ind[i]])
+                    #llik_candi[t] = setup.models[i].llik(setup.ys[i], pred_curr[i][t], marg_lik_cov_candi[t])
+                
+                llik_diffi = (llik_candi - llik_curr[i])
+                alpha_s2 = setup.itl * (llik_diffi)       
+                alpha_s2 += setup.itl * setup.s2_prior_kern[i](np.exp(ls2_candi), setup.ig_a[i], setup.ig_b[i]).sum(axis=1)#ldhc_kern(np.exp(ls2_cand[i])).sum(axis=1)#ldig_kern(np.exp(ls2_cand[i]),setup.ig_a[i],setup.ig_b[i]).sum(axis=1)
+                alpha_s2 += setup.itl * ls2_candi.sum(axis=1)
+                alpha_s2 -= setup.itl * setup.s2_prior_kern[i](np.exp(log_s2[i][m-1]), setup.ig_a[i], setup.ig_b[i]).sum(axis=1)#ldhc_kern(np.exp(log_s2[i][m-1])).sum(axis=1)#ldig_kern(np.exp(log_s2[i][m-1]),setup.ig_a[i],setup.ig_b[i]).sum(axis=1)
+                alpha_s2 -= setup.itl * log_s2[i][m-1].sum(axis=1)
+
+                runif = np.log(uniform(size=setup.ntemps))
+                for t in np.where(runif < alpha_s2)[0]:
+                    count_s2[i, t] += 1
+                    llik_curr[i][t] = llik_candi[t].copy()
+                    log_s2[i][m][t] = ls2_candi[t].copy()
+                    marg_lik_cov_curr[i][t] = marg_lik_cov_candi[t].copy()
+                    cov_ls2_cand[i].count_100[t] += 1
+
+                cov_ls2_cand[i].update_tau(m)
+
+
+        if False:
+            ## MH update s2
+            for i in range(setup.nexp):
+                cov_ls2_cand[i].update(log_s2[i], m)
+                llik_cand[i][:] = 0.
+
+            ls2_cand = [cov_ls2_cand[i].gen_cand(log_s2[i], m) for i in range(setup.nexp)]
+            
+
+            
+            marg_lik_cov_cand = [None] * setup.nexp
+            for i in range(setup.nexp):
+                marg_lik_cov_cand[i] = [None] * setup.ntemps
+                for t in range(setup.ntemps):
+                    marg_lik_cov_cand[i][t] = [None] * setup.ntheta[i]
+                    for j in range(setup.ntheta[i]):
+                        marg_lik_cov_cand[i][t][j] = setup.models[i].lik_cov_inv(np.exp(ls2_cand[i][t, setup.s2_ind[i]])[setup.s2_ind[i]==j])#s2[i][0, t, setup.s2_ind[i]])
+                        llik_cand[i][t][j] = setup.models[i].llik(setup.ys[i][setup.theta_ind[i]==j], pred_curr[i][t][setup.theta_ind[i]==j], marg_lik_cov_cand[i][t][j])
+            
+            ## joint update for ntheta[i] s2s
+            #llik_diff = (llik_cand.sum(axis=2) - llik_curr.sum(axis=2)) # should be summing over the nthera axis
+            alpha_s2[:] = - np.inf
+            #alpha_s2 = setup.itl * (llik_diff)       
+            for i in range(setup.nexp): # this needs help...sum over ntheta axis
+                alpha_s2[i,:] = setup.itl * (llik_cand[i].sum(axis=1) - llik_curr[i].sum(axis=1))
+                alpha_s2[i,:] += setup.itl * setup.s2_prior_kern[i](np.exp(ls2_cand[i]), setup.ig_a[i], setup.ig_b[i]).sum(axis=1)
+                alpha_s2[i,:] += setup.itl * ls2_cand[i].sum(axis=1)
+                alpha_s2[i,:] -= setup.itl * setup.s2_prior_kern[i](np.exp(log_s2[i][m-1]), setup.ig_a[i], setup.ig_b[i]).sum(axis=1)
+                alpha_s2[i,:] -= setup.itl * log_s2[i][m-1].sum(axis=1)
+
+            runif = np.log(uniform(size=[setup.nexp, setup.ntemps]))
+            for i in range(setup.nexp):
+                for t in np.where(runif[i] < alpha_s2[i])[0]:
+                    if np.any(ls2_cand[0][0] > np.log(100)) and t==0:
+                        print('bad')
+                    count_s2[i, t] += 1
+                    llik_curr[i][t] = llik_cand[i][t].copy()
+                    log_s2[i][m][t] = ls2_cand[i][t].copy()
+                    marg_lik_cov_curr[i][t] = marg_lik_cov_cand[i][t].copy()
+                    cov_ls2_cand[i].count_100[t] += 1
+
+            for i in range(setup.nexp):
+                cov_ls2_cand[i].update_tau(m)
 
 
 
@@ -1108,41 +1184,54 @@ def calibPool(setup):
 
 
         #------------------------------------------------------------------------------------------
-        ## M-H update s2
+        ## update s2
+        for i in range(setup.nexp):
 
-        for i in range(setup.nexp):
-            cov_ls2_cand[i].update(log_s2[i], m)
+            if setup.models[i].s2=='gibbs':
+                ## gibbs update s2       
+                
+                dev_sq = (pred_curr[i] - setup.ys[i])**2 @ s2_ind_mat[i] # squared deviations
+                log_s2[i][m] = np.log(1 / np.random.gamma(
+                        itl_mat[i] * (setup.ny_s2[i] / 2 + setup.ig_a[i] + 1) - 1,
+                        1 / (itl_mat[i] * (setup.ig_b[i] + dev_sq / 2)),
+                        ))
+                for t in range(setup.ntemps):
+                    marg_lik_cov_curr[i][t] = setup.models[i].lik_cov_inv(np.exp(log_s2[i][m][t])[setup.s2_ind[i]])
+                    llik_curr[i, t] = setup.models[i].llik(setup.ys[i] - discrep_curr[i][t], pred_curr[i][t], marg_lik_cov_curr[i][t])
+                
 
-        ls2_cand = [cov_ls2_cand[i].gen_cand(log_s2[i], m) for i in range(setup.nexp)]
-        
-        llik_cand[:] = 0.
-        marg_lik_cov_cand = [None] * setup.nexp
-        for i in range(setup.nexp):
-            marg_lik_cov_cand[i] = [None] * setup.ntemps
-            for t in range(setup.ntemps):
-                marg_lik_cov_cand[i][t] = setup.models[i].lik_cov_inv(np.exp(ls2_cand[i][t])[setup.s2_ind[i]])#s2[i][0, t, setup.s2_ind[i]])
-                llik_cand[i, t] = setup.models[i].llik(setup.ys[i] - discrep_curr[i][t], pred_curr[i][t], marg_lik_cov_cand[i][t])
-        
-        llik_diff = (llik_cand - llik_curr)
-        alpha_s2[:] = - np.inf
-        alpha_s2 = setup.itl * (llik_diff)       
-        for i in range(setup.nexp):
-            alpha_s2[i,:] += setup.itl * setup.s2_prior_kern[i](np.exp(ls2_cand[i]), setup.ig_a[i], setup.ig_b[i]).sum(axis=1)#ldhc_kern(np.exp(ls2_cand[i])).sum(axis=1)#ldig_kern(np.exp(ls2_cand[i]),setup.ig_a[i],setup.ig_b[i]).sum(axis=1)
-            alpha_s2[i,:] += setup.itl * ls2_cand[i].sum(axis=1)
-            alpha_s2[i,:] -= setup.itl * setup.s2_prior_kern[i](np.exp(log_s2[i][m-1]), setup.ig_a[i], setup.ig_b[i]).sum(axis=1)#ldhc_kern(np.exp(log_s2[i][m-1])).sum(axis=1)#ldig_kern(np.exp(log_s2[i][m-1]),setup.ig_a[i],setup.ig_b[i]).sum(axis=1)
-            alpha_s2[i,:] -= setup.itl * log_s2[i][m-1].sum(axis=1)
+            else:        
+                ## M-H update s2
+                    # NOTE: there is something wrong with this...with no tempering, 10 kolski experiments, 
+                    # reasonable priors, s2 can diverge for some experiments (not a random walk, has weird patterns).  
+                    # This seems to be because of the joint update, but is strange.  Could be that individual updates 
+                    # would make it go away, but it shouldn't be there anyway.
 
-        runif = np.log(uniform(size=[setup.nexp, setup.ntemps]))
-        for i in range(setup.nexp):
-            for t in np.where(runif[i] < alpha_s2[i])[0]:
-                count_s2[i, t] += 1
-                llik_curr[i, t] = llik_cand[i, t].copy()
-                log_s2[i][m][t] = ls2_cand[i][t].copy()
-                marg_lik_cov_curr[i][t] = marg_lik_cov_cand[i][t].copy()
-                cov_ls2_cand[i].count_100[t] += 1
+                cov_ls2_cand[i].update(log_s2[i], m)
+                ls2_candi = cov_ls2_cand[i].gen_cand(log_s2[i], m)
+                
+                llik_candi = np.zeros(setup.ntemps)
+                marg_lik_cov_candi = [None] * setup.ntemps
+                for t in range(setup.ntemps):
+                    marg_lik_cov_candi[t] = setup.models[i].lik_cov_inv(np.exp(ls2_candi[t])[setup.s2_ind[i]])#s2[i][0, t, setup.s2_ind[i]])
+                    llik_candi[t] = setup.models[i].llik(setup.ys[i] - discrep_curr[i][t], pred_curr[i][t], marg_lik_cov_candi[t])
+                
+                llik_diffi = (llik_candi - llik_curr[i])
+                alpha_s2 = setup.itl * (llik_diffi)       
+                alpha_s2 += setup.itl * setup.s2_prior_kern[i](np.exp(ls2_candi), setup.ig_a[i], setup.ig_b[i]).sum(axis=1)#ldhc_kern(np.exp(ls2_cand[i])).sum(axis=1)#ldig_kern(np.exp(ls2_cand[i]),setup.ig_a[i],setup.ig_b[i]).sum(axis=1)
+                alpha_s2 += setup.itl * ls2_candi.sum(axis=1)
+                alpha_s2 -= setup.itl * setup.s2_prior_kern[i](np.exp(log_s2[i][m-1]), setup.ig_a[i], setup.ig_b[i]).sum(axis=1)#ldhc_kern(np.exp(log_s2[i][m-1])).sum(axis=1)#ldig_kern(np.exp(log_s2[i][m-1]),setup.ig_a[i],setup.ig_b[i]).sum(axis=1)
+                alpha_s2 -= setup.itl * log_s2[i][m-1].sum(axis=1)
 
-        for i in range(setup.nexp):
-            cov_ls2_cand[i].update_tau(m)
+                runif = np.log(uniform(size=setup.ntemps))
+                for t in np.where(runif < alpha_s2)[0]:
+                    count_s2[i, t] += 1
+                    llik_curr[i, t] = llik_candi[t].copy()
+                    log_s2[i][m][t] = ls2_candi[t].copy()
+                    marg_lik_cov_curr[i][t] = marg_lik_cov_candi[t].copy()
+                    cov_ls2_cand[i].count_100[t] += 1
+
+                cov_ls2_cand[i].update_tau(m)
         
         ## tempering swaps
         if m > setup.start_temper and setup.ntemps > 1:
