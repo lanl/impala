@@ -109,7 +109,13 @@ class CalibSetup:
         self.start_tau_ls2 = start_tau_ls2
         self.start_adapt_iter = start_adapt_iter
         return
-    def set_max_clusters(self, nclustmax):
+    def setHierPriors(self, theta0_prior_mean, theta0_prior_cov, Sigma0_prior_df, Sigma0_prior_scale):
+        self.theta0_prior_mean = theta0_prior_mean
+        self.theta0_prior_cov = theta0_prior_cov
+        self.Sigma0_prior_df = Sigma0_prior_df
+        self.Sigma0_prior_scale = Sigma0_prior_scale
+        return
+    def setClusterPriors(self, nclustmax):
         self.nclustmax = nclustmax
     pass
 
@@ -488,16 +494,16 @@ def calibHier(setup):
     cov_theta_cand = AMcov_hier(setup.nexp, np.array([setup.ntheta[i] for i in range(setup.nexp)]), setup.ntemps, setup.p)
     cov_ls2_cand = [AMcov_pool(setup.ntemps, setup.ns2[i]) for i in range(setup.nexp)]
 
-    theta0_prior_cov = np.eye(setup.p)*1**2
+    theta0_prior_mean = setup.theta0_prior_mean#np.repeat(0.5, setup.p)
+    theta0_prior_cov = setup.theta0_prior_cov#np.eye(setup.p)*1**2
     theta0_prior_prec = scipy.linalg.inv(theta0_prior_cov)
-    theta0_prior_mean = np.repeat(0.5, setup.p)
     theta0_prior_ldet = slogdet(theta0_prior_cov)[1]
 
     tbar = np.empty(theta0[0].shape)
     mat = np.zeros((setup.ntemps, setup.p, setup.p))
 
-    Sigma0_prior_df = setup.p
-    Sigma0_prior_scale = np.eye(setup.p)*1**2#/setup.p
+    Sigma0_prior_df = setup.Sigma0_prior_df#setup.p
+    Sigma0_prior_scale = setup.Sigma0_prior_scale#np.eye(setup.p)*1**2#/setup.p
     Sigma0_dfs = Sigma0_prior_df + ntheta * setup.itl
 
     Sigma0_ldet_curr = slogdet(Sigma0[0])[1]
@@ -801,9 +807,8 @@ def calibHier(setup):
                     
                 count_decor2[accept_tot, k] = count_decor2[accept_tot, k] + 1
 
-
         ## tempering swaps
-        if m > 1000 and setup.ntemps > 1:
+        if m > setup.start_temper and setup.ntemps > 1:
             for _ in range(setup.nswap):
                 sw = np.random.choice(setup.ntemps, 2 * setup.nswap_per, replace = False).reshape(-1,2)
                 sw_alpha[:] = 0. # reset swap probability
