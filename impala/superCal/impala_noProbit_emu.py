@@ -846,6 +846,9 @@ def calibHier(setup):
                 z = np.random.normal()*.1
                 theta0_cand = theta0[m].copy()
                 theta0_cand[:,k] += z
+                good_values_theta0 = setup.checkConstraints(
+                    tran_unif(theta0_cand, setup.bounds_mat, setup.bounds.keys()), setup.bounds,
+                    )
                 
                 for i in range(setup.nexp):
                     # Find new candidate values for theta
@@ -859,15 +862,15 @@ def calibHier(setup):
                         )
                     # Generate predictions at "good" candidate values
                     theta_eval_mat[i][good_values_mat[i]] = theta_cand_mat[i][good_values_mat[i]]
-                    good_values[i][:] = good_values_mat[i].reshape(setup.ntemps, setup.ntheta[i])
+                    good_values[i][:] = (good_values_mat[i].reshape(setup.ntemps, setup.ntheta[i]).T * good_values_theta0).T
                     pred_cand[i][:]   = setup.models[i].eval(
-                            tran_unif(theta_eval_mat[i], setup.bounds_mat, setup.bounds.keys())
-                            ).reshape(setup.ntemps, setup.ntheta[i], setup.y_lens[i])
+                            tran_unif(theta_eval_mat[i], setup.bounds_mat, setup.bounds.keys()), pool=False
+                            )#.reshape(setup.ntemps, setup.ntheta[i], setup.y_lens[i])
                     #sse_cand[i][:] = ((pred_cand[i] - setup.ys[i])**2 @ s2_ind_mat[i]) / s2[i][m]
                     for t in range(setup.ntemps):
                         for j in range(setup.ntheta[i]):
-                            llik_cand[i][t][j] = setup.models[i].llik(setup.ys[i][setup.theta_ind[i]==j], pred_cand[i][t][j][setup.theta_ind[i]==j], marg_lik_cov_curr[i][t][j]) 
-
+                            #llik_cand[i][t][j] = setup.models[i].llik(setup.ys[i][setup.theta_ind[i]==j], pred_cand[i][t][setup.theta_ind[i]==j], marg_lik_cov_curr[i][t][j]) 
+                            llik_cand[i][t][j] = setup.models[i].llik(setup.ys[i][theta_which_mat[i][j]], pred_cand[i][t][theta_which_mat[i][j]], marg_lik_cov_curr[i][t][j]) 
                     
                     alpha[i][:] = - np.inf
                     alpha[i][good_values[i]] = (
