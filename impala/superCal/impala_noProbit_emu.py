@@ -950,7 +950,7 @@ def calibHier(setup):
                                             Sigma0_ldet_curr[tt[1]].copy(), Sigma0_ldet_curr[tt[0]].copy()
                 #if np.exp(log_s2[i][m,0,0])>1:
                 #    print('a')
-        print('\rCalibration MCMC {:.01%} Complete'.format(m / setup.nmcmc), end='')
+        #print('\rCalibration MCMC {:.01%} Complete'.format(m / setup.nmcmc), end='')
 
     t1 = time.time()
     print('\rCalibration MCMC Complete. Time: {:f} seconds.'.format(t1 - t0))
