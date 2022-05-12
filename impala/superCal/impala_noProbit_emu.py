@@ -932,8 +932,6 @@ def calibHier(setup):
                 for tt in sw[np.where(np.log(uniform(size = setup.nswap_per)) < sw_alpha)]:
                     count_temper[tt[0], tt[1]] = count_temper[tt[0], tt[1]] + 1
                     for i in range(setup.nexp):
-                        if tt[0] == 0 and np.any(np.exp(log_s2[i][m][tt[1]]) > 1) and m>5000:
-                            print('asdf')
                         theta[i][m,tt[0]], theta[i][m,tt[1]]     = \
                                             theta[i][m,tt[1]].copy(), theta[i][m,tt[0]].copy()
                         log_s2[i][m][tt[0]], log_s2[i][m][tt[1]]               = \
