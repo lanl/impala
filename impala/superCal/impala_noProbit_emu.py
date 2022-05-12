@@ -353,10 +353,10 @@ class AMcov_pool:
 
 
 class AMcov_hier:
-    def __init__(self, nexp, ntheta, ntemps, p, start_var=1e-4, start_adapt_iter=300): # ntheta is a vector of length nexp
+    def __init__(self, nexp, ntheta, ntemps, p, start_var=1e-4, start_adapt_iter=300, tau_start=0.): # ntheta is a vector of length nexp
         self.eps = 1.0e-12
         self.AM_SCALAR = 2.4**2 / p
-        self.tau = [-0 * np.ones((ntemps, ntheta[i])) for i in range(nexp)]
+        self.tau = [tau_start * np.ones((ntemps, ntheta[i])) for i in range(nexp)]
         self.S   = [np.empty((ntemps, ntheta[i], p, p)) for i in range(nexp)]
         for i in range(nexp):
             self.S[i][:] = np.eye(p) * start_var
@@ -391,8 +391,8 @@ class AMcov_hier:
 
     def update_tau(self, m):
         # diminishing adaptation based on acceptance rate for each temperature
-        if m % 100 == 0 and m > self.start_adapt_iter:
-            delta = min(0.1, 5 / np.sqrt(m + 1))
+        if (m % 100 == 0) and (m > self.start_adapt_iter):
+            delta = min(0.5, 5 / np.sqrt(m + 1))
             for i in range(self.nexp):
                 self.tau[i][self.count_100[i] < 23] -= delta
                 self.tau[i][self.count_100[i] > 23] += delta
@@ -491,8 +491,21 @@ def calibHier(setup):
     # for i in range(setup.nexp):
     #     S[i][:] = np.eye(setup.p) * 1e-4
 
-    cov_theta_cand = AMcov_hier(setup.nexp, np.array([setup.ntheta[i] for i in range(setup.nexp)]), setup.ntemps, setup.p)
-    cov_ls2_cand = [AMcov_pool(setup.ntemps, setup.ns2[i]) for i in range(setup.nexp)]
+    cov_theta_cand = AMcov_hier(
+        setup.nexp, 
+        np.array([setup.ntheta[i] for i in range(setup.nexp)]), 
+        setup.ntemps, 
+        setup.p, 
+        start_var=setup.start_var_theta, 
+        start_adapt_iter=setup.start_adapt_iter, 
+        tau_start=setup.start_tau_theta)
+    cov_ls2_cand = [AMcov_pool(
+        setup.ntemps, 
+        setup.ns2[i], 
+        start_var=setup.start_var_ls2, 
+        start_adapt_iter=setup.start_adapt_iter, 
+        tau_start=setup.start_tau_ls2) 
+        for i in range(setup.nexp)]
 
     theta0_prior_mean = setup.theta0_prior_mean#np.repeat(0.5, setup.p)
     theta0_prior_cov = setup.theta0_prior_cov#np.eye(setup.p)*1**2
