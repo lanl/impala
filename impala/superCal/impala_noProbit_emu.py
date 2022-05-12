@@ -420,17 +420,31 @@ def calibHier(setup):
     theta0 = np.empty([setup.nmcmc, setup.ntemps, setup.p])
     Sigma0 = np.empty([setup.nmcmc, setup.ntemps, setup.p, setup.p])
     ntheta = np.sum(setup.ntheta)
-    log_s2 = [np.ones([setup.nmcmc, setup.ntemps, setup.ns2[i]]) for i in range(setup.nexp)]
+    log_s2 = [np.zeros([setup.nmcmc, setup.ntemps, setup.ns2[i]]) for i in range(setup.nexp)]
+    for i in range(setup.nexp):
+        log_s2[i][0] = np.log(setup.sd_est[i]**2)
+
     #sse    = [np.ones([setup.nmcmc, setup.ntemps, setup.ns2[i]]) for i in range(setup.nexp)]
     theta  = [
         np.empty([setup.nmcmc, setup.ntemps, setup.ntheta[i], setup.p])
         for i in range(setup.nexp)
         ]
-    s2_ind_mat = [
-        (setup.s2_ind[i][:,None] == range(setup.ntheta[i]))
+    theta_ind_mat = [
+        (setup.theta_ind[i][:,None] == range(setup.ntheta[i]))
         for i in range(setup.nexp)
         ]
-
+    s2_ind_mat = [
+        (setup.s2_ind[i][:,None] == range(setup.ns2[i]))
+        for i in range(setup.nexp)
+        ]
+    s2_which_mat = [
+        [np.where(s2_ind_mat[i][:,j])[0] for j in range(setup.ntheta[i])]
+        for i in range(setup.nexp)
+        ]
+    theta_which_mat = [
+        [np.where(theta_ind_mat[i][:,j])[0] for j in range(setup.ntheta[i])]
+        for i in range(setup.nexp)
+        ]
     theta0_start = initfunc_unif(size=[setup.ntemps, setup.p])
     good = setup.checkConstraints(
         tran_unif(theta0_start, setup.bounds_mat, setup.bounds.keys()), setup.bounds,
