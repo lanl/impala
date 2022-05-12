@@ -83,10 +83,10 @@ obs_all = np.empty([3, M])
 ifunc = interp1d(obs1[:,1], obs1[:,0]*1e-4, kind = 'cubic')
 obs_all[0] = ifunc(xx104)
 
-ifunc = interp1d(obs2[:,1]-.4, obs2[:,0]*1e-4, kind = 'cubic')
+ifunc = interp1d(obs2[:,1]-.2, obs2[:,0]*1e-4, kind = 'cubic')
 obs_all[1] = ifunc(xx105)
 
-ifunc = interp1d(obs3[:,0]-2.75, obs3[:,1]*1e-4, kind = 'cubic')
+ifunc = interp1d(obs3[:,0]-2.55, obs3[:,1]*1e-4, kind = 'cubic')
 obs_all[2] = ifunc(xx106)
 
 plt.plot(sims_all[0].T, color='lightgrey')
