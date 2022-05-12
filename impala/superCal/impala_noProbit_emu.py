@@ -10,6 +10,7 @@ from scipy.stats import invwishart
 from numpy.linalg import cholesky, slogdet
 from itertools import repeat
 import multiprocessing as mp
+import pbar
 #np.seterr(under='ignore')
 
 # no probit tranform for hierarchical and DP versions
@@ -522,7 +523,8 @@ def calibHier(setup):
         good_values[i].reshape(setup.ntheta[i] * setup.ntemps) for i in range(setup.nexp)
         ]
     ## start MCMC
-    for m in range(1,setup.nmcmc):
+    for m in pbar.pbar(range(1, setup.nmcmc)):
+
         for i in range(setup.nexp):
             theta[i][m] = theta[i][m-1].copy() # current set to previous, will change if accepted
             log_s2[i][m] = log_s2[i][m-1].copy()
@@ -952,7 +954,7 @@ def calibPool(setup):
     llik = np.empty(setup.nmcmc)
 
     ## start MCMC
-    for m in range(1, setup.nmcmc):
+    for m in pbar.pbar(range(1, setup.nmcmc)):
         
 
         theta[m] = theta[m-1].copy() # current set to previous, will change if accepted
