@@ -414,7 +414,7 @@ class AMcov_clust:
 
 ##############################################################################################################################################################################
 ## Hierarchical Calibration
-
+#@profile
 def calibHier(setup):
     t0 = time.time()
     theta0 = np.empty([setup.nmcmc, setup.ntemps, setup.p])
@@ -565,9 +565,15 @@ def calibHier(setup):
             theta[i][m] = theta[i][m-1].copy() # current set to previous, will change if accepted
             log_s2[i][m] = log_s2[i][m-1].copy()
             setup.models[i].step()
-            #if setup.models[i].stochastic:
-
-            # BUG: need to update pred_curr here??
+            if setup.models[i].stochastic: # update emulator
+                pred_curr[i] = setup.models[i].eval(
+                    tran_unif(theta[i][m].reshape(setup.ntemps * setup.ntheta[i], setup.p),
+                        setup.bounds_mat, setup.bounds.keys()), pool=False
+                    )
+                for t in range(setup.ntemps):
+                    for j in range(setup.ntheta[i]):
+                        llik_curr[i][t][j] = setup.models[i].llik(setup.ys[i][theta_which_mat[i][j]], pred_curr[i][t][theta_which_mat[i][j]], marg_lik_cov_curr[i][t][j]) 
+           # No discrepancy for now...update here if added later
 
         #------------------------------------------------------------------------------------------
         ## adaptive Metropolis for each temperature / experiment
