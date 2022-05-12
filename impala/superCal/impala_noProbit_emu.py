@@ -1266,7 +1266,7 @@ def calibPool(setup):
                     theta[m][tt[0]], theta[m][tt[1]] = theta[m][tt[1]].copy(), theta[m][tt[0]].copy()
    
         llik[m] = llik_curr[:, 0].sum()
-        print('\rCalibration MCMC {:.01%} Complete'.format(m / setup.nmcmc), end='')
+        #print('\rCalibration MCMC {:.01%} Complete'.format(m / setup.nmcmc), end='')
 
     s2 = log_s2.copy()
     for i in range(setup.nexp):
