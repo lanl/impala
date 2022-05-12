@@ -29,13 +29,14 @@ class AbstractModel:
         pass
 
     def llik(self, yobs, pred, cov): # assumes diagonal cov
-        vec = yobs - pred 
-        out = -.5 * cov['ldet'] - .5 * np.sum(vec**2 * np.diag(cov['inv']))
+        vec = yobs - pred
+        vec2 = vec*vec*cov['inv']
+        out = -.5 * cov['ldet'] - .5 * vec2.sum()
         return out
 
     def lik_cov_inv(self, s2vec): # default is diagonal covariance matrix
-        inv = np.diag(1/s2vec)
-        ldet = np.sum(np.log(s2vec))
+        inv = 1/s2vec
+        ldet = np.log(s2vec).sum()
         out = {'inv' : inv, 'ldet' : ldet}
         return out
 
