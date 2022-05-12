@@ -128,7 +128,6 @@ class ModelBassPca_func(AbstractModel):
         self.stochastic = True
         self.nmcmc = len(bmod.bm_list[0].samples.s2)
         self.input_names = input_names
-        self.trunc_error_var = np.diag(np.cov(self.mod.trunc_error))
         self.basis = self.mod.basis
         self.meas_error_cor = np.eye(self.basis.shape[0])
         self.discrep_cov = np.eye(self.basis.shape[0])*1e-12
