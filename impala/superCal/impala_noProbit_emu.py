@@ -10,7 +10,11 @@ from scipy.stats import invwishart
 from numpy.linalg import cholesky, slogdet
 from itertools import repeat
 import multiprocessing as mp
+<<<<<<< HEAD
 from impala.superCal.pbar import pbar
+=======
+import impala.superCal.pbar as pbar
+>>>>>>> fa9ba43679c159ebdd99411c59fe8c967b25939a
 #np.seterr(under='ignore')
 
 # no probit tranform for hierarchical and DP versions
