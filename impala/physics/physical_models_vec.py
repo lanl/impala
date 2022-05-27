@@ -80,7 +80,7 @@ class Constant_Density(BaseModel):
     consts = ['rho0']
 
     def value(self, *args):
-        return self.parent.parameters.rho0
+        return self.parent.parameters.rho0 * np.ones(len(self.parent.state.T))
 
 class Linear_Density(BaseModel):
     """
@@ -604,14 +604,18 @@ class MaterialModel(object):
 
         state = self.state
         self.update_state(strain_rate[:,0], 0.)
-        results[0] = np.array([times[:,0], state.strain, state.stress, state.T, state.G, np.repeat(state.rho,nrep)])
+
+        #import pdb
+        #pdb.set_trace()
+
+        results[0] = np.array([times[:,0], state.strain, state.stress, state.T, state.G, state.rho]) #np.repeat(state.rho,nrep)])
 
         for i in range(1, Nhist):
             self.update_state(strain_rate[:,i-1], times[:,i] - times[:,i-1])
             # self.update_state(strain_rate.T[i-1], times.T[i] - times.T[i-1])
             # results[i] = [times[i], state.strain, state.stress, state.T, state.G, state.rho]
             results[i] = np.array([times[:,i], state.strain, state.stress, state.T, state.G,
-                 np.repeat(state.rho, nrep)])
+                 state.rho]) #np.repeat(state.rho, nrep)])
 
         return results
 
