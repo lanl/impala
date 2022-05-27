@@ -269,6 +269,7 @@ class ModelMaterialStrength(AbstractModel):
             melt_model=eval('pm_vec.' + melt_model),
             density_model=eval('pm_vec.' + density_model)
             )
+        self.model_info = [flow_stress_model, shear_model, specific_heat_model, melt_model, density_model]
         self.constants = consts
         self.temps = temps
         self.edots = edots
