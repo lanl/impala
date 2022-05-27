@@ -8,8 +8,9 @@ from math import sqrt, floor, log
 from scipy.special import erf, erfinv, gammaln
 from scipy.stats import invwishart
 from numpy.linalg import cholesky, slogdet
-from itertools import repeat
-import multiprocessing as mp
+#from itertools import repeat
+#import multiprocessing as mp
+#import pandas as pd
 import impala.superCal.pbar as pbar
 #np.seterr(under='ignore')
 
@@ -296,10 +297,10 @@ def ldhc_kern(x, a, b): # half cauchy
 
 from collections import namedtuple
 OutCalibPool = namedtuple(
-    'OutCalibPool', 'theta s2 count count_s2 count_decor cov_theta_cand cov_ls2_cand pred_curr discrep_vars llik',
+    'OutCalibPool', 'theta s2 count count_s2 count_decor cov_theta_cand cov_ls2_cand pred_curr discrep_vars llik theta_native',
     )
 OutCalibHier = namedtuple(
-    'OutCalibHier', 'theta s2 count count_s2 count_decor2 cov_theta_cand cov_ls2_cand count_temper pred_curr theta0 Sigma0',
+    'OutCalibHier', 'theta s2 count count_s2 count_decor2 cov_theta_cand cov_ls2_cand count_temper pred_curr theta0 Sigma0 llik theta_native theta0_native theta_parent_native',
     )
 OutCalibClust = namedtuple(
     'OutCalibClust', 'theta theta_hist s2 count count_temper pred_curr theta0 Sigma0 delta eta nclustmax'
@@ -984,6 +985,18 @@ def calibHier(setup):
     t1 = time.time()
     print('\rCalibration MCMC Complete. Time: {:f} seconds.'.format(t1 - t0))
 
+    theta_parent_01 = chol_sample_1per_constraints(
+        theta0[:,0], Sigma0[:,0], setup.checkConstraints,
+        setup.bounds_mat, setup.bounds.keys(), setup.bounds,
+        )
+
+
+    theta_native = [tran_unif(theta[i][:,0], setup.bounds_mat, setup.bounds.keys()) for i in range(setup.nexp)]
+    theta0_native = tran_unif(theta0[:,0], setup.bounds_mat, setup.bounds.keys())
+    theta_parent_native = tran_unif(theta_parent_01, setup.bounds_mat, setup.bounds.keys())
+    pred = [setup.models[i].eval(theta_parent_native, pool=True) for i in range(setup.nexp)]
+    llik = sum([((pred[i]-setup.ys[i])**2).mean(axis=1) for i in range(setup.nexp)])
+
     s2 = log_s2.copy()
     for i in range(setup.nexp):
         s2[i] = np.exp(log_s2[i])
@@ -991,7 +1004,7 @@ def calibHier(setup):
     count_temper = count_temper + count_temper.T - np.diag(np.diag(count_temper))
     # theta_reshape = [np.swapaxes(t,1,2) for t in theta]
     out = OutCalibHier(theta, s2, count, count_s2, count_decor2, cov_theta_cand, cov_ls2_cand,
-                            count_temper, pred_curr, theta0, Sigma0)
+                            count_temper, pred_curr, theta0, Sigma0, llik, theta_native, theta0_native, theta_parent_native)
     return(out)
 
 
@@ -1301,10 +1314,12 @@ def calibPool(setup):
     for i in range(setup.nexp):
         s2[i] = np.exp(log_s2[i])
 
+    theta_native = tran_unif(theta[:,0], setup.bounds_mat, setup.bounds.keys())
+
     t1 = time.time()
     print('\rCalibration MCMC Complete. Time: {:f} seconds.'.format(t1 - t0))
     count = count + count.T - np.diag(np.diag(count))
-    out = OutCalibPool(theta, s2, count, count_s2, count_decor, cov_theta_cand, cov_ls2_cand, pred_curr, discrep_vars, llik)
+    out = OutCalibPool(theta, s2, count, count_s2, count_decor, cov_theta_cand, cov_ls2_cand, pred_curr, discrep_vars, llik, theta_native)
     return(out)
 
 
