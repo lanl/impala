@@ -1,10 +1,11 @@
 from math import ceil, sqrt
 
 from pygments import highlight
-from models_withLik import interpolate_experiment
+#from models_withLik import interpolate_experiment
+from impala.superCal import interpolate_experiment
 import seaborn as sns
 import numpy as np
-import impala_noProbit_emu as impala
+import impala.superCal as impala
 import matplotlib.pyplot as plt
 plt.rcParams.update({'figure.max_open_warning': 0})
 from matplotlib.backends.backend_pdf import PdfPages
@@ -157,9 +158,9 @@ class PTW_Plotter(object):
         pdf.close()
         return
 
-    def ptw_prediction_plots_pool(self, path):
+    def ptw_prediction_plots_pool(self, path, uu):
         """ PTW Prediction Hierarchical Plots (no input) """
-        sel = np.arange(20000, self.setup.nmcmc, 10) # need to script this in
+        sel = uu#np.arange(20000, self.setup.nmcmc, 10) # need to script this in
         pred_theta_raw  = [
             np.empty([sel.shape[0], self.setup.ys[i].shape[0]]) 
             for i in range(self.setup.nexp)
@@ -167,7 +168,7 @@ class PTW_Plotter(object):
         for i in range(self.setup.nexp):
             pred_theta_raw[i] = self.setup.models[i].eval(
                 impala.tran_probit(
-                    self.out.theta[sel,0].repeat(self.setup.ns2[i], axis = 0), 
+                    self.out.theta[sel,0],#.repeat(self.setup.ns2[i], axis = 0), 
                     self.setup.bounds_mat, self.setup.bounds.keys(),
                     ),
                 )
@@ -179,26 +180,40 @@ class PTW_Plotter(object):
         pred_theta_quant_ub = []
         edots = []
         temps = []
+        model_type = []
 
         for i in range(self.setup.nexp):
             for j in range(self.setup.ns2[i]):
                 pred_theta.append(pred_theta_raw[i].T[self.setup.s2_ind[i] == j].T)
                 pred_theta_quant_lb.append(np.quantile(pred_theta[-1], 0.025, 0))
                 pred_theta_quant_ub.append(np.quantile(pred_theta[-1], 0.975, 0))
-                edots.append(self.setup.models[i].edots[j])
-                temps.append(self.setup.models[i].temps[j])
-                real_strain.append(self.setup.models[i].meas_strain_histories[j])
-                real_stress.append(self.setup.ys[i][self.setup.s2_ind[i] == j])
+                model_type.append(type(self.setup.models[i]).__name__)
+                if model_type[-1] == 'ModelMaterialStrength':
+                    edots.append(self.setup.models[i].edots[j])
+                    temps.append(self.setup.models[i].temps[j])
+                    real_strain.append(self.setup.models[i].meas_strain_histories[j])
+                    real_stress.append(self.setup.ys[i][self.setup.s2_ind[i] == j])
+                else:
+                    edots.append(None)
+                    temps.append(None)
+                    real_strain.append(np.linspace(0,1,len(self.setup.ys[i][self.setup.s2_ind[i] == j])))
+                    real_stress.append(self.setup.ys[i][self.setup.s2_ind[i] == j])
 
         rows = zip(
-            real_strain,real_stress,pred_theta_quant_lb,pred_theta_quant_ub,edots,temps,
+            real_strain,real_stress,pred_theta_quant_lb,pred_theta_quant_ub,edots,temps,model_type
             )
-        keys = ['actual_x','actual_y','pred_y_lb', 'pred_y_ub','edot','temp']
+        keys = ['actual_x','actual_y','pred_y_lb', 'pred_y_ub','edot','temp','model_type']
         plot_param_list = [dict(zip(keys,row)) for row in rows]
 
         pdf = PdfPages(path)
         for plot_params in plot_param_list:
-            self.ptw_prediction_plot_single(**plot_params, pdf = pdf)
+            if plot_params['model_type'] == 'ModelMaterialStrength':
+                self.ptw_prediction_plot_single(**plot_params, pdf = pdf)
+            else:
+                if len(plot_params['actual_x']) == 1:
+                    pass
+                else:
+                    self.ptw_prediction_plot_single(**plot_params, pdf = pdf)
         pdf.close()
         return
 
@@ -390,8 +405,8 @@ class PTW_Plotter(object):
             plt.show()
         return
 
-    def pairwise_theta_plot_pool(self, path = None):
-        sel = np.arange(20000, self.setup.nmcmc, 10)
+    def pairwise_theta_plot_pool(self, path, uu):
+        sel = uu#np.arange(20000, self.setup.nmcmc, 10)
         plt.figure(figsize = (15,15))
         for i in range(self.setup.p):
             for j in range(self.setup.p):

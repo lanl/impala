@@ -506,15 +506,15 @@ def cluster_matrix_plot(setup, calib_out, path = None, **kwargs):
     return
 
 
-def pairs(setup, mat_unst, col=None, s=None):
-    dat = pd.DataFrame(sc.tran_unif(mat_unst, setup.bounds_mat, setup.bounds.keys()))
+def pairs(setup, mat_st, col=None, s=None):
+    dat = pd.DataFrame(sc.tran_unif(mat_st, setup.bounds_mat, setup.bounds.keys()))
     if col is None:
-        col = ['blue']*mat_unst.shape[0]
+        col = ['blue']*mat_st.shape[0]
     if s is None:
-        s = [3]*mat_unst.shape[0]
+        s = [3]*mat_st.shape[0]
     dat['col'] = col
     g = sns.pairplot(dat, plot_kws={"s": s}, corner=True, diag_kind='hist', hue='col')
-    for i in range(mat_unst.shape[1]):
+    for i in range(mat_st.shape[1]):
         g.axes[i,i].set_xlim(setup.bounds[dat.keys()[i]])
         g.axes[i,i].set_ylim(setup.bounds[dat.keys()[i]])
     g.fig.set_size_inches(10,10)

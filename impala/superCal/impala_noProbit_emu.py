@@ -22,7 +22,7 @@ import impala.superCal.pbar as pbar
 
 class CalibSetup:
     """Structure for storing calibration experimental data, likelihood, discrepancy, etc."""
-    def __init__(self, bounds, constraint_func=None):
+    def __init__(self, bounds, constraint_func='bounds'):
         self.nexp = 0 # Number of independent emulators
         self.ys = []
         self.y_lens = []
@@ -34,6 +34,8 @@ class CalibSetup:
         self.p = bounds.__len__()
         if constraint_func is None:
             constraint_func = lambda *x: True
+        if constraint_func=='bounds':
+            constraint_func = cf_bounds
         self.checkConstraints = constraint_func
         self.nmcmc = 10000
         self.nburn = 5000
@@ -55,11 +57,28 @@ class CalibSetup:
         return
     def addVecExperiments(self, yobs, model, sd_est, s2_df, s2_ind, meas_error_cor=None, theta_ind=None, D=None, discrep_tau=1):
         # if theta_ind specified, s2_ind is?
+        yobs = np.array(yobs)
+        sd_est = np.array(sd_est)
+        s2_df = np.array(s2_df)
+        s2_ind = np.array(s2_ind)
+        if len(yobs.shape) != 1:
+            raise ValueError('len(yobs.shape) should be 1')
+        if len(sd_est.shape) != 1:
+            raise ValueError('len(sd_est.shape) should be 1')
+        if len(s2_df.shape) != 1:
+            raise ValueError('len(s2_df.shape) should be 1')
+        if s2_ind.dtype != 'int64':
+            raise ValueError('s2_ind.dtype should be int64')
+        if len(yobs) != len(s2_ind):
+            raise ValueError('len(yobs) and len(s2_ind) should be the same')
         self.ys.append(np.array(yobs))
         self.y_lens.append(len(yobs))
         if theta_ind is None:
             theta_ind = [0]*len(yobs)
-        
+        theta_ind = np.array(theta_ind)
+
+        model.exp_ind = theta_ind
+
         self.theta_ind.append(theta_ind)
         self.ntheta.append(len(set(theta_ind)))
         model.yobs = np.array(yobs)
@@ -120,6 +139,12 @@ class CalibSetup:
         self.nclustmax = nclustmax
     pass
 
+def cf_bounds(x, bounds):
+    k = list(bounds.keys())[0]
+    good = x[k] < bounds[k][1]
+    for k in list(bounds.keys()):
+        good = good * (x[k] < bounds[k][1]) * (x[k] > bounds[k][0])
+    return good
 
 def normalize(x, bounds):
     """Normalize to 0-1 scale"""
@@ -139,6 +164,9 @@ def invprobit(y):
 
 initfunc_probit = np.random.normal # if probit, then normal--if uniform, then uniform
 initfunc_unif = np.random.uniform
+
+def subset_dict(dd, idx):
+    return {key: value[idx] for key, value in dd.items()}
 
 def tran_probit(th, bounds, names):
     return dict(zip(names, unnormalize(invprobit(th),bounds).T)) # If probit

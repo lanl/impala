@@ -69,6 +69,8 @@ class ModelBassPca_mult(AbstractModel):
         self.yobs = None
         self.marg_lik_cov = None
         self.nd = 0
+        if exp_ind is None:
+            exp_ind = np.array(0)
         self.nexp = exp_ind.max() + 1
         self.exp_ind = exp_ind
         self.s2 = s2
@@ -148,6 +150,8 @@ class ModelBassPca_func(AbstractModel):
         self.discrep_tau = 1.
         self.D = None
         self.discrep = 0.
+        if exp_ind is None:
+            exp_ind = np.array(0)
         self.nexp = exp_ind.max() + 1
         self.exp_ind = exp_ind
         self.s2 = s2
@@ -227,6 +231,8 @@ class ModelF(AbstractModel):
         self.stochastic = False
         self.yobs = None
         self.meas_error_cor = 1.#np.diag(self.basis.shape[0])
+        if exp_ind is None:
+            exp_ind = np.array(0)
         self.nexp = exp_ind.max() + 1
         self.exp_ind = exp_ind
         self.nd = 0

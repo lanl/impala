@@ -4,18 +4,53 @@ Basic progress bar.
 
 from datetime import timedelta, datetime
 import time
+import sys
 
 def pbrange(*args, **kwargs):
+    """
+    # Example 1:
+    for i in pbrange(n):
+        time.sleep(s)
+
+    # Example 2: Context and add extra args, using prange.
+    print("pbrange in context:")
+    with pbrange(0, 5 * n, 5) as pb:
+        for i in pb:
+            pb.extra = {f"{i}^2": i ** 2}
+            time.sleep(s)
+    """
+
     return pbar(range(*args), **kwargs)
 
 class pbar:
-    def __init__(self, iterable, min_interval=0.2):
+    """
+    # Example 1:
+    for i in pbar(range(n)):
+        time.sleep(s)
+
+    # Example 2:
+    pb = pbar(range(n))
+    for i in pb:
+        time.sleep(s)
+
+    # Example 3: Context and add extra args.
+    xs = range(0, 5 * n, 5)
+    with pbar(xs) as pb:
+        for i in pb:
+            pb.extra = {f"{i}^2": i ** 2}
+            time.sleep(s)
+    """
+    def __init__(self, iterable, min_interval=0.2, show=lambda: True, fname=None):
         self.iterator = iterable.__iter__()
         self.iters = iterable.__len__()
         self.min_interval = min_interval
         self.genesis = time.time()
         self.tic = self.genesis
         self.extra = None
+        self.show = show
+        self.fname = fname
+        self.stdout = sys.stdout
+        self.set_stdout()
 
     def parse_extra(self):
         if self.extra is None:
@@ -32,11 +67,17 @@ class pbar:
 
     def __next__(self):
         toc = time.time()
-        self.print(toc)
+        if self.show():
+            self.print(toc)
         self.i += 1
-        if self.i > self.iters:
-            print()
+        if self.i > self.iters and self.show():
+            if self.fname is None:
+                print()
         return self.iterator.__next__()
+
+    def set_stdout(self):
+        if self.fname is not None:
+            sys.stdout = open(self.fname, "w")
 
     def print(self, toc):
         if self.i == 0:
@@ -64,7 +105,7 @@ class pbar:
         return self
 
     def __exit__(self, *args, **kwargs):
-        pass
+        sys.stdout = self.stdout
 
 # Demo. TODO: Move to tests.
 if __name__ == "__main__":
