@@ -9,7 +9,7 @@ pip install git+https://github.com/lanl/impala.git
 ```
 
 ## Examples
-* [Example 1](examples/ex_friedman.ipynb) - univariate response    
+* [Example 1](examples/ex_friedman.ipynb)    
 
 ## References
 
