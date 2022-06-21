@@ -8,8 +8,8 @@ Use
 pip install git+https://github.com/lanl/impala.git
 ```
 
-## Example
-    
+## Examples
+* [Example 1](examples/ex_friedman.ipynb) - univariate response    
 
 ## References
 
