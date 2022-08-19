@@ -543,9 +543,26 @@ def parameter_trace_plot(sample_parameters,ylim=None):
 
 
 def save_parent_strength(setup, ptw_mod, calib_out, mcmc_use, path):
-    sub_dict = {k: calib_out.theta_parent_native[k][mcmc_use] for k in calib_out.theta_parent_native.keys()}
-    params = pd.DataFrame(sub_dict)
-    params['sse'] = calib_out.llik[mcmc_use]
+
+    theta_parent = sc.chol_sample_1per_constraints(
+        calib_out.theta0[mcmc_use,0], calib_out.Sigma0[mcmc_use,0], setup.checkConstraints,
+        setup.bounds_mat, setup.bounds.keys(), setup.bounds,
+        )
+    theta_parent_native = sc.unnormalize(theta_parent, setup.bounds_mat)
+
+    #sub_dict = {k: calib_out.theta_parent_native[k][mcmc_use] for k in calib_out.theta_parent_native.keys()}
+    #params = pd.DataFrame(sub_dict)
+    #params = pd.DataFrame(theta_parent_native)
+
+    theta_parent_native_dict = sc.tran_unif(theta_parent, setup.bounds_mat, setup.bounds.keys())
+
+    params = pd.DataFrame(theta_parent_native_dict)
+
+    pred = [setup.models[i].eval(theta_parent_native_dict, pool=True) for i in range(setup.nexp)]
+    llik = sum([((pred[i]-setup.ys[i])**2).mean(axis=1) for i in range(setup.nexp)])
+
+    #params['sse'] = calib_out.llik[mcmc_use]
+    params['sse'] = llik
     consts = pd.DataFrame(ptw_mod.constants, index=[0])
     bounds = pd.DataFrame(setup.bounds)
     mods = ptw_mod.model_info
