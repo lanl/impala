@@ -57,18 +57,42 @@ class Constant_Specific_Heat(BaseModel):
     def value(self, *args):
         return self.parent.parameters.Cv0
 
+#class Linear_Specific_Heat(BaseModel):
+#    """
+#    Linear Specific Heat Model
+#    """
+#    consts = ['Cv0', 'T0', 'dCdT']
+
+#    def value(self, *args):
+#        c0=self.parent.parameters.Cv0
+#        t0=self.parent.parameters.T0
+#        dcdt=self.parent.parameters.dCdT
+#        tnow=self.parent.state.T
+#        cnow=c0+(tnow-t0)*dcdt
+#        return cnow
+
 class Linear_Specific_Heat(BaseModel):
     """
     Linear Specific Heat Model
     """
-    consts = ['Cv0', 'T0', 'dCdT']
+    consts = ['c0', 'c1']
 
     def value(self, *args):
-        c0=self.parent.parameters.Cv0
-        t0=self.parent.parameters.T0
-        dcdt=self.parent.parameters.dCdT
+
         tnow=self.parent.state.T
-        cnow=c0+(tnow-t0)*dcdt
+        cnow=self.parent.parameters.c0+self.parent.parameters.c1*tnow
+        return cnow
+
+class Quadratic_Specific_Heat(BaseModel):
+    """
+    Quadratic Specific Heat Model
+    """
+    consts = ['c0', 'c1', 'c2']
+
+    def value(self, *args):
+
+        tnow=self.parent.state.T
+        cnow=self.parent.parameters.c0+self.parent.parameters.c1*tnow+self.parent.parameters.c2*tnow**2
         return cnow
 
 # Density Models
@@ -82,20 +106,57 @@ class Constant_Density(BaseModel):
     def value(self, *args):
         return self.parent.parameters.rho0 * np.ones(len(self.parent.state.T))
 
+#class Linear_Density(BaseModel):
+#    """
+#    Linear Density Model
+#    """
+#    consts = ['rho0', 'T0', 'dRhodT']
+
+#    def value(self, *args):
+#        r0=self.parent.parameters.rho0
+#        t0=self.parent.parameters.T0
+#        drdt=self.parent.parameters.dRhodT
+#        tnow=self.parent.state.T
+#        rnow=r0+drdt*(tnow-t0)
+#        return rnow
+
 class Linear_Density(BaseModel):
     """
     Linear Density Model
     """
-    consts = ['rho0', 'T0', 'dRhodT']
+    consts = ['r0','r1']
 
     def value(self, *args):
-        r0=self.parent.parameters.rho0
-        t0=self.parent.parameters.T0
-        drdt=self.parent.parameters.dRhodT
+        
         tnow=self.parent.state.T
-        rnow=r0+drdt*(tnow-t0)
+        rnow=self.parent.parameters.r0+self.parent.parameters.r1*tnow
+        return rnow    
+
+class Quadratic_Density(BaseModel):
+    """
+    Quadratic Density Model
+    """
+    consts = ['r0','r1','r2']
+
+    def value(self, *args):
+        
+        tnow=self.parent.state.T
+        rnow=self.parent.parameters.r0+self.parent.parameters.r1*tnow+self.parent.parameters.r2*tnow**2
         return rnow
 
+class Cubic_Density(BaseModel):
+    """
+    Quadratic Density Model
+    """
+    consts = ['r0','r1','r2','r3']
+
+    def value(self, *args):
+        
+        tnow=self.parent.state.T
+        rnow=self.parent.parameters.r0+self.parent.parameters.r1*tnow+self.parent.parameters.r2*tnow**2+self.parent.parameters.r3*tnow**3
+        return rnow
+    
+    
 # Melt Temperature Models
 
 class Constant_Melt_Temperature(BaseModel):
@@ -107,20 +168,42 @@ class Constant_Melt_Temperature(BaseModel):
     def value(self, *args):
         return self.parent.parameters.Tmelt0
 
+#class Linear_Melt_Temperature(BaseModel):
+#    """
+#    Linear Melt Temperature Model
+#    """
+#    consts=['Tmelt0', 'rho0', 'dTmdRho']#
+
+#    def value(self, *args):
+#        tm0=self.parent.parameters.Tmelt0
+#        rnow=self.parent.state.rho
+#        dtdr=self.parent.parameters.dTmdRho
+#        r0=self.parent.parameters.rho0
+#        tmeltnow=tm0+dtdr*(rnow-r0)
+#        return tmeltnow
+
 class Linear_Melt_Temperature(BaseModel):
     """
     Linear Melt Temperature Model
     """
-    consts=['Tmelt0', 'rho0', 'dTmdRho']
 
+    consts=['tm0', 'tm1']
     def value(self, *args):
-        tm0=self.parent.parameters.Tmelt0
         rnow=self.parent.state.rho
-        dtdr=self.parent.parameters.dTmdRho
-        r0=self.parent.parameters.rho0
-        tmeltnow=tm0+dtdr*(rnow-r0)
+        
+        tmeltnow=self.parent.parameters.tm0+self.parent.parameters.tm1*rnow
         return tmeltnow
 
+class Quadratic_Melt_Temperature(BaseModel):
+    """
+    Quadratic Melt Temperature Model
+    """
+    consts=['tm0', 'tm1', 'tm2']
+    def value(self, *args):
+        rnow=self.parent.state.rho
+        tmeltnow=self.parent.parameters.tm0+self.parent.parameters.tm1*rnow+self.parent.parameters.tm2*rnow**2
+        return tmeltnow    
+    
 class BGP_Melt_Temperature(BaseModel):
 
     consts = ['Tm_0', 'rho_m', 'gamma_1', 'gamma_3', 'q3']
@@ -141,17 +224,47 @@ class Constant_Shear_Modulus(BaseModel):
     def value(self, *args):
         return self.parent.parameters.G0
 
-class Linear_Shear_Modulus(BaseModel):
-    consts =  ['G0', 'rho0', 'dGdRho' ]
+#class Linear_Shear_Modulus(BaseModel):
+#    consts =  ['G0', 'rho0', 'dGdRho' ]#
 
-    def value(self, *args):
-         g0=self.parent.parameters.G0
-         rho0=self.parent.parameters.rho0
-         dgdr=self.parent.parameters.dGdRho
-         rnow=self.parent.state.rho
-         gnow=g0+dgdr*(rnow-rho0)
-         return gnow
+#    def value(self, *args):
+#         g0=self.parent.parameters.G0
+#         rho0=self.parent.parameters.rho0
+#         dgdr=self.parent.parameters.dGdRho
+#         rnow=self.parent.state.rho
+#         gnow=g0+dgdr*(rnow-rho0)
+#         return gnow
 
+class Linear_Cold_PW_Shear_Modulus(BaseModel):
+     consts = ['g0', 'g1', 'alpha']
+     def value(self, *args):
+        mp    = self.parent.parameters
+        rho   = self.parent.state.rho
+        temp  = self.parent.state.T
+        tmelt = self.parent.state.Tmelt
+        cold_shear = mp.g0+mp.g1*rho
+        gnow = cold_shear*(1.- mp.alpha* (temp/tmelt))
+
+        gnow[np.where(temp >= tmelt)] = 0.
+        gnow[np.where(gnow < 0)] = 0.
+
+        return gnow
+
+class Quadratic_Cold_PW_Shear_Modulus(BaseModel):
+     consts = ['g0', 'g1', 'g2', 'alpha']
+     def value(self, *args):
+        mp    = self.parent.parameters
+        rho   = self.parent.state.rho
+        temp  = self.parent.state.T
+        tmelt = self.parent.state.Tmelt
+        cold_shear = mp.g0+mp.g1*rho+mp.g2*rho**2
+        gnow = cold_shear*(1.- mp.alpha* (temp/tmelt))
+
+        gnow[np.where(temp >= tmelt)] = 0.
+        gnow[np.where(gnow < 0)] = 0.
+
+        return gnow
+    
 class Simple_Shear_Modulus(BaseModel):
     consts = ['G0', 'alpha']
 
@@ -253,7 +366,7 @@ class JC_Yield_Stress(BaseModel):
 
 class PTW_Yield_Stress(BaseModel):
     params = ['theta','p','s0','sInf','kappa','lgamma','y0','yInf','y1', 'y2']
-    consts = ['beta', 'matomic', 'chi']
+    consts = ['rho0', 'beta', 'matomic', 'chi']
 
     #@profile
     def value(self, edot):
