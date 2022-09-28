@@ -11,7 +11,8 @@ from numpy.linalg import cholesky, slogdet
 #from itertools import repeat
 #import multiprocessing as mp
 #import pandas as pd
-import impala.superCal.pbar as pbar
+#import impala.superCal.pbar as pbar
+from . import pbar
 #np.seterr(under='ignore')
 
 # no probit tranform for hierarchical and DP versions
@@ -307,15 +308,6 @@ def gamma_logpdf(s, alpha, beta):
         - beta * s
         )
     return ld
-
-def bincount2D_vectorized(a, max_count):
-    """
-    Applies np.bincount across a 2d array (row-wise).
-
-    Adapted From: https://stackoverflow.com/questions/46256279/bin-elements-per-row-vectorized-2d-bincount-for-numpy
-    """
-    a_offs = a + np.arange(a.shape[0])[:,None]*max_count
-    return np.bincount(a_offs.ravel(), minlength=a.shape[0]*max_count).reshape(-1,max_count)
 
 def ldig_kern(x, a, b): # ig
   return (-a - 1) * np.log(x) - b / x
