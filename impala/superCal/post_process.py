@@ -505,6 +505,8 @@ def cluster_matrix_plot(setup, calib_out, path = None, **kwargs):
         plt.show()
     return
 
+def hide_current_axis(*args, **kwds):
+    plt.gca().set_visible(False)
 
 def pairs(setup, mat_st, col=None, s=None):
     dat = pd.DataFrame(sc.tran_unif(mat_st, setup.bounds_mat, setup.bounds.keys()))
@@ -513,7 +515,9 @@ def pairs(setup, mat_st, col=None, s=None):
     if s is None:
         s = [3]*mat_st.shape[0]
     dat['col'] = col
-    g = sns.pairplot(dat, plot_kws={"s": s}, corner=True, diag_kind='hist', hue='col')
+    #g = sns.pairplot(dat, plot_kws={"s": s}, corner=True, diag_kind='hist', hue='col')
+    g = sns.pairplot(dat, plot_kws={"s": s}, diag_kind='hist', hue='col')
+    g.map_upper(hide_current_axis) # to make compatible with early version of seaborn
     for i in range(mat_st.shape[1]):
         g.axes[i,i].set_xlim(setup.bounds[dat.keys()[i]])
         g.axes[i,i].set_ylim(setup.bounds[dat.keys()[i]])
