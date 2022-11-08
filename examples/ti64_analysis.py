@@ -3,77 +3,109 @@
 ## using SHPB/quasistatic data.
 ##########################################################################################
 
-import numpy as np
 from impala import superCal as sc
 import matplotlib.pyplot as plt
+import impala.superCal.post_process as pp
+import numpy as np
+import dill
 import pandas as pd
 import sqlite3 as sq
+import os
 np.seterr(under='ignore')
+
+name = 'hier_Ti64_final3'
+path = name + '_results/'
+os.makedirs(path, exist_ok=True)
 
 ##########################################################################################
 ## Three Ti64 experiments, 1st column is plastic strain 2nd column is stress (units: mbar)
 
-
 ## get meta data
-con = sq.connect('../../../Desktop/data_Ti64.db')
+con = sq.connect('data/ti-6al-4v/data_Ti64.db')
 meta = pd.read_sql('select * from meta;', con)
 n_tot = meta.shape[0]
 n_shpb = np.sum(meta['type']=='shpb')
 n_tc = np.sum(meta['type']=='tc')
+
+#notmst_idx = np.array([st[0:3]!='MST' for st in np.array(meta.pname)[:289]])
+#use_idx = np.where(notmst_idx * (meta['type']=='shpb')[:289])[0]
 edots = np.hstack(meta.edot[:n_shpb].values)
 temps = np.hstack(meta.temperature[:n_shpb].values)
+
+#n_shpb = use_idx.shape[0]
+# edots = np.hstack(meta.edot[use_idx].values)
+# temps = np.hstack(meta.temperature[use_idx].values)
 ## get SHPB experimental data
 dat_all = []
+#for i in use_idx:
 for i in range(n_shpb):
     ## get first datset
     dat_all.append(pd.read_sql('select * from data_{};'.format(i + 1), con).values)
 stress_stacked = np.hstack([v.T[1] for v in dat_all])
 strain_hist_list = [v.T[0] for v in dat_all]
 
-for i in range(n_shpb):
-    plt.plot(dat_all[i][:,0],dat_all[i][:,1])
-plt.show()
+emu = True
 
+#for i in range(n_shpb):
+#    plt.plot(dat_all[i][:,0],dat_all[i][:,1])
+#plt.show()
 
-import pyBASS as pb
-emu_list = []
-y_emu_list = []
-for i in range(n_shpb, n_tot, 1):
-    X = pd.read_sql('select * from sims_input_{};'.format(i + 1), con).values
-    y = pd.read_sql('select * from sims_output_{};'.format(i + 1), con).values
-    mod = pb.bassPCA(X, y, ncores=15, percVar=99.9)
-    emu_list.append(mod)
-    yobs = pd.read_sql('select * from data_{};'.format(i + 1), con).values
-    y_emu_list.append(yobs)
+#pd.read_sql("SELECT * FROM sqlite_master where type='table';", con)
 
-emu_list[4].plot()
+if emu:
+    import pyBASS as pb
+    emu_list = []
+    y_emu_list = []
+    input_names_emu = ['theta','p','s0','sInf','y0','yInf','y1','y2','kappa','lgamma','vel'] # actually gamma, not lgamma, but we take log below
+    for i in np.where(meta['type'] != 'shpb')[0][range(n_tc)]:
+        X = pd.read_sql('select * from sims_input_{};'.format(i + 1), con).values
+        X[:,9] = np.log(X[:,9]) # we use log gamma below
+        y = pd.read_sql('select * from sims_output_{};'.format(i + 1), con).values
+        mod = pb.bassPCA(X, y, ncores=15, percVar=99.9)
+        emu_list.append(mod)
+        yobs = pd.read_sql('select * from data_{};'.format(i + 1), con).values
+        y_emu_list.append(yobs)
+    
+    #emu_list[0].plot()
+
+con.close()
+del con
+
 ##########################################################################################
 # set constants and parameter bounds
 consts_ptw = {
-    'alpha'  : 0.2,
+    'alpha'  : 0.95,
     'beta'   : 0.33,
     'matomic': 45.9,
-    'Tmelt0' : 2110.,
-    'rho0'   : 4.419,
-    'Cv0'    : 0.525e-5,
-    'G0'     : 0.4,
+    'Tmelt0' : 2473.8,
     'chi'    : 1.0,
-    'sgB'    : 6.44e-4
+    'G0'     : 0.44,
+    'rho0'   : 4.419,
+    'rho_0'  : 4.45,
+    'gamma_1': 2.2,
+    'gamma_2': -4.7,
+    'q2'     : 0.8,
+    'Cv0'    : 5.1388e-5,
+    'T0'     : 298.15,
+    'dCdT'   : 1.371e-8,
+    'dTmdRho': 1448.2,
+    't0'     : 54.73,
+    'dRhodT' : -2.5965e-5
     }
+
 bounds_ptw = {
-    'theta' : (0.0001,   0.2),
-    'p'     : (0.0001,   5.),
-    's0'    : (0.0001,   0.05),
-    'sInf'  : (0.0001,   0.05),
-    'kappa' : (0.0001,   0.5),
-    'lgamma': (-14.,     -9.),
-    'y0'    : (0.0001,   0.05),
-    'yInf'  : (0.0001,   0.01),
-    'y1'    : (0.001,    0.1),
-    'y2'    : (0.33,      1.),
+    'theta' : (0.0001,       0.2),
+    'p'     : (0.0001,       5.),
+    's0'    : (0.0001,       0.05),
+    'sInf'  : (0.0001,       0.05),
+    'kappa' : (0.0001,       0.5),
+    'lgamma': (np.log(1e-6), np.log(1e-4)),
+    'y0'    : (0.0001,       0.05),
+    'yInf'  : (0.0001,       0.01), 
+    'y1'    : (0.001,        0.1),
+    'y2'    : (0.33,         1.),
+    'vel'   : (0.99,         1.01),
     }
-
-
 
 ##########################################################################################
 # constraints: sInf < s0, yInf < y0, y0 < s0, yInf < sInf, s0 < y1, beta < y2 (but beta is fixed)
@@ -83,107 +115,98 @@ def constraints_ptw(x, bounds):
         good = good * (x[k] < bounds[k][1]) * (x[k] > bounds[k][0])
     return good
 
-
-
 ##########################################################################################
 # these define measurement error estimates, I would leave these as is for most SHPB/quasistatic data
-sd_est = np.array(([.0001]*n_shpb + [.001]*n_tc))
-s2_df = np.array([15]*n_tot)
-s2_ind = np.hstack([[v]*len(dat_all[v]) for v in list(range(n_shpb))] + [[v + n_shpb]*len(y_emu_list[v]) for v in list(range(n_tc))])
 
-input_names_emu = list(bounds_ptw.keys()) + ['vel']
-models_emu = []
-for i in range(n_tc):
-    models_emu.append(sc.ModelBassPca_func(emu_list[i], input_names_emu))
+sd_est_shpb = np.array([.00025]*n_shpb)
+s2_df_shpb = np.array([5]*n_shpb)
+s2_ind_shpb = np.hstack([[v]*len(dat_all[v]) for v in list(range(n_shpb))])
 
 ##########################################################################################
 # define PTW model
 
-model_ptw = sc.ModelMaterialStrength(temps=np.array(temps), 
+#impala = reload(impala)
+#models = reload(models)
+
+flow_stress_model = 'PTW_Yield_Stress'
+melt_model = 'Linear_Melt_Temperature'
+shear_model = 'BGP_PW_Shear_Modulus'
+specific_heat_model = 'Linear_Specific_Heat'
+density_model = 'Linear_Density'
+
+model_ptw_hier = sc.ModelMaterialStrength(temps=np.array(temps), 
     edots=np.array(edots), 
     consts=consts_ptw, 
     strain_histories=strain_hist_list, 
-    flow_stress_model='PTW_Yield_Stress',
-    melt_model='Constant_Melt_Temperature', 
-    shear_model='Simple_Shear_Modulus', 
-    specific_heat_model='Constant_Specific_Heat', 
-    density_model='Constant_Density',
-    pool=False)
-# bring everything together into calibration structure
-setup_pool_ptw = sc.CalibSetup(bounds_ptw, constraints_ptw)
-setup_pool_ptw.addVecExperiments(yobs=stress_stacked, 
-    model=model_ptw, 
-    sd_est=sd_est, 
-    s2_df=s2_df, 
-    s2_ind=s2_ind)
-setup_pool_ptw.setTemperatureLadder(1.05**np.arange(50), start_temper=2000)
-setup_pool_ptw.setMCMC(nmcmc=10000, nburn=5000, thin=1, decor=100, start_tau_theta=-4.)
+    flow_stress_model=flow_stress_model,
+    melt_model=melt_model, 
+    shear_model=shear_model, 
+    specific_heat_model=specific_heat_model, 
+    density_model=density_model,
+    pool=False, s2='gibbs')
 
-setup_pool_jc = sc.CalibSetup(bounds_jc, constraints_jc)
-setup_pool_jc.addVecExperiments(yobs=stress_stacked, 
-    model=model_jc, 
-    sd_est=sd_est, 
-    s2_df=s2_df, 
-    s2_ind=s2_ind)
-setup_pool_jc.setTemperatureLadder(1.05**np.arange(50), start_temper=2000)
-setup_pool_jc.setMCMC(nmcmc=10000, nburn=5000, thin=1, decor=100, start_tau_theta=-4.)
+# bring everything together into calibration structure
+setup_hier_ptw = sc.CalibSetup(bounds_ptw, constraints_ptw)
+setup_hier_ptw.addVecExperiments(yobs=stress_stacked, 
+    model=model_ptw_hier, 
+    sd_est=sd_est_shpb, 
+    s2_df=s2_df_shpb, 
+    s2_ind=s2_ind_shpb,
+    theta_ind=s2_ind_shpb)
+
+if emu:
+    models_emu = []
+    for i in range(n_tc):
+        models_emu.append(sc.ModelBassPca_func(emu_list[i], input_names_emu, exp_ind=np.array([0]*len(y_emu_list[i])), s2='fix'))
+    for i in range(n_tc):
+        setup_hier_ptw.addVecExperiments(
+            yobs=y_emu_list[i].flatten(),
+            model=models_emu[i],
+            sd_est=np.array([0.001]), 
+            s2_df=np.array([150]), 
+            s2_ind=np.array([0]*len(y_emu_list[i])),
+            theta_ind=np.array([0]*len(y_emu_list[i]))
+        )
+setup_hier_ptw.setTemperatureLadder(1.05**np.arange(30), start_temper=2000)
+setup_hier_ptw.setMCMC(nmcmc=30000, thin=1, decor=100, start_tau_theta=-4.)
+setup_hier_ptw.setHierPriors(
+    theta0_prior_mean=np.repeat(0.5, setup_hier_ptw.p), 
+    theta0_prior_cov=np.eye(setup_hier_ptw.p)*10**2, 
+    Sigma0_prior_df=setup_hier_ptw.p + 20, 
+    #Sigma0_prior_df=setup_hier_ptw.p + 2, 
+    Sigma0_prior_scale=np.eye(setup_hier_ptw.p)*.1**2 # used .1**2 before, .5 is what we used elsewhere, indicating low shrinkage (may want to use .5**2 or .25**2 instead), but that was probit space
+    ) 
+
+
 
 ##########################################################################################
 # calibrate
-out_pool_jc = sc.calibPool(setup_pool_jc)
-out_pool_ptw = sc.calibPool(setup_pool_ptw)
+
+out_hier = sc.calibHier(setup_hier_ptw)
+
+mcmc_use = np.arange(20000, 30000, 2) # burn and thin index
+pp.save_parent_strength(setup_hier_ptw, setup_hier_ptw.models[0], out_hier, mcmc_use, path+'parent_'+name+'.csv') # saves parent distribution
+
+# save output
+#dill.dump_session(path + name + '.pkl')
+
+# rank parent distribution samples by stress at particular strain, strain rate, temperature, save to file
 
 
-out_pool = out_pool_ptw
-setup_pool = setup_pool_ptw
+pp.parameter_trace_plot(out_hier.theta0[:,0],ylim=[0,1]) # we want these to look like they converge, choose burn-in accordingly
+plt.savefig(path+'traceTheta0_'+name+'.pdf')
 
-# thetas trace plot, coolest temperature
-plt.plot(out_pool.theta[:,0,0])
-plt.show()
+pp.pairs(setup_hier_ptw, out_hier.theta0[mcmc_use, 0]) # pairs plot of posterior samples of theta0 (parent mean)
+plt.savefig(path+'samplePairsTheta0_'+name+'.pdf')
 
-plt.plot(out_pool.llik)
-plt.show()
+pp.parameter_trace_plot(out_hier.theta[0][:,0,4],ylim=[0,1]) # trace plot of the 5th experiment parameters
+plt.savefig(path+'traceTheta5_'+name+'.pdf')
 
-# index of posterior samples I will use
-uu = np.arange(5000, 10000, 5)
- 
-mle_idx = np.argmax(out_pool.llik[uu])
-mat = np.vstack((out_pool.theta[uu,0,:], out_pool.theta[uu[mle_idx],0,:], out_pool.theta[uu,0,:].mean(0)))
+pp.pairs(setup_hier_ptw, out_hier.theta[0][mcmc_use,0,4]) # pairs plot of the 5th experiment parameters
+plt.savefig(path+'samplePairsTheta5_'+name+'.pdf')
 
-##########################################################################################
-# posterior predictions (without measurement error, which has standard deviation np.sqrt(out.s2)), disregarding the first 25000 MCMC samples
-pred = setup_pool.models[0].eval( # evaluates the model passed to setup.  If more than one call to "addExperiment..." use the index
-    sc.tran_unif( # transforms thetas (which are scaled to 0-1) to native scale, results in a dict
-        mat, setup_pool.bounds_mat, setup_pool.bounds.keys()
-        )
-    ) # note, our PTW eval doesn't care about parameter ordering, just the names in the dict
+pp.pairwise_theta_plot_hier(setup_hier_ptw, out_hier, path+'pairs_'+name+'.pdf', mcmc_use) # saves the combined pairs plot
+pp.ptw_prediction_plots_hier(setup_hier_ptw, out_hier, path+'pred_'+name+'.pdf', mcmc_use, ylim=[0,.025]) # saves predictions
 
-plt.plot(pred.T,color='grey') # note, these don't include the additional error we are estimating (measurement error, plus everything else)
-plt.plot(pred[len(uu)],color='red')
-plt.plot(pred[len(uu)+1],color='green')
-plt.plot(stress_stacked,color='black')
-plt.show()
-
-
-best_theta = sc.tran_unif( # transforms thetas (which are scaled to 0-1) to native scale, results in a dict
-    out_pool.theta[uu[mle_idx],0,:], setup_pool.bounds_mat, setup_pool.bounds.keys()
-    )
-
-
-# pairs plot of parameter posterior samples
-import pandas as pd
-import seaborn as sns
-dat = pd.DataFrame(sc.tran_unif(mat, setup_pool.bounds_mat, setup_pool.bounds.keys()))
-dat['col'] = ['blue']*len(uu) + ['red'] + ['green']
-g = sns.pairplot(dat, plot_kws={"s": [3]*len(uu) + [30]*2}, corner=True, diag_kind='hist', hue='col')
-#g.set(xlim=(0,1), ylim = (0,1))
-for i in range(out_pool.theta.shape[2]):
-    g.axes[i,i].set_xlim(setup_pool.bounds[dat.keys()[i]])
-    g.axes[i,i].set_ylim(setup_pool.bounds[dat.keys()[i]])
-#g.axes[1,1].set_xlim((-20,20))
-g.fig.set_size_inches(10,10)
-g
-plt.show()
-
-
-
+pp.get_best_sse(path+'parent_'+name+'.csv', path+'bestSSE_'+name+'.csv') # function to get best parameters (uses sum of squared error, sse)
+pp.get_bounds(edot=1.1e6, strain=1., temp=0.2*2400, results_csv=path+'parent_'+name+'.csv', write_path=path+'bounds_'+name+'.csv') # function to get bounds
