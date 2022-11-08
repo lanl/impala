@@ -639,10 +639,15 @@ def generate_strain_history(emax, edot, Nhist):
     strain_rate = strain_diffs[:, np.newaxis] / np.diff(times,axis=0)
     return dict((['times',times.T], ['strains',strains], ['strain_rate',strain_rate.T]))
 
+def my_linspace(start, stop, N): # to make compatible with python 3.6
+    divisor = N-1
+    steps = (1.0/divisor) * (stop - start)
+    return (steps[:,None]*np.arange(N) + start[:,None]).T
+
 def generate_strain_history_new(emax, edot, nhist):
     tmax    = emax / edot     
-    strains = np.linspace(0, emax, nhist) # nhist * nexp
-    times   = np.linspace(0, tmax, nhist) # nhist * nexp
+    strains = my_linspace(np.array([0]), emax, nhist) # nhist * nexp
+    times   = my_linspace(np.array([0]), tmax, nhist) # nhist * nexp
     rates   = np.diff(strains, axis = 0) / np.diff(times, axis = 0) # (nhist - 1) * nexp
     return {'times' : times.T, 'strains' : strains.T, 'strain_rate' : rates.T}
 
