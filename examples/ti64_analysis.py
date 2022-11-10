@@ -3,17 +3,20 @@
 ## using SHPB/quasistatic data.
 ##########################################################################################
 
+import matplotlib
+## Force matplotlib to not use any Xwindows backend.
+matplotlib.use('Agg')
 from impala import superCal as sc
 import matplotlib.pyplot as plt
 import impala.superCal.post_process as pp
 import numpy as np
-import dill
+#import dill
 import pandas as pd
 import sqlite3 as sq
 import os
 np.seterr(under='ignore')
 
-name = 'hier_Ti64_final3'
+name = 'hier_Ti64'
 path = name + '_results/'
 os.makedirs(path, exist_ok=True)
 
@@ -191,7 +194,6 @@ pp.save_parent_strength(setup_hier_ptw, setup_hier_ptw.models[0], out_hier, mcmc
 #dill.dump_session(path + name + '.pkl')
 
 # rank parent distribution samples by stress at particular strain, strain rate, temperature, save to file
-
 
 pp.parameter_trace_plot(out_hier.theta0[:,0],ylim=[0,1]) # we want these to look like they converge, choose burn-in accordingly
 plt.savefig(path+'traceTheta0_'+name+'.pdf')
