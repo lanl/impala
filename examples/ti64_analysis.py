@@ -75,7 +75,7 @@ if emu:
         emu_list.append(mod)
         yobs = pd.read_sql('select * from data_{};'.format(i + 1), con).values
         y_emu_list.append(yobs)
-        print('emu '+str(i)+' '+str(process.memory_info().rss/1e9))
+        #print('emu '+str(i)+' '+str(process.memory_info().rss/1e9))
     
     #emu_list[0].plot()
 
@@ -161,7 +161,7 @@ model_ptw_hier = sc.ModelMaterialStrength(temps=np.array(temps),
 #print('before init '+str(process.memory_info().rss/1e9))
 # bring everything together into calibration structure
 setup_hier_ptw = sc.CalibSetup(bounds_ptw, constraints_ptw)
-print('init1 '+str(process.memory_info().rss/1e9))
+#print('init1 '+str(process.memory_info().rss/1e9))
 setup_hier_ptw.addVecExperiments(yobs=stress_stacked, 
     model=model_ptw_hier, 
     sd_est=sd_est_shpb, 
@@ -194,7 +194,7 @@ setup_hier_ptw.setHierPriors(
     Sigma0_prior_scale=np.eye(setup_hier_ptw.p)*.1**2 # used .1**2 before, .5 is what we used elsewhere, indicating low shrinkage (may want to use .5**2 or .25**2 instead), but that was probit space
     ) 
 
-print('before run '+str(process.memory_info().rss/1e9))
+#print('before run '+str(process.memory_info().rss/1e9))
 
 ##########################################################################################
 # calibrate
