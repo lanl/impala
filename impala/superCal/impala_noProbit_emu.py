@@ -84,7 +84,7 @@ class CalibSetup:
         self.ntheta.append(len(set(theta_ind)))
         model.yobs = np.array(yobs)
         
-        model.meas_error_cor = np.eye(len(yobs)) # this doesn't work when ntheta>1
+        #model.meas_error_cor = np.eye(len(yobs)) # this doesn't work when ntheta>1
         if meas_error_cor is not None:
             model.meas_error_cor = meas_error_cor
         

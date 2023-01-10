@@ -3,17 +3,25 @@
 ## using SHPB/quasistatic data.
 ##########################################################################################
 
+import matplotlib
+## Force matplotlib to not use any Xwindows backend.
+matplotlib.use('Agg')
 from impala import superCal as sc
 import matplotlib.pyplot as plt
 import impala.superCal.post_process as pp
 import numpy as np
-import dill
+#import dill
 import pandas as pd
 import sqlite3 as sq
 import os
 np.seterr(under='ignore')
 
-name = 'hier_Ti64_final3'
+
+#import os, psutil
+#process = psutil.Process(os.getpid())
+#print('start '+str(process.memory_info().rss/1e9))
+
+name = 'hier_Ti64'
 path = name + '_results/'
 os.makedirs(path, exist_ok=True)
 
@@ -44,6 +52,8 @@ for i in range(n_shpb):
 stress_stacked = np.hstack([v.T[1] for v in dat_all])
 strain_hist_list = [v.T[0] for v in dat_all]
 
+#print('get data  '+str(process.memory_info().rss/1e9))
+
 emu = True
 
 #for i in range(n_shpb):
@@ -65,8 +75,11 @@ if emu:
         emu_list.append(mod)
         yobs = pd.read_sql('select * from data_{};'.format(i + 1), con).values
         y_emu_list.append(yobs)
+        #print('emu '+str(i)+' '+str(process.memory_info().rss/1e9))
     
     #emu_list[0].plot()
+
+#print('emulators '+str(process.memory_info().rss/1e9))
 
 con.close()
 del con
@@ -145,8 +158,10 @@ model_ptw_hier = sc.ModelMaterialStrength(temps=np.array(temps),
     density_model=density_model,
     pool=False, s2='gibbs')
 
+#print('before init '+str(process.memory_info().rss/1e9))
 # bring everything together into calibration structure
 setup_hier_ptw = sc.CalibSetup(bounds_ptw, constraints_ptw)
+#print('init1 '+str(process.memory_info().rss/1e9))
 setup_hier_ptw.addVecExperiments(yobs=stress_stacked, 
     model=model_ptw_hier, 
     sd_est=sd_est_shpb, 
@@ -154,6 +169,7 @@ setup_hier_ptw.addVecExperiments(yobs=stress_stacked,
     s2_ind=s2_ind_shpb,
     theta_ind=s2_ind_shpb)
 
+#print('init2 '+str(process.memory_info().rss/1e9))
 if emu:
     models_emu = []
     for i in range(n_tc):
@@ -167,6 +183,7 @@ if emu:
             s2_ind=np.array([0]*len(y_emu_list[i])),
             theta_ind=np.array([0]*len(y_emu_list[i]))
         )
+#print('init emu '+str(process.memory_info().rss/1e9))
 setup_hier_ptw.setTemperatureLadder(1.05**np.arange(30), start_temper=2000)
 setup_hier_ptw.setMCMC(nmcmc=30000, thin=1, decor=100, start_tau_theta=-4.)
 setup_hier_ptw.setHierPriors(
@@ -177,7 +194,7 @@ setup_hier_ptw.setHierPriors(
     Sigma0_prior_scale=np.eye(setup_hier_ptw.p)*.1**2 # used .1**2 before, .5 is what we used elsewhere, indicating low shrinkage (may want to use .5**2 or .25**2 instead), but that was probit space
     ) 
 
-
+#print('before run '+str(process.memory_info().rss/1e9))
 
 ##########################################################################################
 # calibrate
@@ -191,7 +208,6 @@ pp.save_parent_strength(setup_hier_ptw, setup_hier_ptw.models[0], out_hier, mcmc
 #dill.dump_session(path + name + '.pkl')
 
 # rank parent distribution samples by stress at particular strain, strain rate, temperature, save to file
-
 
 pp.parameter_trace_plot(out_hier.theta0[:,0],ylim=[0,1]) # we want these to look like they converge, choose burn-in accordingly
 plt.savefig(path+'traceTheta0_'+name+'.pdf')
