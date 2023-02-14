@@ -12,7 +12,14 @@ from numpy.linalg import cholesky, slogdet
 #import multiprocessing as mp
 #import pandas as pd
 #import impala.superCal.pbar as pbar
-from . import pbar
+#from . import pbar
+import pbar ####### TODO: switch with above ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+####### TODO: switch with above ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+####### TODO: switch with above ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+####### TODO: switch with above ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+####### TODO: switch with above ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+####### TODO: switch with above ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+####### TODO: switch with above ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #np.seterr(under='ignore')
 
 # no probit tranform for hierarchical and DP versions
@@ -22,8 +29,30 @@ from . import pbar
 #####################
 
 class CalibSetup:
-    """Structure for storing calibration experimental data, likelihood, discrepancy, etc."""
+    """
+    Structure for storing calibration experimental data, likelihood, discrepancy, etc.
+    Includes the following methods:
+
+    * addVecExperiments
+    * setTemperatureLadder
+    * setMCMC
+    * setHierPriors
+    * setClusterPriors
+
+    """
     def __init__(self, bounds, constraint_func='bounds'):
+        """
+        Initialize the structure for storing data, models, etc.
+
+        :param bounds: dictionary where keys are parameter names and items are tuples that are the 
+            lower and upper bounds for the parameters
+        :param constraint_func: a function that takes a dictionary of parameter combinations as well
+            as the dictionary of bounds and (these should have matching keys) and returns a vector 
+            of 1s and 0s with 1s where the parameter combinations meet the constraint. Alternatively, 
+            if no constraints other than bounds exist, passing "bounds" for this argument will use
+            the proper constraint function.
+        """
+
         self.nexp = 0 # Number of independent emulators
         self.ys = []
         self.y_lens = []
@@ -56,7 +85,28 @@ class CalibSetup:
         self.nswap = 5
         self.s2_prior_kern = []
         return
-    def addVecExperiments(self, yobs, model, sd_est, s2_df, s2_ind, meas_error_cor=None, theta_ind=None, D=None, discrep_tau=1):
+    def addVecExperiments(self, yobs, model, sd_est, s2_df, s2_ind, meas_error_cor=None, 
+            theta_ind=None, D=None, discrep_tau=1):
+        """
+        Add an experiment (really a data/model combination), or a set of experiments for which 
+        model prediction of the quantity of interest is vectorized.
+
+        :param yobs: a vector (numpy array) of observed data
+        :param model: a class with an eval method.  The eval method should include arguments 
+            parmat (a dictionary with keys matching those in the bounds dictionary, and items
+            that are parameter combinations), pool (logical indicating whether this is a 
+            calculation for a pooled model or a hierarchical model), and nugget (logical 
+            indicating whether prediction is done including a nugget term) and should return 
+            the model evaluations at the parameter combinations.  If this is an emulator with
+            posterior samples, a step method can also be included
+        :param sd_est:
+        :param s2_df:
+        :param s2_ind:
+        :param meas_error_cor:
+        :param theta_ind:
+        :param D:
+        :param discrep_tau:
+        """
         # if theta_ind specified, s2_ind is?
         yobs = np.array(yobs)
         sd_est = np.array(sd_est)
@@ -106,7 +156,6 @@ class CalibSetup:
         for i in range(len(vec)):
             vec[i] = np.sum(s2_ind==i)
         self.ny_s2.append(vec)
-        self.nclustmax = max(sum(self.ntheta), 10)
         if np.any(s2_df == 0):
             self.s2_prior_kern.append(ldhc_kern)
         else:
@@ -136,8 +185,12 @@ class CalibSetup:
         self.Sigma0_prior_df = Sigma0_prior_df
         self.Sigma0_prior_scale = Sigma0_prior_scale
         return
-    def setClusterPriors(self, nclustmax):
+    def setClusterPriors(self, nclustmax=None, eta_prior_shape=2, eta_prior_rate=0.1):
+        if nclustmax is None:
+            nclustmax = max(sum(self.ntheta), 10)
         self.nclustmax = nclustmax
+        self.eta_prior_shape = eta_prior_shape
+        self.eta_prior_rate = eta_prior_rate
     pass
 
 def cf_bounds(x, bounds):
@@ -437,6 +490,9 @@ class AMcov_clust:
 ## Hierarchical Calibration
 #@profile
 def calibHier(setup):
+    """
+    Hierarchical calibration
+    """
     t0 = time.time()
     theta0 = np.empty([setup.nmcmc, setup.ntemps, setup.p])
     Sigma0 = np.empty([setup.nmcmc, setup.ntemps, setup.p, setup.p])
@@ -1039,6 +1095,9 @@ def calibHier(setup):
 
 #@profile
 def calibPool(setup):
+    """
+    Pooled calibration
+    """
     t0 = time.time()
     theta = np.empty([setup.nmcmc, setup.ntemps, setup.p])
     n_s2 = np.sum(setup.ns2)
