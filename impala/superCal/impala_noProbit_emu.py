@@ -476,15 +476,6 @@ class AMcov_hier:
         x_cand = [chol_sample_1per(x[i][m-1], self.S[i]) for i in range(self.nexp)]
         return x_cand
 
-class AMcov_clust:
-    def __init__(self):
-        pass
-
-    def update(self, x, m):
-        pass
-
-    def update_tau(self, m):
-        pass
 
 ##############################################################################################################################################################################
 ## Hierarchical Calibration
