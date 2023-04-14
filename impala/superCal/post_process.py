@@ -622,6 +622,48 @@ def get_bounds(edot, strain, temp, results_csv, write_path, percentiles=[0.05, 0
 
     return
 
+
+
+
+def get_samples_rank(edot, strain, temp, results_csv, write_path):
+    # rank parent distribution samples by stress at particular strain, strain rate, temperature, save all samples to file, for sky
+    edot_star = edot * 1e-6 # first term is per second
+
+    df = pd.read_csv(results_csv, nrows=1, header=None)
+    mods = df.loc[0, :].values.tolist()
+
+    df = pd.read_csv(results_csv, skiprows=1, nrows=1)
+    consts = df.to_dict('records')[0]
+
+    df = pd.read_csv(results_csv, skiprows=7)
+    theta_parent_native = dict(zip(df.T.index,df.values.T))
+
+
+    model_ptw_star = sc.ModelMaterialStrength(
+        temps=np.array(temp), 
+        edots=np.array(edot*1e-6), 
+        consts=consts, 
+        strain_histories=[np.arange(0, strain, .01)], 
+        flow_stress_model=mods[0],
+        shear_model=mods[1],
+        specific_heat_model=mods[2], 
+        melt_model=mods[3],  
+        density_model=mods[4],
+        pool=True)
+    
+    stress_star = model_ptw_star.eval(theta_parent_native)[:,-1]
+    ranked_post = pd.DataFrame(theta_parent_native)
+    ranked_post['stress'] = stress_star
+    ranked_post['rank'] = ss.rankdata(stress_star) # append
+
+    template = "edot(1/s)=" + str(edot) + ", strain=" + str(strain) + ", temp(K)=" + str(temp) + "\n{}"
+
+    with open(write_path, 'w') as fp:
+        fp.write(template.format(ranked_post.to_csv(index=False)))
+
+    return
+
+
 def get_best_sse(results_csv, write_path):
 
     df = pd.read_csv(results_csv, skiprows=7)
