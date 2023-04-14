@@ -1,5 +1,6 @@
 import numpy as np
 import pyBASS as pb
+import pyBayesPPR as pb
 #import physical_models_vec as pm_vec
 from impala import physics as pm_vec
 from itertools import cycle
@@ -115,6 +116,75 @@ class ModelBassPca_mult(AbstractModel):
         return out
 
 
+class ModelBpprPca_mult(AbstractModel):
+    """ PCA Based Model Emulator """
+    def __init__(self, bmod, input_names, exp_ind=None, s2='MH'):
+        """
+        bmod        : ~
+        input_names : list of the names of the inputs to bmod
+        pool        : Whether using the pooled model
+        """
+        self.mod = bmod
+        self.stochastic = True
+        self.nmcmc = len(bmod.bm_list[0].samples.sdResid)
+        self.input_names = input_names
+        self.trunc_error_cov = np.cov(self.mod.trunc_error)
+        self.basis = self.mod.basis
+        self.meas_error_cor = np.eye(self.basis.shape[0])
+        self.discrep_cov = np.eye(self.basis.shape[0])*1e-12
+        self.ii = 0
+        npc = self.mod.nbasis
+        self.mod_s2 = np.empty([self.nmcmc, npc])
+        for i in range(npc):
+            self.mod_s2[:,i] = self.mod.bm_list[i].samples.sdResid**2
+        self.emu_vars = self.mod_s2[self.ii]
+        self.yobs = None
+        self.marg_lik_cov = None
+        self.nd = 0
+        if exp_ind is None:
+            exp_ind = np.array(0)
+        self.nexp = exp_ind.max() + 1
+        self.exp_ind = exp_ind
+        self.s2 = s2
+        if s2=='gibbs':
+            raise "Cannot use Gibbs s2 for emulator models."
+        return
+
+    def step(self):
+        self.ii = np.random.choice(range(self.nmcmc), 1).item()
+        self.emu_vars = self.mod_s2[self.ii]
+        return
+
+    def eval(self, parmat, pool = None, nugget=False):
+        """
+        parmat : ~
+        """
+        parmat_array = np.vstack([parmat[v] for v in self.input_names]).T # get correct subset/ordering of inputs
+        pred = self.mod.predict(parmat_array, mcmc_use=np.array([self.ii]), nugget=nugget)[0, :, :]
+
+        if pool is True:
+            return pred
+        else:
+            nrep = list(parmat.values())[0].shape[0] // self.nexp
+            return np.concatenate([pred[np.ix_(np.arange(i, nrep*self.nexp, self.nexp), np.where(self.exp_ind==i)[0])] for i in range(self.nexp)], 1)
+            # this is evaluating all experiments for all thetas, which is overkill
+
+    def llik(self, yobs, pred, cov):
+        vec = yobs - pred 
+        out = -.5*(cov['ldet'] + vec.T @ cov['inv'] @ vec)
+        return out
+
+    def lik_cov_inv(self, s2vec):
+        n = len(s2vec)
+        Sigma = cor2cov(self.meas_error_cor[:n,:n], np.sqrt(s2vec)) # :n is a hack for when ntheta>1 in heir...fix this sometime
+        mat = Sigma + self.trunc_error_cov + self.discrep_cov + self.basis @ np.diag(self.emu_vars) @ self.basis.T
+        # this doesnt work for vectorized experiments...maybe dont allow those for BASS
+        chol = cholesky(mat)
+        ldet = 2 * np.sum(np.log(np.diag(chol)))
+        #la.dpotri(chol, overwrite_c=True) # overwrites chol with original matrix inverse
+        inv=np.linalg.inv(mat)
+        out = {'inv' : inv, 'ldet' : ldet}
+        return out
 
 
 
@@ -221,6 +291,114 @@ class ModelBassPca_func(AbstractModel):
         ldet = in_mat['ldet'] + Aldet + Cldet
         out = {'inv' : inv, 'ldet' : ldet}
         return out
+
+
+
+class ModelBpprPca_func(AbstractModel):
+    """ PCA Based Model Emulator """
+    def __init__(self, bmod, input_names, exp_ind=None, s2='MH'):
+        """
+        bmod        : ~
+        input_names : list of the names of the inputs to bmod
+        pool        : Whether using the pooled model
+        """
+        self.mod = bmod
+        self.stochastic = True
+        self.nmcmc = len(bmod.bm_list[0].samples.sdResid)
+        self.input_names = input_names
+        self.basis = self.mod.basis
+        self.meas_error_cor = np.eye(self.basis.shape[0])
+        self.discrep_cov = np.eye(self.basis.shape[0])*1e-12
+        self.ii = 0
+        npc = self.mod.nbasis
+        if npc > 1:
+            self.trunc_error_var = np.diag(np.cov(self.mod.trunc_error))
+        else:
+            self.trunc_error_var = np.diag(np.cov(self.mod.trunc_error).reshape([1,1]))
+        self.mod_s2 = np.empty([self.nmcmc, npc])
+        for i in range(npc):
+            self.mod_s2[:,i] = self.mod.bm_list[i].samples.sdResid**2
+        self.emu_vars = self.mod_s2[self.ii]
+        self.yobs = None
+        self.marg_lik_cov = None
+        self.discrep_vars = None
+        self.nd = 0
+        self.discrep_tau = 1.
+        self.D = None
+        self.discrep = 0.
+        if exp_ind is None:
+            exp_ind = np.array(0)
+        self.nexp = exp_ind.max() + 1
+        self.exp_ind = exp_ind
+        self.s2 = s2
+        if s2=='gibbs':
+            raise "Cannot use Gibbs s2 for emulator models."
+        return
+
+    def step(self):
+        self.ii = np.random.choice(range(self.nmcmc), 1).item()
+        self.emu_vars = self.mod_s2[self.ii]
+        return
+    #@profile
+    def discrep_sample(self, yobs, pred, cov, itemp):
+        #if self.nd>0:
+        S = np.linalg.inv(
+            np.eye(self.nd) / self.discrep_tau 
+            + self.D.T @ cov['inv'] @ self.D
+            )
+        m = self.D.T @ cov['inv'] @ (yobs - pred)
+        discrep_vars = chol_sample(S @ m, S/itemp)
+        #self.discrep = self.D @ self.discrep_vars
+        return discrep_vars
+    #@profile
+    def eval(self, parmat, pool = None, nugget=False):
+        """
+        parmat : ~
+        """
+        parmat_array = np.vstack([parmat[v] for v in self.input_names]).T # get correct subset/ordering of inputs
+        pred = self.mod.predict(parmat_array, mcmc_use=np.array([self.ii]), nugget=nugget)[0, :, :]
+
+        if pool is True:
+            return pred
+        else:
+            nrep = list(parmat.values())[0].shape[0] // self.nexp
+            return np.concatenate([pred[np.ix_(np.arange(i, nrep*self.nexp, self.nexp), np.where(self.exp_ind==i)[0])] for i in range(self.nexp)], 1)
+            # this is evaluating all experiments for all thetas, which is overkill
+
+    #@profile
+    def llik(self, yobs, pred, cov):
+        vec = yobs - pred 
+        out = -.5*(cov['ldet'] + vec.T @ cov['inv'] @ vec)
+        return out
+    #@profile
+    def lik_cov_inv(self, s2vec):
+        vec = self.trunc_error_var + s2vec
+        #mat = np.diag(vec) + self.basis @ np.diag(self.emu_vars) @ self.basis.T
+        #inv = np.linalg.inv(mat)
+        #ldet = np.linalg.slogdet(mat)[1]
+        #out = {'inv' : inv, 'ldet' : ldet}
+        Ainv = np.diag(1/vec)
+        Aldet = np.log(vec).sum()
+        out = self.swm(Ainv, self.basis, np.diag(1/self.emu_vars), self.basis.T, Aldet, np.log(self.emu_vars).sum())
+        return out
+    #@profile
+    def chol_solve(self, x):
+        mat = cho_factor(x)
+        ldet = 2 * np.sum(np.log(np.diag(mat[0])))
+        ##la.dpotri(mat, overwrite_c=True) # overwrites mat with original matrix inverse, but not correct
+        #inv = cho_solve(mat, np.eye(x.shape[0])) # correct, but slower for small dimension
+        inv = np.linalg.inv(x)
+        out = {'inv' : inv, 'ldet' : ldet}
+        return out
+    #@profile
+    def swm(self, Ainv, U, Cinv, V, Aldet, Cldet): # sherman woodbury morrison (A+UCV)^-1 and |A+UCV|
+        in_mat = self.chol_solve(Cinv + V @ Ainv @ U)
+        inv = Ainv - Ainv @ U @ in_mat['inv'] @ V @ Ainv
+        ldet = in_mat['ldet'] + Aldet + Cldet
+        out = {'inv' : inv, 'ldet' : ldet}
+        return out
+
+
 
 
 

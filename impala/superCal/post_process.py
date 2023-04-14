@@ -65,8 +65,8 @@ def ptw_prediction_plots_pool(setup, calib_out, path, mcmc_use, ylim=None, alpha
             if type(setup.models[i]).__name__ == 'ModelMaterialStrength':
                 ntot += 1
                 pred_theta.append(pred_theta_raw[i].T[setup.s2_ind[i] == j].T)
-                pred_theta_quant_lb.append(np.quantile(pred_theta[-1], alpha/2, 0))
-                pred_theta_quant_ub.append(np.quantile(pred_theta[-1], 1-alpha/2, 0))
+                pred_theta_quant_lb.append(np.percentile(pred_theta[-1], alpha/2, 0))
+                pred_theta_quant_ub.append(np.percentile(pred_theta[-1], 1-alpha/2, 0))
                 text.append('edot: '+str(round(setup.models[i].edots[j]*1e6))+'/s\ntemp: '+str(round(setup.models[i].temps[j]))+'K')
                 obs_strain.append(setup.models[i].meas_strain_histories[j])
                 obs_stress.append(setup.ys[i][setup.s2_ind[i] == j])
@@ -129,14 +129,14 @@ def ptw_prediction_plots_hier(setup, calib_out, path, mcmc_use, ylim=None, alpha
             if type(setup.models[i]).__name__ == 'ModelMaterialStrength':
                 ntot += 1
                 pred_theta.append(pred_theta_raw[i].T[setup.s2_ind[i] == j].T)
-                pred_theta_quant_lb.append(np.quantile(pred_theta[-1], alpha/2, 0))
-                pred_theta_quant_ub.append(np.quantile(pred_theta[-1], 1-alpha/2, 0))
+                pred_theta_quant_lb.append(np.percentile(pred_theta[-1], alpha/2, 0))
+                pred_theta_quant_ub.append(np.percentile(pred_theta[-1], 1-alpha/2, 0))
                 pred_theta0.append(pred_theta0_raw[i].T[setup.s2_ind[i] == j].T)
-                pred_theta0_quant_lb.append(np.quantile(pred_theta0[-1], alpha/2, 0))
-                pred_theta0_quant_ub.append(np.quantile(pred_theta0[-1], 1-alpha/2, 0))
+                pred_theta0_quant_lb.append(np.percentile(pred_theta0[-1], alpha/2, 0))
+                pred_theta0_quant_ub.append(np.percentile(pred_theta0[-1], 1-alpha/2, 0))
                 pred_thetap.append(pred_thetap_raw[i].T[setup.s2_ind[i] == j].T)
-                pred_thetap_quant_lb.append(np.quantile(pred_thetap[-1], alpha/2, 0))
-                pred_thetap_quant_ub.append(np.quantile(pred_thetap[-1], 1-alpha/2, 0))
+                pred_thetap_quant_lb.append(np.percentile(pred_thetap[-1], alpha/2, 0))
+                pred_thetap_quant_ub.append(np.percentile(pred_thetap[-1], 1-alpha/2, 0))
                 text.append('edot: '+str(round(setup.models[i].edots[j]*1e6))+'/s\ntemp: '+str(round(setup.models[i].temps[j]))+'K')
                 obs_strain.append(setup.models[i].meas_strain_histories[j])
                 obs_stress.append(setup.ys[i][setup.s2_ind[i] == j])
@@ -218,14 +218,14 @@ def ptw_prediction_plots_cluster(setup, calib_out, path, mcmc_use, ylim=None, al
             if type(setup.models[i]).__name__ == 'ModelMaterialStrength':
                 ntot += 1
                 pred_theta.append(pred_theta_raw[i].T[setup.s2_ind[i] == j].T)
-                pred_theta_quant_lb.append(np.quantile(pred_theta[-1], alpha/2, 0))
-                pred_theta_quant_ub.append(np.quantile(pred_theta[-1], 1-alpha/2, 0))
+                pred_theta_quant_lb.append(np.percentile(pred_theta[-1], alpha/2, 0))
+                pred_theta_quant_ub.append(np.percentile(pred_theta[-1], 1-alpha/2, 0))
                 pred_theta0.append(pred_theta0_raw[i].T[setup.s2_ind[i] == j].T)
-                pred_theta0_quant_lb.append(np.quantile(pred_theta0[-1], alpha/2, 0))
-                pred_theta0_quant_ub.append(np.quantile(pred_theta0[-1], 1-alpha/2, 0))
+                pred_theta0_quant_lb.append(np.percentile(pred_theta0[-1], alpha/2, 0))
+                pred_theta0_quant_ub.append(np.percentile(pred_theta0[-1], 1-alpha/2, 0))
                 pred_thetap.append(pred_thetap_raw[i].T[setup.s2_ind[i] == j].T)
-                pred_thetap_quant_lb.append(np.quantile(pred_thetap[-1], alpha/2, 0))
-                pred_thetap_quant_ub.append(np.quantile(pred_thetap[-1], 1-alpha/2, 0))
+                pred_thetap_quant_lb.append(np.percentile(pred_thetap[-1], alpha/2, 0))
+                pred_thetap_quant_ub.append(np.percentile(pred_thetap[-1], 1-alpha/2, 0))
                 text.append('edot: '+str(round(setup.models[i].edots[j]*1e6))+'/s\ntemp: '+str(round(setup.models[i].temps[j]))+'K')
                 obs_strain.append(setup.models[i].meas_strain_histories[j])
                 obs_stress.append(setup.ys[i][setup.s2_ind[i] == j])
@@ -523,7 +523,7 @@ def pairs(setup, mat_st, col=None, s=None):
         g.axes[i,i].set_ylim(setup.bounds[dat.keys()[i]])
     g.fig.set_size_inches(10,10)
     g
-    plt.show()
+#    plt.show()
     return
 
 def parameter_trace_plot(sample_parameters,ylim=None):
@@ -541,7 +541,7 @@ def parameter_trace_plot(sample_parameters,ylim=None):
             ax = plt.gca()
             if ylim is not None:
                 ax.set_ylim(ylim)
-    plt.show()
+#    plt.show()
     return
 
 

@@ -134,7 +134,7 @@ class CalibSetup:
         self.ntheta.append(len(set(theta_ind)))
         model.yobs = np.array(yobs)
         
-        model.meas_error_cor = np.eye(len(yobs)) # this doesn't work when ntheta>1
+        #model.meas_error_cor = np.eye(len(yobs)) # this doesn't work when ntheta>1
         if meas_error_cor is not None:
             model.meas_error_cor = meas_error_cor
         
@@ -485,16 +485,18 @@ def calibHier(setup):
     Hierarchical calibration
     """
     t0 = time.time()
-    theta0 = np.empty([setup.nmcmc, setup.ntemps, setup.p])
-    Sigma0 = np.empty([setup.nmcmc, setup.ntemps, setup.p, setup.p])
+    theta0 = np.zeros([setup.nmcmc, setup.ntemps, setup.p])
+    theta0 += 0.0
+    Sigma0 = np.zeros([setup.nmcmc, setup.ntemps, setup.p, setup.p])
+    Sigma0 += 0.0
     ntheta = np.sum(setup.ntheta)
-    log_s2 = [np.zeros([setup.nmcmc, setup.ntemps, setup.ns2[i]]) for i in range(setup.nexp)]
+    log_s2 = [np.zeros([setup.nmcmc, setup.ntemps, setup.ns2[i]]) + 0.0 for i in range(setup.nexp)]
     for i in range(setup.nexp):
         log_s2[i][0] = np.log(setup.sd_est[i]**2)
 
     #sse    = [np.ones([setup.nmcmc, setup.ntemps, setup.ns2[i]]) for i in range(setup.nexp)]
     theta  = [
-        np.empty([setup.nmcmc, setup.ntemps, setup.ntheta[i], setup.p])
+        np.zeros([setup.nmcmc, setup.ntemps, setup.ntheta[i], setup.p]) + 0.0
         for i in range(setup.nexp)
         ]
     theta_ind_mat = [
