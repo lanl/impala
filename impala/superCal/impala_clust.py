@@ -671,7 +671,4 @@ def calibClust(setup, parallel = False):
                             pred_curr, theta0, Sigma0, delta, eta, setup.nclustmax)
     return(out)
 
-if __name__ == '__main__':
-    pass
-
 # EOF
