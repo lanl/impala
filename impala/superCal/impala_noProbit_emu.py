@@ -14,7 +14,7 @@ from numpy.linalg import cholesky, slogdet
 #import impala.superCal.pbar as pbar
 from . import pbar
 #import pbar 
-#np.seterr(under='ignore')
+np.seterr(under='ignore')
 
 # no probit tranform for hierarchical and DP versions
 
@@ -186,6 +186,12 @@ class CalibSetup:
         self.eta_prior_shape = eta_prior_shape
         self.eta_prior_rate = eta_prior_rate
     pass
+
+def constraints_ptw(x, bounds):
+    good = (x['sInf'] < x['s0']) * (x['yInf'] < x['y0']) * (x['y0'] < x['s0']) * (x['yInf'] < x['sInf']) * (x['s0'] < x['y1'])
+    for k in list(bounds.keys()):
+        good = good * (x[k] < bounds[k][1]) * (x[k] > bounds[k][0])
+    return good
 
 def cf_bounds(x, bounds):
     k = list(bounds.keys())[0]
@@ -1390,6 +1396,27 @@ def calibPool(setup):
 
 
 ##############################################################################################################################################################################
+from multiprocessing import Pool
+class PoolCalib(object):
+    # adapted from https://stackoverflow.com/questions/1816958/cant-pickle-type-instancemethod-when-using-multiprocessing-pool-map/41959862#41959862 answer by parisjohn
+    # somewhat slow collection of results
+   def __init__(self, setup_list):
+       self.setup_list = setup_list
+       
+   def singleCal(self, i):
+       return calibPool(self.setup_list[i])
 
+   def fit(self, ncores, num):
+      pool = Pool(ncores)
+      out = pool.map(self, range(num))
+      return out
+
+   def __call__(self, i):
+     return self.singleCal(i)
+
+def calibPoolParallel(setup_list, ncores):
+    temp = PoolCalib(setup_list)
+    out = temp.fit(ncores, len(setup_list))
+    return(out)
 
 # EOF
