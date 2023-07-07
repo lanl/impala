@@ -11,7 +11,7 @@ physical_models_vec.py
 """
 
 import numpy as np
-np.seterr(all = 'raise')
+np.seterr(under='ignore')
 #import ipdb
 import copy
 from math import pi
