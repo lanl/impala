@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from impala.physics import physical_models_vec as physics
+from impala import physical_models_vec as physics
 import matplotlib.pyplot as plt
 
 class TestPhysics(unittest.TestCase):

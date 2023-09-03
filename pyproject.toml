@@ -5,20 +5,20 @@ description = "Bayesian model calibration"
 authors = [
     {name = "Devin Francom", email = "dfrancom@lanl.gov"},
     {name = "Arthur Lui", email = "luiarthur@gmail.com"},
-    {name = "Peter Trubey", email = ""},
+    {name = "Peter Trubey", email = "ptrubey@lanl.gov"},
 	{name = "J. Derek Tucker", email = "jdtuck@sandia.gov"}
 ]
 license = {text = "BSD 3-Clause"}
 readme = "README.md"
 requires-python = ">=3.6"
 
-keywords = ["model calibration"]
+keywords = ["modelcalibration"]
 
 dependencies=[
         "numpy",
         "matplotlib",
         "scipy",
-        "pyBASS,
+        "pyBASS",
 ]
 
 classifiers = [
@@ -33,3 +33,6 @@ classifiers = [
 
 [project.urls]
 repository = "http://www.github.com/lanl/impala"
+
+[tool.setuptools.packages.find]
+exclude = ["data*", "tests*"]
