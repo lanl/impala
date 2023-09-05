@@ -15,6 +15,10 @@ from scipy.interpolate import interp1d
 from numpy.random import uniform
 
 
+def autocorr(x):
+    result = np.correlate(x, x, mode='full')
+    return result[int(result.size/2):]
+
 # diagnostic plots to include:
 #    - traces of theta, s2, but for hier which ones? All?
 #   - tempering and MCMC counts
@@ -25,6 +29,44 @@ class Diagnostics(object):
         self.out   = out
         return
     
+    def plot_log_likehood(save_fn=None):
+        figure = plt.figure()
+        plt.plot(self.out.llik)
+        plt.title('Log Likelihood')
+        if save_fn is not None:
+            plt.savefig(save_fn + 'platinumnp_llike.png', dpi=300, transparent=True)  
+        return
+
+    def plot_chains(save_fn=None, input_names = None):
+        if input_names is None:
+            input_names = self.out.theta_native.keys()
+        nplots = len(input_names)
+        ns1 = int(np.ceil(np.sqrt(nplots)))
+        ns2 = int(np.round(np.sqrt(nplots)))
+        fig, axs = plt.subplots(ns1, ns2)
+        for i, ax in enumerate(fig.axes):
+            if i < nplots:
+                ax.plot(self.out.theta_native[input_names[i]])
+                ax.set(title=input_names[i])
+        plt.tight_layout()
+        if save_fn is not None:
+            plt.savefig(save_fn + 'platinumnp_chains.png', dpi=300, transparent=True)  
+        
+        return
+
+    def plot_acf(save_fn=None, input_names = None):
+        if input_names is None:
+            input_names = self.out.theta_native.keys()
+        nplots = len(input_names)
+        fig, axs = plt.subplots(nplots, 1)
+        for i in range(nplots):
+            axs[i].plot(autocorr(self.out.theta_native[input_names[i]]))
+            axs[i].set(title='ACF '+ input_names[i])
+        plt.tight_layout()
+        if save_fn is not None:
+            plt.savefig(save_fn + 'platinumnp_acf.png', dpi=300, transparent=True)  
+        return
+
     def pooled_trace_plots():
         pass
 
