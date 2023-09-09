@@ -1,6 +1,6 @@
 [project]
 name = "impala"
-version = "0.1"
+version = "0.1.0"
 description = "Bayesian model calibration"
 authors = [
     {name = "Devin Francom", email = "dfrancom@lanl.gov"},
