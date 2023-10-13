@@ -8,12 +8,7 @@ from math import sqrt, floor, log
 from scipy.special import erf, erfinv, gammaln
 from scipy.stats import invwishart
 from numpy.linalg import cholesky, slogdet
-#from itertools import repeat
-#import multiprocessing as mp
-#import pandas as pd
-#import impala.superCal.pbar as pbar
 from . import pbar
-#import pbar 
 np.seterr(under='ignore')
 
 # no probit tranform for hierarchical and DP versions

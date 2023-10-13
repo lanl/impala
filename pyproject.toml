@@ -1,0 +1,38 @@
+[project]
+name = "impala"
+version = "0.1"
+description = "Bayesian model calibration"
+authors = [
+    {name = "Devin Francom", email = "dfrancom@lanl.gov"},
+    {name = "Arthur Lui", email = "luiarthur@gmail.com"},
+    {name = "Peter Trubey", email = "ptrubey@lanl.gov"},
+	{name = "J. Derek Tucker", email = "jdtuck@sandia.gov"}
+]
+license = {text = "BSD 3-Clause"}
+readme = "README.md"
+requires-python = ">=3.6"
+
+keywords = ["modelcalibration"]
+
+dependencies=[
+        "numpy",
+        "matplotlib",
+        "scipy",
+        "pyBASS",
+]
+
+classifiers = [
+    'License :: OSI Approved :: BSD License',
+    'Operating System :: OS Independent',
+    'Programming Language :: Python',
+    'Topic :: Scientific/Engineering',
+    'Topic :: Scientific/Engineering :: Mathematics',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.6',
+]
+
+[project.urls]
+repository = "http://www.github.com/lanl/impala"
+
+[tool.setuptools.packages.find]
+exclude = ["data*", "tests*"]

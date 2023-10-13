@@ -1,8 +1,7 @@
 import numpy as np
 import pyBASS as pb
-#import pyBayesPPR as pbppr
-#import physical_models_vec as pm_vec
-from impala import physics as pm_vec
+import pyBayesPPR as pbppr
+import impala.physical_models_vec as pm_vec
 from itertools import cycle
 from scipy.interpolate import interp1d
 from scipy.linalg import cho_factor, cho_solve, cholesky
@@ -233,7 +232,6 @@ class ModelBassPca_func(AbstractModel):
         self.ii = np.random.choice(range(self.nmcmc), 1).item()
         self.emu_vars = self.mod_s2[self.ii]
         return
-    #@profile
     def discrep_sample(self, yobs, pred, cov, itemp):
         #if self.nd>0:
         S = np.linalg.inv(
@@ -244,7 +242,6 @@ class ModelBassPca_func(AbstractModel):
         discrep_vars = chol_sample(S @ m, S/itemp)
         #self.discrep = self.D @ self.discrep_vars
         return discrep_vars
-    #@profile
     def eval(self, parmat, pool = None, nugget=False):
         """
         parmat : ~
@@ -259,32 +256,23 @@ class ModelBassPca_func(AbstractModel):
             return np.concatenate([pred[np.ix_(np.arange(i, nrep*self.nexp, self.nexp), np.where(self.exp_ind==i)[0])] for i in range(self.nexp)], 1)
             # this is evaluating all experiments for all thetas, which is overkill
 
-    #@profile
     def llik(self, yobs, pred, cov):
         vec = yobs - pred 
         out = -.5*(cov['ldet'] + vec.T @ cov['inv'] @ vec)
         return out
-    #@profile
     def lik_cov_inv(self, s2vec):
         vec = self.trunc_error_var + s2vec
-        #mat = np.diag(vec) + self.basis @ np.diag(self.emu_vars) @ self.basis.T
-        #inv = np.linalg.inv(mat)
-        #ldet = np.linalg.slogdet(mat)[1]
-        #out = {'inv' : inv, 'ldet' : ldet}
         Ainv = np.diag(1/vec)
         Aldet = np.log(vec).sum()
         out = self.swm(Ainv, self.basis, np.diag(1/self.emu_vars), self.basis.T, Aldet, np.log(self.emu_vars).sum())
         return out
-    #@profile
     def chol_solve(self, x):
         mat = cho_factor(x)
         ldet = 2 * np.sum(np.log(np.diag(mat[0])))
-        ##la.dpotri(mat, overwrite_c=True) # overwrites mat with original matrix inverse, but not correct
         #inv = cho_solve(mat, np.eye(x.shape[0])) # correct, but slower for small dimension
         inv = np.linalg.inv(x)
         out = {'inv' : inv, 'ldet' : ldet}
         return out
-    #@profile
     def swm(self, Ainv, U, Cinv, V, Aldet, Cldet): # sherman woodbury morrison (A+UCV)^-1 and |A+UCV|
         in_mat = self.chol_solve(Cinv + V @ Ainv @ U)
         inv = Ainv - Ainv @ U @ in_mat['inv'] @ V @ Ainv
@@ -339,18 +327,14 @@ class ModelBpprPca_func(AbstractModel):
         self.ii = np.random.choice(range(self.nmcmc), 1).item()
         self.emu_vars = self.mod_s2[self.ii]
         return
-    #@profile
     def discrep_sample(self, yobs, pred, cov, itemp):
-        #if self.nd>0:
         S = np.linalg.inv(
             np.eye(self.nd) / self.discrep_tau 
             + self.D.T @ cov['inv'] @ self.D
             )
         m = self.D.T @ cov['inv'] @ (yobs - pred)
         discrep_vars = chol_sample(S @ m, S/itemp)
-        #self.discrep = self.D @ self.discrep_vars
         return discrep_vars
-    #@profile
     def eval(self, parmat, pool = None, nugget=False):
         """
         parmat : ~
@@ -365,41 +349,29 @@ class ModelBpprPca_func(AbstractModel):
             return np.concatenate([pred[np.ix_(np.arange(i, nrep*self.nexp, self.nexp), np.where(self.exp_ind==i)[0])] for i in range(self.nexp)], 1)
             # this is evaluating all experiments for all thetas, which is overkill
 
-    #@profile
     def llik(self, yobs, pred, cov):
         vec = yobs - pred 
         out = -.5*(cov['ldet'] + vec.T @ cov['inv'] @ vec)
         return out
-    #@profile
     def lik_cov_inv(self, s2vec):
         vec = self.trunc_error_var + s2vec
-        #mat = np.diag(vec) + self.basis @ np.diag(self.emu_vars) @ self.basis.T
-        #inv = np.linalg.inv(mat)
-        #ldet = np.linalg.slogdet(mat)[1]
-        #out = {'inv' : inv, 'ldet' : ldet}
         Ainv = np.diag(1/vec)
         Aldet = np.log(vec).sum()
         out = self.swm(Ainv, self.basis, np.diag(1/self.emu_vars), self.basis.T, Aldet, np.log(self.emu_vars).sum())
         return out
-    #@profile
     def chol_solve(self, x):
         mat = cho_factor(x)
         ldet = 2 * np.sum(np.log(np.diag(mat[0])))
-        ##la.dpotri(mat, overwrite_c=True) # overwrites mat with original matrix inverse, but not correct
         #inv = cho_solve(mat, np.eye(x.shape[0])) # correct, but slower for small dimension
         inv = np.linalg.inv(x)
         out = {'inv' : inv, 'ldet' : ldet}
         return out
-    #@profile
     def swm(self, Ainv, U, Cinv, V, Aldet, Cldet): # sherman woodbury morrison (A+UCV)^-1 and |A+UCV|
         in_mat = self.chol_solve(Cinv + V @ Ainv @ U)
         inv = Ainv - Ainv @ U @ in_mat['inv'] @ V @ Ainv
         ldet = in_mat['ldet'] + Aldet + Cldet
         out = {'inv' : inv, 'ldet' : ldet}
         return out
-
-
-
 
 
 class ModelF(AbstractModel):
