@@ -8,8 +8,12 @@ physical_models_vec.py
         DJ Luscher,    djl@lanl.gov
         Peter Trubey,  ptrubey@lanl.gov
         Devin Francom, dfrancom@lanl.gov
+        Lauren Beesley VanDervort, lvandervort@lanl.gov
 """
 
+###############
+### Imports ###
+###############
 import numpy as np
 np.seterr(under='ignore')
 #import ipdb
@@ -17,7 +21,9 @@ import copy
 from math import pi
 from scipy.special import erf
 
-## Error Definitions
+#########################
+### Error Definitions ###
+#########################
 
 class ConstraintError(ValueError):
     pass
@@ -25,7 +31,11 @@ class ConstraintError(ValueError):
 class PTWStressError(FloatingPointError):
     pass
 
-## Model Definitions
+#########################
+#########################
+### Model Definitions ###
+#########################
+#########################
 
 class BaseModel(object):
     """
@@ -46,11 +56,17 @@ class BaseModel(object):
         self.parent = parent
         return
 
-# Specific Heat Models
+############################
+### Specific Heat Models ###
+############################
 
 class Constant_Specific_Heat(BaseModel):
     """
-    Constant Specific Heat Model
+    Constant Specific Heat Model (Mbar*cc/g/K)
+    
+    Conversion: 1 Mbar*cc/g/K = 1e2 * MJ/kg/K
+    
+    Cv0: constant specific heat
     """
     consts = ['Cv0']
 
@@ -73,7 +89,12 @@ class Constant_Specific_Heat(BaseModel):
 
 class Linear_Specific_Heat(BaseModel):
     """
-    Linear Specific Heat Model
+    Linear Specific Heat Model (Mbar*cc/g/K)
+    
+    Conversion: 1 Mbar*cc/g/K = 1e2 * MJ/kg/K
+    
+    c0: intercept
+    c1: slope for temperature in K
     """
     consts = ['c0', 'c1']
 
@@ -85,7 +106,13 @@ class Linear_Specific_Heat(BaseModel):
 
 class Quadratic_Specific_Heat(BaseModel):
     """
-    Quadratic Specific Heat Model
+    Quadratic Specific Heat Model (Mbar*cc/g/K)
+    
+    Conversion: 1 Mbar*cc/g/K = 1e2 * MJ/kg/K
+    
+    c0: intercept
+    c1: slope for temperature in K
+    c2: quadratic coefficient for temperature in K
     """
     consts = ['c0', 'c1', 'c2']
 
@@ -95,11 +122,18 @@ class Quadratic_Specific_Heat(BaseModel):
         cnow=self.parent.parameters.c0+self.parent.parameters.c1*tnow+self.parent.parameters.c2*tnow**2
         return cnow
 
-# Density Models
+
+
+
+######################
+### Density Models ###
+######################
 
 class Constant_Density(BaseModel):
     """
-    Constant Density Model
+    Constant Density Model (g/cc)
+    
+    rho0: constant density
     """
     consts = ['rho0']
 
@@ -122,7 +156,10 @@ class Constant_Density(BaseModel):
 
 class Linear_Density(BaseModel):
     """
-    Linear Density Model
+    Linear Density Model (g/cc)
+    
+    r0: intercept
+    r1: slope for temperature in K
     """
     consts = ['r0','r1']
 
@@ -134,7 +171,11 @@ class Linear_Density(BaseModel):
 
 class Quadratic_Density(BaseModel):
     """
-    Quadratic Density Model
+    Quadratic Density Model (g/cc)
+    
+    r0: intercept
+    r1: slope for temperature in K
+    r2: quadratic coefficient for temperature in K
     """
     consts = ['r0','r1','r2']
 
@@ -146,7 +187,12 @@ class Quadratic_Density(BaseModel):
 
 class Cubic_Density(BaseModel):
     """
-    Quadratic Density Model
+    Cubic Density Model (g/cc)
+    
+    r0: intercept
+    r1: slope for temperature in K
+    r2: quadratic coefficient for temperature in K
+    r3: cubic coefficient for temperature in K
     """
     consts = ['r0','r1','r2','r3']
 
@@ -156,12 +202,15 @@ class Cubic_Density(BaseModel):
         rnow=self.parent.parameters.r0+self.parent.parameters.r1*tnow+self.parent.parameters.r2*tnow**2+self.parent.parameters.r3*tnow**3
         return rnow
     
-    
-# Melt Temperature Models
+###############################   
+### Melt Temperature Models ###
+###############################
 
 class Constant_Melt_Temperature(BaseModel):
     """
-    Constant Melt Temperature Model
+    Constant Melt Temperature Model (K)
+    
+    Tmelt0: constant melt temperature
     """
     consts = ['Tmelt0']
 
@@ -184,7 +233,10 @@ class Constant_Melt_Temperature(BaseModel):
 
 class Linear_Melt_Temperature(BaseModel):
     """
-    Linear Melt Temperature Model
+    Linear Melt Temperature Model (K)
+    
+    tm0: intercept
+    tm1: slope for density in g/cc
     """
 
     consts=['tm0', 'tm1']
@@ -196,7 +248,11 @@ class Linear_Melt_Temperature(BaseModel):
 
 class Quadratic_Melt_Temperature(BaseModel):
     """
-    Quadratic Melt Temperature Model
+    Quadratic Melt Temperature Model (K)
+    
+    tm0: intercept
+    tm1: slope for density in g/cc
+    tm2: quadratic coefficient for density in g/cc
     """
     consts=['tm0', 'tm1', 'tm2']
     def value(self, *args):
@@ -204,8 +260,17 @@ class Quadratic_Melt_Temperature(BaseModel):
         tmeltnow=self.parent.parameters.tm0+self.parent.parameters.tm1*rnow+self.parent.parameters.tm2*rnow**2
         return tmeltnow    
     
-class BGP_Melt_Temperature(BaseModel):
-
+class BGP_Melt_Temperature(BaseModel): 
+    """
+    Burakovsky-Greeff-Preston (BGP) Melt Temperature Model (K)
+    #https://journals.aps.org/prb/pdf/10.1103/PhysRevB.67.094107
+    
+    Tm_0: Tm(rho_m), melt temperature in K at density rho_m (JeeYeon, please check!)
+    rho_m: zero-pressure density at melt
+    gamma_1: fitted coefficient from equations in Burakovsky, Greeff, and Preston (2003)
+    gamma_3: fitted coefficient from equations in Burakovsky, Greeff, and Preston (2003)
+    q3: fitted coefficient from equations in Burakovsky, Greeff, and Preston (2003)
+    """
     consts = ['Tm_0', 'rho_m', 'gamma_1', 'gamma_3', 'q3']
 
     def value(self, *args):
@@ -216,9 +281,18 @@ class BGP_Melt_Temperature(BaseModel):
                     +2.*mp.gamma_3/mp.q3*(np.power(mp.rho_m,-mp.q3)-np.power(rho,-mp.q3)))
         return melt_temp
 
-# Shear Modulus Models
+
+
+############################
+### Shear Modulus Models ###
+############################
 
 class Constant_Shear_Modulus(BaseModel):
+    """
+    Constant Shear Modulus (GPa)
+    
+    G0: constant shear modulus
+    """
     consts = ['G0']
 
     def value(self, *args):
@@ -236,6 +310,14 @@ class Constant_Shear_Modulus(BaseModel):
 #         return gnow
 
 class Linear_Cold_PW_Shear_Modulus(BaseModel):
+    """
+    Preston and Wallace 1992 (PW) Linear Cold Shear Modulus (GPa)
+    #https://www.sciencedirect.com/science/article/pii/003810989290514A
+    
+    g0: intercept from linear model for cold shear as a function of density
+    g1: slope from linear model for cold shear as a function of density
+    alpha: fitted parameter
+    """
      consts = ['g0', 'g1', 'alpha']
      def value(self, *args):
         mp    = self.parent.parameters
@@ -251,6 +333,15 @@ class Linear_Cold_PW_Shear_Modulus(BaseModel):
         return gnow
 
 class Quadratic_Cold_PW_Shear_Modulus(BaseModel):
+    """
+    Preston and Wallace 1992 (PW) Quadratic Cold Shear Modulus (GPa)
+    #https://www.sciencedirect.com/science/article/pii/003810989290514A
+
+    g0: intercept from linear model for cold shear as a function of density
+    g1: slope from linear model for cold shear as a function of density
+    g2: quadratic coefficient from linear model for cold shear as a function of density
+    alpha: fitted parameter
+    """
      consts = ['g0', 'g1', 'g2', 'alpha']
      def value(self, *args):
         mp    = self.parent.parameters
@@ -266,6 +357,12 @@ class Quadratic_Cold_PW_Shear_Modulus(BaseModel):
         return gnow
     
 class Simple_Shear_Modulus(BaseModel):
+    """
+    Simple Cold Shear Modulus (GPa)
+    
+    G0: G(rho_0,0), the zero temperature zero pressure shear modulus (JeeYeon, please check!)
+    alpha: fitted parameter
+    """
     consts = ['G0', 'alpha']
 
     def value(self, *args):
@@ -280,7 +377,17 @@ class BGP_PW_Shear_Modulus(BaseModel):
     #PW describes the (lienar) temperature dependence of the shear modulus. (Same dependency as
     #in Simple_Shear_modulus.)
     #With these two models combined, we get the shear modulus as a function of density and temperature.
+    """
+    Burakovsky-Greeff-Preston (BGP) Shear Modulus Model (GPa)
+    #https://journals.aps.org/prb/pdf/10.1103/PhysRevB.67.094107
     
+    G0: G(rho_0,0), the zero temperature, zero pressure shear modulus
+    rho_0: zero temperature zero pressure density
+    gamma_1: fitted coefficient from equations in Burakovsky, Greeff, and Preston (2003)
+    gamma_2: fitted coefficient from equations in Burakovsky, Greeff, and Preston (2003)
+    q2: fitted coefficient from equations in Burakovsky, Greeff, and Preston (2003)
+    alpha: fitted parameter
+    """    
     consts = ['G0', 'rho_0', 'gamma_1', 'gamma_2', 'q2', 'alpha']
 
     def value(self, *args):
@@ -300,10 +407,18 @@ class BGP_PW_Shear_Modulus(BaseModel):
         #if gnow < 0.0:    gnow = 0.0
         return gnow
 
+
+
 class Stein_Shear_Modulus(BaseModel):
     #consts = ['G0', 'sgA', 'sgB']
     #assuming constant density and pressure
     #so we only include the temperature dependence
+    """
+    Stein Shear Modulus Model (GPa)
+
+    G0: add definition
+    sgB: add definition
+    """   
     consts = ['G0', 'sgB']
     eta = 1.0
 
@@ -322,11 +437,16 @@ class Stein_Shear_Modulus(BaseModel):
         gnow[np.where(gnow < 0)] = 0.
         return gnow
 
-# Yield Stress Models
+
+###########################
+### Yield Stress Models ###
+###########################
 
 class Constant_Yield_Stress(BaseModel):
     """
-    Constant Yield Stress Model
+    Constant Yield Stress Model (add units)
+    
+    yield_stress: constant yield stress
     """
     consts = ['yield_stress']
 
@@ -345,6 +465,11 @@ def fast_pow(a, b):
 pos = lambda a: (abs(a) + a) / 2 # same as max(0,a)
 
 class JC_Yield_Stress(BaseModel):
+    """
+    Johnson-Cook Yield Stress Model (add units)
+    
+    A, B, C, n, m: fitted parameters
+    """
     params = ['A','B','C','n','m']
     consts = ['Tref','edot0','chi']
 
@@ -365,6 +490,14 @@ class JC_Yield_Stress(BaseModel):
         return Y
 
 class PTW_Yield_Stress(BaseModel):
+    """
+    Preston-Tonks-Wallace (PTW) Model Yield Stress (add units)
+    
+    rho0: add definition
+    beta: add definition
+    matomic: add definition
+    chi: add definition
+    """
     params = ['theta','p','s0','sInf','kappa','lgamma','y0','yInf','y1', 'y2']
     consts = ['rho0', 'beta', 'matomic', 'chi']
 
@@ -501,6 +634,13 @@ class PTW_Yield_Stress(BaseModel):
         return out
 
 class Stein_Flow_Stress(BaseModel):
+    """
+    Stein Flow Stress (add units)
+    
+    G0: add definition
+    epsi: add definition
+    chi: add definition
+    """
     params = ['y0', 'a', 'b', 'beta', 'n', 'ymax']
     consts = ['G0', 'epsi', 'chi']
 
@@ -521,7 +661,10 @@ class Stein_Flow_Stress(BaseModel):
         #if temp > tmelt: fnow = 0.0
         return mp.y0*fnow*shear/mp.G0
 
-## Parameters Definition
+
+#############################
+### Parameters Definition ###
+#############################
 
 class ModelParameters(object):
     params = []
@@ -550,7 +693,10 @@ class ModelParameters(object):
         self.parent = parent
         return
 
-## State Definition
+
+########################
+### State Definition ###
+########################
 
 class MaterialState(object):
     T      = None
@@ -570,7 +716,9 @@ class MaterialState(object):
         self.set_state(T, strain, stress)
         return
 
-## Material Model Definition
+#################################
+### Material Model Definition ###
+#################################
 
 class MaterialModel(object):
     def __init__(
