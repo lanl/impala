@@ -1,3 +1,13 @@
+####################################
+####################################
+### Impala Model Fit Definitions ###
+####################################
+####################################
+
+###############
+### Imports ###
+###############
+
 import numpy as np
 import time
 import scipy
@@ -18,9 +28,9 @@ np.seterr(under='ignore')
 
 # no probit tranform for hierarchical and DP versions
 
-#####################
-# class for setting everything up
-#####################
+###############################################################
+### CalibSetup Class for Initializing the Calibration Model ###
+###############################################################
 
 class CalibSetup:
     """
@@ -93,13 +103,13 @@ class CalibSetup:
             indicating whether prediction is done including a nugget term) and should return 
             the model evaluations at the parameter combinations.  If this is an emulator with
             posterior samples, a step method can also be included
-        :param sd_est:
-        :param s2_df:
-        :param s2_ind:
-        :param meas_error_cor:
-        :param theta_ind:
-        :param D:
-        :param discrep_tau:
+        :param sd_est: a list or numpy array of initial values for observation noise standard deviation, len(sd_est) = number of separately-estimated s2 values 
+        :param s2_df: a list or numpy array of initial values for s2 Inverse Gamma prior degrees of freedom (s2_df = 0; Half-Cauchy prior), same structure as sd_est
+        :param s2_ind: a list or numpy array of indices for s2 value associated with each element of yobs, len(s2_ind) = len(yobs), max(s2_ind)+1 = len(sd_est)
+        :param meas_error_cor: (optional) correlation matrix for observation measurement errors, default = independent 
+        :param theta_ind: a list or numpy array of indices for theta_i associated with each element of yobs (usually, indexes experiments), len(theta_ind) = len(yobs)
+        :param D: (optional) numpy array containing basis functions for discrepancy, possibly including intercept. D.shape = (length of yobs, number of bases)
+        :param discrep_tau: (optional) fixed prior standard deviation for discrepancy basis coefficients (discrepancy = D @ discrep_vars, discrep_vars ~ N(0,discrep_tau))
         """
         # if theta_ind specified, s2_ind is?
         yobs = np.array(yobs)
@@ -156,6 +166,12 @@ class CalibSetup:
             self.s2_prior_kern.append(ldig_kern)
         return
     def setTemperatureLadder(self, temperature_ladder, start_temper=1000):
+        """
+        Define an array of temperatures to use for parallel tempering
+
+        :param temperature_ladder : numpy array of increasing temperatures all above 1, e.g., 1.05**np.arange(50)
+        :param start_temper : (optional) MCnC iteration at which to start the parallel tempering, default = 1000
+        """
         self.tl = temperature_ladder
         self.itl = 1/self.tl
         self.ntemps = len(self.tl)
@@ -163,6 +179,24 @@ class CalibSetup:
         self.start_temper = start_temper
         return
     def setMCMC(self, nmcmc, nburn=0, thin=1, decor=100, start_var_theta=1e-8, start_tau_theta = 0., start_var_ls2=1e-5, start_tau_ls2=0., start_adapt_iter=300):
+        """
+        Define properties of MCMC algorithm
+
+        :param nmcmc : total number of MCMC iterations, including burn-in
+        :param nburn : deprecated, no longer used
+        :param thin : deprecated, no longer used
+        :param decor : currently not used
+        :param start_var_theta : (optional) initial variance of adaptive MCMC proposal distributions for theta. 
+            Can be increased from default if posterior samples of theta are stuck at a single value across many iterations
+        :param start_tau_theta : (optional) np.exp(start_tau_theta) is the initial scaling factor for the adaptive MCMC proposal covariance for theta. 
+            Can be kept at default for most users. 
+        :param start_var_ls2 : (optional) initial variance of adaptive MCMC proposal distributions for log(s2), i.e. the log of the observation error/noise standard deviation. 
+            Can be increased from default if posterior samples of theta are stuck at a single value across many iterations
+        :param start_tau_ls2 : (optional) np.exp(start_tau_ls2) is the initial scaling factor for the adaptive MCMC proposal covariance for log(s2). 
+            Can be kept at default for most users. 
+        :param start_adapt_iter : (optional) MCMC iteration at which to start adapting the MCMC proposal distributions. 
+            Can be left as default for most users. 
+        """
         self.nmcmc = nmcmc
         self.nburn = nburn
         self.thin = thin
@@ -174,18 +208,43 @@ class CalibSetup:
         self.start_adapt_iter = start_adapt_iter
         return
     def setHierPriors(self, theta0_prior_mean, theta0_prior_cov, Sigma0_prior_df, Sigma0_prior_scale):
+        """
+        Define hierachical model hyperparameters, where theta_i ~ N(theta0, Sigma0)
+        with priors (1) theta0~N(mean=theta0_prior_mean,covariance=theta0_prior_cov) and (2) Sigma0~InverseWishart(V=Sigma0_prior_scale,m=Sigma0_prior_df)
+        where prior E(Sigma0)=V/(m-p-1) and Var(Sigma0)ii = 2 (Vii)^2/(((m-p-1)^2)*(m-p-3))
+
+        :param theta0_prior_mean : numpy array of length self.p containing initial values for calibration parameter theta0, usually np.repeat(0.5, self.p)
+        :param theta0_prior_cov : numpy array (self.p by self.p) containing the prior covariance for theta0, usually np.eye(self.p)*user_defined_prior_variance
+        :param Sigma0_prior_df :  prior degrees of freedom for the prior for Sigma0, at least 1 + self.p, 
+            where larger values generally indicate theta_i values closer to theta_0
+        :param Sigma0_prior_scale : prior scale for the prior for Sigma0, where smaller values generally indicate theta_i values closer to theta_0
+        """
         self.theta0_prior_mean = theta0_prior_mean
         self.theta0_prior_cov = theta0_prior_cov
         self.Sigma0_prior_df = Sigma0_prior_df
         self.Sigma0_prior_scale = Sigma0_prior_scale
         return
     def setClusterPriors(self, nclustmax=None, eta_prior_shape=2, eta_prior_rate=0.1):
+        """
+        Define clustered experiment model hyperparameters
+
+        :param nclustmax : maximum number of unique theta values to estimate (i.e., maximum number of clusters)
+        :param eta_prior_shape : NEED TO ADD
+        :param eta_prior_rate :  NEED TO ADD
+        """
         if nclustmax is None:
             nclustmax = max(sum(self.ntheta), 10)
         self.nclustmax = nclustmax
         self.eta_prior_shape = eta_prior_shape
         self.eta_prior_rate = eta_prior_rate
     pass
+
+
+
+
+########################
+### Helper Functions ###
+########################
 
 def constraints_ptw(x, bounds):
     good = (x['sInf'] < x['s0']) * (x['yInf'] < x['y0']) * (x['y0'] < x['s0']) * (x['yInf'] < x['sInf']) * (x['s0'] < x['y1'])
@@ -475,6 +534,11 @@ class AMcov_hier:
     def gen_cand(self, x, m):
         x_cand = [chol_sample_1per(x[i][m-1], self.S[i]) for i in range(self.nexp)]
         return x_cand
+
+
+
+
+
 
 
 ##############################################################################################################################################################################
@@ -1315,7 +1379,9 @@ def calibPool(setup):
                 for t in range(setup.ntemps):
                     marg_lik_cov_curr[i][t] = setup.models[i].lik_cov_inv(np.exp(log_s2[i][m][t])[setup.s2_ind[i]])
                     llik_curr[i, t] = setup.models[i].llik(setup.ys[i] - discrep_curr[i][t], pred_curr[i][t], marg_lik_cov_curr[i][t])
-                
+            
+            elif setup.models[i].s2=='fix':
+                    log_s2[i][m] = np.log(setup.sd_est[i]**2)    
 
             else:        
                 ## M-H update s2
