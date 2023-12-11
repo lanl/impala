@@ -318,8 +318,8 @@ class Linear_Cold_PW_Shear_Modulus(BaseModel):
     g1: slope from linear model for cold shear as a function of density
     alpha: fitted parameter
     """
-     consts = ['g0', 'g1', 'alpha']
-     def value(self, *args):
+    consts = ['g0', 'g1', 'alpha']
+    def value(self, *args):
         mp    = self.parent.parameters
         rho   = self.parent.state.rho
         temp  = self.parent.state.T
@@ -342,8 +342,8 @@ class Quadratic_Cold_PW_Shear_Modulus(BaseModel):
     g2: quadratic coefficient from linear model for cold shear as a function of density
     alpha: fitted parameter
     """
-     consts = ['g0', 'g1', 'g2', 'alpha']
-     def value(self, *args):
+    consts = ['g0', 'g1', 'g2', 'alpha']
+    def value(self, *args):
         mp    = self.parent.parameters
         rho   = self.parent.state.rho
         temp  = self.parent.state.T
