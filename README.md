@@ -13,6 +13,10 @@ pip install git+https://github.com/lanl/impala.git
 
 ## References
 
+## Tests
+```console
+> python -m unittest
+```
 
 ************
 
