@@ -6,7 +6,7 @@ run-name: ${{ github.actor }} is performing GitHub Actions
 
 on:
   push:
-    branches: [ "impala_ci_test" ]
+    branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
 
