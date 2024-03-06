@@ -95,6 +95,23 @@ class Quadratic_Specific_Heat(BaseModel):
         cnow=self.parent.parameters.c0+self.parent.parameters.c1*tnow+self.parent.parameters.c2*tnow**2
         return cnow
 
+class Piecewise_Linear_Specific_Heat(BaseModel):
+   """
+   Piecewise Linear Specific Heat Model
+   Cv (T) = c0_0 + c1_0 * T for T<=T_t
+   Cv (T) = c0_1 + c1_1 * T for T>T_t          
+   """
+   consts = ['T_t','c0_0', 'c1_0', 'c0_1', 'c1_1']
+   def value(self, *args):
+       tnow=self.parent.state.T
+       intercept = np.repeat(self.parent.parameters.c0_0,len(tnow))
+       slope = np.repeat(self.parent.parameters.c1_0,len(tnow))
+       intercept[np.where(tnow > self.parent.parameters.T_t)] =  self.parent.parameters.c0_1
+       slope[np.where(tnow > self.parent.parameters.T_t)] =  self.parent.parameters.c1_1
+       cnow = intercept + slope * tnow
+       return cnow
+
+    
 # Density Models
 
 class Constant_Density(BaseModel):
