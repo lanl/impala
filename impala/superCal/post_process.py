@@ -375,6 +375,48 @@ def pairwise_theta_plot_pool(setup, calib_out, path, mcmc_use, alpha=0.05):
         plt.show()
     return
 
+def pairwise_theta_plot_pool_compare(setup, calib_out_list, cols, path, mcmc_use, alpha=0.05):
+    """ Pairwise Theta scatterplot """
+    theta_names = list(setup.bounds.keys())
+    theta0_unst_list = [sc.unnormalize(x.theta[mcmc_use,0,:], setup.bounds_mat) for x in calib_out_list]
+    n = len(calib_out_list)
+    plt.figure(figsize = (15,15))
+    for i in range(setup.p):
+        for j in range(setup.p):
+            if i == j:
+                plt.subplot2grid((setup.p, setup.p), (i,j))
+                for k in range(n):
+                    sns.kdeplot(theta0_unst_list[k][:, i], color = cols[k])
+                #plt.xlim(0,1)
+                plt.xlim(setup.bounds_mat[i, 0], setup.bounds_mat[i, 1])
+                ax = plt.gca()
+                ax.axes.yaxis.set_visible(False)
+                plt.xlabel(theta_names[i])
+                ax.tick_params(axis = 'x', which = 'major', labelsize = 8)
+                plt.setp(ax.get_xticklabels(), rotation = 30, horizontalalignment = 'right')
+            elif i < j:
+                plt.subplot2grid((setup.p, setup.p), (i,j))
+                contour_list = [kde_contour(x[:, j], x[:, i], 1-alpha) for x in theta0_unst_list]
+                for k in range(n):
+                    plt.contour(contour_list[k]['X'], contour_list[k]['Y'], contour_list[k]['Z'], contour_list[k]['conts'], colors = cols[k])
+                #plt.xlim(0,1)
+                #plt.ylim(0,1)
+                plt.xlim(setup.bounds_mat[j, 0], setup.bounds_mat[j, 1])
+                plt.ylim(setup.bounds_mat[i, 0], setup.bounds_mat[i, 1])
+                ax = plt.gca()
+                ax.axes.xaxis.set_visible(False)
+                ax.axes.yaxis.set_visible(False)
+            else:
+                pass
+    plt.subplots_adjust(wspace=0.05, hspace=0.05)
+    plt.subplot2grid((setup.p, setup.p), (2, 0))
+    plt.axis('off')
+    if path:
+        plt.savefig(path, bbox_inches = 'tight')
+    else:
+        plt.show()
+    return
+
 
 
 def pairwise_theta_plot_cluster(setup, calib_out, path, mcmc_use, alpha=0.05, highlight=None):

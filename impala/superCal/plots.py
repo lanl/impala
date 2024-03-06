@@ -560,7 +560,4 @@ class PTW_Plotter(object):
 
     pass
 
-if __name__ == '__main__':
-    pass
-
 # EOF
