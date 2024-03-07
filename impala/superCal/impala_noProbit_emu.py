@@ -109,7 +109,7 @@ class CalibSetup:
         :param meas_error_cor: (optional) correlation matrix for observation measurement errors, default = independent 
         :param theta_ind: a list or numpy array of indices for theta_i associated with each element of yobs (usually, indexes experiments), len(theta_ind) = len(yobs)
         :param D: (optional) numpy array containing basis functions for discrepancy, possibly including intercept. D.shape = (length of yobs, number of bases)
-        :param discrep_tau: (optional) fixed prior standard deviation for discrepancy basis coefficients (discrepancy = D @ discrep_vars, discrep_vars ~ N(0,discrep_tau))
+        :param discrep_tau: (optional) fixed prior variance for discrepancy basis coefficients (discrepancy = D @ discrep_vars, discrep_vars ~ N(0,discrep_tau))
         """
         # if theta_ind specified, s2_ind is?
         yobs = np.array(yobs)
