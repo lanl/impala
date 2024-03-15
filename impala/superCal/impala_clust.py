@@ -457,7 +457,7 @@ def calibClust(setup, parallel = False):
                     setup.bounds_mat, 
                     setup.bounds.keys(),
                     ),
-                ).reshape(setup.ntemps, setup.nclustmax, setup.y_lens[i])
+                ).reshape(setup.ntemps, setup.nclustmax, setup.y_lens[i]) ### isnt this just pred_curr??? Speedup.~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~``
             
             llik_cand_delta[i] = np.empty([setup.ntemps, setup.nclustmax, setup.ntheta[i]])
             for t in range(setup.ntemps):
@@ -620,6 +620,13 @@ def calibClust(setup, parallel = False):
                 
             elif setup.models[i].s2=='fix':
                     log_s2[i][m] = np.log(setup.sd_est[i]**2)
+
+                    for t in range(setup.ntemps):
+                        s2_stretched = log_s2[i][m][t,setup.theta_ind[i]]
+                        for j in range(setup.ntheta[i]):
+                            marg_lik_cov_curr[i][t][j] = setup.models[i].lik_cov_inv(np.exp(s2_stretched[s2_which_mat[i][j]]))
+                            llik_curr[i][t][j] = setup.models[i].llik(setup.ys[i][s2_which_mat[i][j]], pred_curr[i][t][s2_which_mat[i][j]], marg_lik_cov_curr[i][t][j])
+                    
 
                     #for t in range(setup.ntemps):
                     #    for j in range(setup.ntheta[i]):
