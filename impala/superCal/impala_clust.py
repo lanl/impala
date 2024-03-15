@@ -11,6 +11,7 @@ from numpy.linalg import cholesky, slogdet
 from itertools import repeat
 import multiprocessing as mp
 import impala_noProbit_emu as impa
+from collections import namedtuple
 import pbar
 #np.seterr(under='ignore')
 
@@ -130,87 +131,113 @@ def sample_eta(curr_eta, nclust, ndat, prior_shape, prior_rate):
 
 class AMcov_clust:
     """
+    We want to do adaptive metropolis (AM) for theta. There are nclustmax theta vectors, but we 
+    can't do AM on them because they will be switching labels. Instead we do AM on the experiment
+    specific theta histories, but then need to combine them to get a sample for the 
+    cluster. Within each cluster, we weight the means and covariances from experiments within
+    the cluster. The way Peter has done this is to accumulate with the proper weights. He 
+    loops over experiments, which each have a cov and mu, and adds them (weighted) to the 
+    appropriate cluster cov and mu.
+
     Adaptive Metropolis for clustered calibration. Notes:
-    - You cannot just do AM on 'theta' beause it is changing dimension
+    - You cannot just do AM on 'theta' beause of label switching
     - Instead do AM on 'theta_hist' because it always exists with same dimension
     - Tricky part is that we are then proposing an update to theta instead of theta_hist
-    - Combine relevant theta_hists for updating theta with
+    - Combine relevant theta_hists (appropriately weighted) for updating theta
+    - https://www.mathworks.com/help/matlab/import_export/using-mapreduce-to-compute-covariance-and-related-quantities.html
     """
     def __init__(self, nexp, ntheta, ntemps, p, nclustmax, start_var=1e-4, start_adapt_iter=300, tau_start=0.):
         self.eps = 1.0e-12
         self.AM_SCALAR = 2.4**2 / p
         self.tau = tau_start * np.ones(ntemps) # note this is different from hier--not sure how to have a different tau for each experiment
-        self.S   = np.empty((ntemps, nclustmax, p, p))
-        for i in range(nexp):
-            self.S[i][:] = np.eye(p) * start_var
-        self.cov = [np.empty((ntemps, ntheta[i], p, p)) for i in range(nexp)]
-        self.mu  = [np.empty((ntemps, ntheta[i], p)) for i in range(nexp)]
+        self.S   = np.empty((ntemps, nclustmax, p, p)) # proposal covariance
+        for t in range(ntemps):
+            for c in range(nclustmax):
+                self.S[t,c] = np.eye(p) * start_var
+        self.cov_hist = [np.empty((ntemps, ntheta[i], p, p)) for i in range(nexp)] # covariance of past sample by experiment
+        self.mu_hist  = [np.empty((ntemps, ntheta[i], p)) for i in range(nexp)] # mean of past samples by experiment
+        self.cov_clust = np.empty((ntemps, nclustmax, p, p)) # covariance of past samples by cluster (weighted combination of cov_hist)
+        self.mu_clust = np.zeros((ntemps, nclustmax, p)) # mean of past sample by cluster (weighted combination of mu_hist)
+        self.n_hc = np.zeros((ntemps, nclustmax)) # count for accumulation purposes 
         self.nexp = nexp
         self.ntheta = ntheta
         self.ntemps = ntemps
         self.nclustmax = nclustmax
         self.p = p
         self.start_adapt_iter = start_adapt_iter
-        self.count_100 = np.zeros(self..ntemps, dtype = int)
+        self.count_100 = np.zeros(self.ntemps, dtype = int)
         self.nS  = np.zeros((ntemps, nclustmax))
-        self.mS  = np.zeros((ntemps, nclustmax, p))
         self.temps = np.arange(ntemps)
 
     def update(self, x, m, curr_delta):
         if m > self.start_adapt_iter:
+            # update experiment-specific mu and cov
             for i in range(self.nexp):
-                self.mu[i] += (x[i][m-1] - self.mu[i]) / m
-                self.cov[i][:] = (
-                    + ((m-1) / m) * self.cov[i]
+                self.mu_hist[i] += (x[i][m-1] - self.mu_hist[i]) / m
+                self.cov_hist[i][:] = (
+                    + ((m-1) / m) * self.cov_hist[i]
                     + ((m-1) / (m * m)) * np.einsum(
-                        'tej,tel->tejl', x[i][m-1] - self.mu[i], x[i][m-1] - self.mu[i],
+                        'tej,tel->tejl', x[i][m-1] - self.mu_hist[i], x[i][m-1] - self.mu_hist[i],
                         )
                     )
+            # reweight experiment-specific to get cluster-specific mu and cov
             self.cluster_covariance_update(m, curr_delta)
-            self.S = self.AM_SCALAR * np.einsum('ijkl,i->ijkl', self.S, np.exp(self.tau))
+            # make history covariance into proposal covariance
+            self.S = self.AM_SCALAR * np.einsum('tmjl,t->tmjl', self.cov_clust + np.eye(self.p) * self.eps, np.exp(self.tau)) # is identity be added correctly (correctly broadcast)?
+
 
         elif m == self.start_adapt_iter:
+            # calculate experiment-specific mu and cov
             for i in range(self.nexp):
-                self.mu[i][:]  = x[i][:m].mean(axis = 0)
-                self.cov[i][:] = impa.cov_4d_pcm(x[i][:m], self.mu[i])
-                self.cluster_covariance_update(m, curr_delta)
-                self.S[i][:]   = self.AM_SCALAR * np.einsum('tejl,te->tejl', self.cov[i] + np.eye(self.p) * self.eps, np.exp(self.tau[i]))
-            self.S = self.AM_SCALAR * np.einsum('ijkl,i->ijkl', self.S, np.exp(self.tau))
+                self.mu_hist[i][:]  = x[i][:m].mean(axis = 0)
+                self.cov_hist[i][:] = impa.cov_4d_pcm(x[i][:m], self.mu_hist[i])
+
+            # reweight experiment-specific to get cluster-specific mu and cov
+            self.cluster_covariance_update(m, curr_delta)
+            # make history covariance into proposal covariance
+            self.S = self.AM_SCALAR * np.einsum('tmjl,t->tmjl', self.cov_clust + np.eye(self.p) * self.eps, np.exp(self.tau)) # is identity be added correctly (correctly broadcast)?
 
     def cluster_covariance_update(self, n, delta):
         # https://www.mathworks.com/help/matlab/import_export/using-mapreduce-to-compute-covariance-and-related-quantities.html
-        self.S[:]  = 0. 
-        self.mS[:] = 0.
-        self.nS[:] = 0.
-        mC = np.empty((self.ntemps, self.S.shape[-1]))
-        nC = np.zeros((self.ntemps, 1))
-        for i in range(self.nexp):
-            for j in range(delta[i].shape[1]):
-                nC[:] = self.nS[self.temps, delta[i].T[j], None] + n
-                mC[:] = (self.nS[self.temps, delta[i].T[j],None] * self.S[self.temps, delta[i].T[j]] + n * self.mus[i][self.temps, j]) / nC
-                self.S[self.temps, delta[i].T[j]] =  1 / nC[:,:,None] * (
-                    + self.nS[self.temps, delta[i].T[j],None,None] * self.S[self.temps, delta[i].T[j]]
-                    + n * self.covs[i][self.temps, j]
-                    + np.einsum('t,tp,tq->tpq', self.nS[self.temps, delta[i].T[j]], 
-                                    self.mS[self.temps, delta[i].T[j]] - mC, self.mS[self.temps, delta[i].T[j]] - mC)
-                    + n * np.einsum('tp,tq->tpq', self.mus[i][self.temps, j] - mC, self.mus[i][self.temps, j] - mC)
+        self.cov_clust[:]  = 0. # accumulating covariance                                                                                   #(c1)
+        self.mu_clust[:] = 0. # accumulating mean                                                                                           #(m1)
+        self.n_hc[:] = 0. # accumulating count                                                                                              #(n1)
+        mu_new = np.empty((self.ntemps, self.cov_clust.shape[-1]))                                                                          #(m)
+        n_new = np.zeros((self.ntemps, 1))                                                                                                  #(n)
+        for i in range(self.nexp): # loop over unvectorized experiments
+            for j in range(delta[i].shape[1]): # loop over vectorized experiments
+                n_new[:] = self.n_hc[self.temps, delta[i].T[j], None] + n                                                    #(n=n1+n2)
+                mu_new[:] = (self.n_hc[self.temps, delta[i].T[j],None] * self.mu_clust[self.temps, delta[i].T[j]] + n * self.mu_hist[i][self.temps, j]) / n_new #(m=(n1*m1 + n2*m2)/n)
+                self.cov_clust[self.temps, delta[i].T[j]] =  1 / n_new[:,:,None] * (                                                #1/n * 
+                    + self.n_hc[self.temps, delta[i].T[j],None,None] * self.cov_clust[self.temps, delta[i].T[j]]                  # cov1 (what has accumulated so far)  #(c1)
+                    + n * self.cov_hist[i][self.temps, j]                                                                   # cov2 (history for experiment ij)          #(c2)
+                    + np.einsum('t,tp,tq->tpq', self.n_hc[self.temps, delta[i].T[j]],                                     # mu1                                         
+                                    self.mu_clust[self.temps, delta[i].T[j]] - mu_new, self.mu_clust[self.temps, delta[i].T[j]] - mu_new)
+                    + n * np.einsum('tp,tq->tpq', self.mu_hist[i][self.temps, j] - mu_new, self.mu_hist[i][self.temps, j] - mu_new)     # mu2
                     )
-                self.mS[self.temps, delta[i].T[j]] = mC
-                self.nS[self.temps, delta[i].T[j]] = nC.ravel()
-        self.S[:] += np.eye(self.S.shape[-1]) * self.eps
+                self.mu_clust[self.temps, delta[i].T[j]] = mu_new       #(m1=m)
+                self.n_hc[self.temps, delta[i].T[j]] = n_new.ravel()    #(n1=n)
         return
+        
 
-    def update_tau(self, m):
+    def update_tau(self, m): # label switching makes it difficult to track acceptance rate, so this is turned off
         # diminishing adaptation based on acceptance rate for each temperature
-        if (m % 100 == 0) and (m > 300):
-            ddelta = min(0.1, 5 / sqrt(m + 1))
-            self.tau[np.where(self.count_100 < 23)] = self.tau[np.where(self.count_100 < 23)] - ddelta
-            self.tau[np.where(self.count_100 > 23)] = self.tau[np.where(self.count_100 > 23)] + ddelta
-            self.count_100 *= 0
+        if False:
+            if (m % 100 == 0) and (m > 300):
+                ddelta = min(0.1, 5 / sqrt(m + 1))
+                self.tau[np.where(self.count_100 < 23)] = self.tau[np.where(self.count_100 < 23)] - ddelta
+                self.tau[np.where(self.count_100 > 23)] = self.tau[np.where(self.count_100 > 23)] + ddelta
+                self.count_100 *= 0
 
-    def gen_cand(self, x, m):
-        x_cand = [impa.chol_sample_1per(x[i][m-1], self.S[i]) for i in range(self.nexp)]
+    def gen_cand(self, x, m): # one sample per cluster
+        #x_cand = [impa.chol_sample_1per(x[i][m-1], self.S) for i in range(self.nexp)]
+        x_cand = impa.chol_sample_1per(x[m-1], self.S)
         return x_cand
+
+
+OutCalibClust = namedtuple(
+    'OutCalibClust', 'theta theta_hist s2 count count_temper pred_curr theta0 Sigma0 delta eta nclustmax theta_am'
+    )
 
 ## DP Cluster Calibration
 
@@ -245,7 +272,6 @@ def calibClust(setup, parallel = False):
         for i in range(setup.nexp)
         ]
 
-    AM_SCALAR = 2.4**2/setup.p
     ## Parameter Declaration
     theta0 = np.empty([setup.nmcmc, setup.ntemps, setup.p])
     theta0[0] = impa.chol_sample_1per_constraints(
@@ -368,14 +394,15 @@ def calibClust(setup, parallel = False):
     #cov = [np.empty((setup.ntemps, setup.ns2[i], setup.p, setup.p)) for i in range(setup.nexp)]
     #mu  = [np.empty((setup.ntemps, setup.ns2[i], setup.p)) for i in range(setup.nexp)]
     cov_theta_cand = AMcov_clust(
-        setup.nexp, 
-        np.array([setup.ntheta[i] for i in range(setup.nexp)]), 
-        setup.ntemps, 
-        setup.p, 
-        setup.nclustmax
+        nexp=setup.nexp, 
+        ntheta=np.array([setup.ntheta[i] for i in range(setup.nexp)]), 
+        ntemps=setup.ntemps, 
+        p=setup.p, 
+        nclustmax=setup.nclustmax,
         start_var=setup.start_var_theta, 
         start_adapt_iter=setup.start_adapt_iter, 
-        tau_start=setup.start_tau_theta)
+        tau_start=setup.start_tau_theta
+        )
 
     ## Initialize Theta0 and Sigma0 related variables 
     theta0_prior_cov = setup.theta0_prior_cov # was 10^2, but that is far from uniform when back transforming
@@ -408,8 +435,6 @@ def calibClust(setup, parallel = False):
     cluster_cum_prob = np.empty((setup.ntemps, setup.nclustmax))
     cluster_sample_unif = [np.empty((setup.ntemps, setup.ns2[i])) for i in range(setup.nexp)]
 
-    tau  = np.repeat(-0.0, setup.ntemps)
-    count_100 = np.zeros(setup.ntemps, dtype = int)
 
     ## start MCMC
     for m in range(1,setup.nmcmc):
@@ -505,7 +530,13 @@ def calibClust(setup, parallel = False):
         llik_curr_theta_[:] = 0.
         theta[m]      = theta[m-1]
         theta_eval[:] = theta[m-1]
-        theta_cand[:] = impa.chol_sample_1per(theta[m-1], S)
+        #theta_cand[:] = impa.chol_sample_1per(theta[m-1], cov_theta_cand.S)
+
+        cov_theta_cand.update(theta_hist, m, curr_delta)
+        #------------------------------------------------------------------------------------------
+        # MCMC update for thetas
+        theta_cand = cov_theta_cand.gen_cand(theta, m)
+
         good_values[:] = setup.checkConstraints(
             impa.tran_unif(theta_cand.reshape(theta_long_shape), setup.bounds_mat, setup.bounds.keys()), 
             setup.bounds,
@@ -559,18 +590,15 @@ def calibClust(setup, parallel = False):
                 False,
                 )
         count += accept.sum(axis = 1)
+        cov_theta_cand.count_100 += accept.sum(axis = 1)
+
+        cov_theta_cand.update_tau(m)
         theta_ext[:] = False
         for i in range(setup.nexp):
             theta_ext[theta_unravel[i], delta[i][m].ravel()] += True
         ntheta[:] = theta_ext.sum(axis = 1)
 
-        #------------------------------------------------------------------------------------------
-        # diminishing adaptation based on acceptance rate for each temperature
-        if (m % 100 == 0) and (m > 300):
-            ddelta = min(0.1, 5 / sqrt(m + 1))
-            tau[np.where(count_100 < 23)] = tau[np.where(count_100 < 23)] - ddelta
-            tau[np.where(count_100 > 23)] = tau[np.where(count_100 > 23)] + ddelta
-            count_100 *= 0
+
         #------------------------------------------------------------------------------------------
         ## Gibbs update s2
 
@@ -762,8 +790,8 @@ def calibClust(setup, parallel = False):
     t1 = time.time()
     print('\rCalibration MCMC Complete. Time: {:f} seconds.'.format(t1 - t0))
     count_temper = count_temper + count_temper.T - np.diag(np.diag(count_temper))
-    out = impa.OutCalibClust(theta, theta_hist, log_s2, count, count_temper, 
-                            pred_curr, theta0, Sigma0, delta, eta, setup.nclustmax)
+    out = OutCalibClust(theta, theta_hist, log_s2, count, count_temper, 
+                            pred_curr, theta0, Sigma0, delta, eta, setup.nclustmax, cov_theta_cand)
     return(out)
 
 # EOF
