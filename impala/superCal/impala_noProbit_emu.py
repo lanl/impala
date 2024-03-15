@@ -18,11 +18,12 @@ from math import sqrt, floor, log
 from scipy.special import erf, erfinv, gammaln
 from scipy.stats import invwishart
 from numpy.linalg import cholesky, slogdet
+from collections import namedtuple
 #from itertools import repeat
 #import multiprocessing as mp
 #import pandas as pd
-#import impala.superCal.pbar as pbar
-from . import pbar
+import impala.superCal.pbar as pbar
+#from . import pbar
 #import pbar 
 np.seterr(under='ignore')
 
@@ -427,16 +428,14 @@ def ldig_kern(x, a, b): # ig
 def ldhc_kern(x, a, b): # half cauchy
   return -np.log(x + 1)
 
-from collections import namedtuple
+
 OutCalibPool = namedtuple(
     'OutCalibPool', 'theta s2 count count_s2 count_decor cov_theta_cand cov_ls2_cand pred_curr discrep_vars llik theta_native',
     )
 OutCalibHier = namedtuple(
     'OutCalibHier', 'theta s2 count count_s2 count_decor2 cov_theta_cand cov_ls2_cand count_temper pred_curr theta0 Sigma0',# llik theta_native theta0_native theta_parent_native',
     )
-OutCalibClust = namedtuple(
-    'OutCalibClust', 'theta theta_hist s2 count count_temper pred_curr theta0 Sigma0 delta eta nclustmax'
-    )
+
 
 
 class AMcov_pool:
