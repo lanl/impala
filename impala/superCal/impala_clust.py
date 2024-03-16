@@ -274,10 +274,22 @@ def calibClust(setup, parallel = False):
 
     ## Parameter Declaration
     theta0 = np.empty([setup.nmcmc, setup.ntemps, setup.p])
-    theta0[0] = impa.chol_sample_1per_constraints(
-            np.zeros((setup.ntemps, setup.p)), np.array([np.eye(setup.p)] * setup.ntemps),
-            setup.checkConstraints, setup.bounds_mat, setup.bounds.keys(), setup.bounds,
+    #theta0[0] = impa.chol_sample_1per_constraints(
+    #        np.zeros((setup.ntemps, setup.p)), np.array([np.eye(setup.p)] * setup.ntemps),
+    #        setup.checkConstraints, setup.bounds_mat, setup.bounds.keys(), setup.bounds,
+    #        )
+    theta0_start = impa.initfunc_unif(size=[setup.ntemps, setup.p])
+    good = setup.checkConstraints(
+        impa.tran_unif(theta0_start, setup.bounds_mat, setup.bounds.keys()), setup.bounds,
+        )
+    while np.any(~good):
+        theta0_start[np.where(~good)] = impa.initfunc_unif(size = [(~good).sum(), setup.p])
+        good[np.where(~good)] = setup.checkConstraints(
+            impa.tran_unif(theta0_start[np.where(~good)], setup.bounds_mat, setup.bounds.keys()),
+            setup.bounds,
             )
+    theta0[0] = theta0_start
+
     Sigma0 = np.empty([setup.nmcmc, setup.ntemps, setup.p, setup.p])
     Sigma0[0] = np.eye(setup.p) * 0.25**2
     # initialize delta, the cluster membership indicator (for each experiment)
