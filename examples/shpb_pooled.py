@@ -189,42 +189,42 @@ s2_ind = np.hstack([[v]*len(dat_all[v]) for v in list(range(nexp))])
 ##########################################################################################
 # define PTW model
 
-model_jc = sc.ModelMaterialStrength(temps=np.array(temps), 
-    edots=np.array(edots)*1e-6, 
-    consts=consts_jc, 
-    strain_histories=strain_hist_list, 
+model_jc = sc.ModelMaterialStrength(temps=np.array(temps),
+    edots=np.array(edots)*1e-6,
+    consts=consts_jc,
+    strain_histories=strain_hist_list,
     flow_stress_model='JC_Yield_Stress',
-    melt_model='Constant_Melt_Temperature', 
-    shear_model='Simple_Shear_Modulus', 
-    specific_heat_model='Constant_Specific_Heat', 
+    melt_model='Constant_Melt_Temperature',
+    shear_model='Simple_Shear_Modulus',
+    specific_heat_model='Constant_Specific_Heat',
     density_model='Constant_Density',
     pool=True)
 
-model_ptw = sc.ModelMaterialStrength(temps=np.array(temps), 
-    edots=np.array(edots)*1e-6, 
-    consts=consts_ptw, 
-    strain_histories=strain_hist_list, 
+model_ptw = sc.ModelMaterialStrength(temps=np.array(temps),
+    edots=np.array(edots)*1e-6,
+    consts=consts_ptw,
+    strain_histories=strain_hist_list,
     flow_stress_model='PTW_Yield_Stress',
-    melt_model='Constant_Melt_Temperature', 
-    shear_model='Simple_Shear_Modulus', 
-    specific_heat_model='Constant_Specific_Heat', 
+    melt_model='Constant_Melt_Temperature',
+    shear_model='Simple_Shear_Modulus',
+    specific_heat_model='Constant_Specific_Heat',
     density_model='Constant_Density',
     pool=True)
 # bring everything together into calibration structure
 setup_pool_ptw = sc.CalibSetup(bounds_ptw, constraints_ptw)
-setup_pool_ptw.addVecExperiments(yobs=stress_stacked, 
-    model=model_ptw, 
-    sd_est=sd_est, 
-    s2_df=s2_df, 
+setup_pool_ptw.addVecExperiments(yobs=stress_stacked,
+    model=model_ptw,
+    sd_est=sd_est,
+    s2_df=s2_df,
     s2_ind=s2_ind)
 setup_pool_ptw.setTemperatureLadder(1.05**np.arange(50), start_temper=2000)
 setup_pool_ptw.setMCMC(nmcmc=10000, nburn=5000, thin=1, decor=100, start_tau_theta=-4.)
 
 setup_pool_jc = sc.CalibSetup(bounds_jc, constraints_jc)
-setup_pool_jc.addVecExperiments(yobs=stress_stacked, 
-    model=model_jc, 
-    sd_est=sd_est, 
-    s2_df=s2_df, 
+setup_pool_jc.addVecExperiments(yobs=stress_stacked,
+    model=model_jc,
+    sd_est=sd_est,
+    s2_df=s2_df,
     s2_ind=s2_ind)
 setup_pool_jc.setTemperatureLadder(1.05**np.arange(50), start_temper=2000)
 setup_pool_jc.setMCMC(nmcmc=10000, nburn=5000, thin=1, decor=100, start_tau_theta=-4.)
@@ -247,7 +247,7 @@ plt.show()
 
 # index of posterior samples I will use
 uu = np.arange(5000, 10000, 5)
- 
+
 mle_idx = np.argmax(out_pool.llik[uu])
 mat = np.vstack((out_pool.theta[uu,0,:], out_pool.theta[uu[mle_idx],0,:], out_pool.theta[uu,0,:].mean(0)))
 
@@ -281,6 +281,3 @@ for i in range(out_pool.theta.shape[2]):
 g.fig.set_size_inches(10,10)
 g
 plt.show()
-
-
-
