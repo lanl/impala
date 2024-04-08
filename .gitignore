@@ -7,6 +7,7 @@
 **/.idea/
 /DJWLocal
 *~$*
+*~
 *.pyd
 /calibration/**/*.o
 /calibration/**/*.so
