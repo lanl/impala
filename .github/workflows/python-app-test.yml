@@ -6,7 +6,7 @@ run-name: ${{ github.actor }} is performing GitHub Actions
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "impala_martin" ]
   pull_request:
     branches: [ "master" ]
   workflow_dispatch:
