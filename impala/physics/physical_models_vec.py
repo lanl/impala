@@ -99,7 +99,7 @@ class Piecewise_Linear_Specific_Heat(BaseModel):
    """
    Piecewise Linear Specific Heat Model
    Cv (T) = c0_0 + c1_0 * T for T<=T_t
-   Cv (T) = c0_1 + c1_1 * T for T>T_t          
+   Cv (T) = c0_1 + c1_1 * T for T>T_t
    """
    consts = ['T_t','c0_0', 'c1_0', 'c0_1', 'c1_1']
    def value(self, *args):
@@ -111,7 +111,7 @@ class Piecewise_Linear_Specific_Heat(BaseModel):
        cnow = intercept + slope * tnow
        return cnow
 
-    
+
 # Density Models
 
 class Constant_Density(BaseModel):
@@ -144,10 +144,10 @@ class Linear_Density(BaseModel):
     consts = ['r0','r1']
 
     def value(self, *args):
-        
+
         tnow=self.parent.state.T
         rnow=self.parent.parameters.r0+self.parent.parameters.r1*tnow
-        return rnow    
+        return rnow
 
 class Quadratic_Density(BaseModel):
     """
@@ -156,7 +156,7 @@ class Quadratic_Density(BaseModel):
     consts = ['r0','r1','r2']
 
     def value(self, *args):
-        
+
         tnow=self.parent.state.T
         rnow=self.parent.parameters.r0+self.parent.parameters.r1*tnow+self.parent.parameters.r2*tnow**2
         return rnow
@@ -168,12 +168,12 @@ class Cubic_Density(BaseModel):
     consts = ['r0','r1','r2','r3']
 
     def value(self, *args):
-        
+
         tnow=self.parent.state.T
         rnow=self.parent.parameters.r0+self.parent.parameters.r1*tnow+self.parent.parameters.r2*tnow**2+self.parent.parameters.r3*tnow**3
         return rnow
-    
-    
+
+
 # Melt Temperature Models
 
 class Constant_Melt_Temperature(BaseModel):
@@ -207,7 +207,7 @@ class Linear_Melt_Temperature(BaseModel):
     consts=['tm0', 'tm1']
     def value(self, *args):
         rnow=self.parent.state.rho
-        
+
         tmeltnow=self.parent.parameters.tm0+self.parent.parameters.tm1*rnow
         return tmeltnow
 
@@ -219,8 +219,8 @@ class Quadratic_Melt_Temperature(BaseModel):
     def value(self, *args):
         rnow=self.parent.state.rho
         tmeltnow=self.parent.parameters.tm0+self.parent.parameters.tm1*rnow+self.parent.parameters.tm2*rnow**2
-        return tmeltnow    
-    
+        return tmeltnow
+
 class BGP_Melt_Temperature(BaseModel):
 
     consts = ['Tm_0', 'rho_m', 'gamma_1', 'gamma_3', 'q3']
@@ -228,7 +228,7 @@ class BGP_Melt_Temperature(BaseModel):
     def value(self, *args):
         mp    = self.parent.parameters
         rho   = self.parent.state.rho
-       
+
         melt_temp = mp.Tm_0*np.power(rho/mp.rho_m, 1./3.)*np.exp(6*mp.gamma_1*(np.power(mp.rho_m,-1./3.)-np.power(rho,-1./3.))\
                     +2.*mp.gamma_3/mp.q3*(np.power(mp.rho_m,-mp.q3)-np.power(rho,-mp.q3)))
         return melt_temp
@@ -281,7 +281,7 @@ class Quadratic_Cold_PW_Shear_Modulus(BaseModel):
         gnow[np.where(gnow < 0)] = 0.
 
         return gnow
-    
+
 class Simple_Shear_Modulus(BaseModel):
     consts = ['G0', 'alpha']
 
@@ -297,7 +297,7 @@ class BGP_PW_Shear_Modulus(BaseModel):
     #PW describes the (lienar) temperature dependence of the shear modulus. (Same dependency as
     #in Simple_Shear_modulus.)
     #With these two models combined, we get the shear modulus as a function of density and temperature.
-    
+
     consts = ['G0', 'rho_0', 'gamma_1', 'gamma_2', 'q2', 'alpha']
 
     def value(self, *args):
@@ -305,7 +305,7 @@ class BGP_PW_Shear_Modulus(BaseModel):
         rho   = self.parent.state.rho
         temp  = self.parent.state.T
         tmelt = self.parent.state.Tmelt
- 
+
         cold_shear  = mp.G0*np.exp(6.*mp.gamma_1*(np.power(mp.rho_0,-1./3.)-np.power(rho,-1./3.))\
                     + 2*mp.gamma_2/mp.q2*(np.power(mp.rho_0,-mp.q2)-np.power(rho,-mp.q2)))
         gnow = cold_shear*(1.- mp.alpha* (temp/tmelt))
@@ -528,7 +528,7 @@ class Stein_Flow_Stress(BaseModel):
         shear = self.parent.state.G
         eps   = self.parent.state.strain
         fnow  = fast_pow((1.0+mp.beta*(mp.epsi+eps)), mp.n)
-        
+
         cond1 = fnow*mp.y0 > mp.ymax
         fnow[cond1] = (mp.ymax/mp.y0)[cond1]
         cond2 = temp > tmelt
@@ -770,7 +770,7 @@ def generate_strain_history(emax, edot, Nhist):
     return dict((['times',times.T], ['strains',strains], ['strain_rate',strain_rate.T]))
 
 def generate_strain_history_new(emax, edot, nhist):
-    tmax    = emax / edot     
+    tmax    = emax / edot
     strains = np.linspace(0, emax, nhist) # nhist * nexp
     times   = np.linspace(0, tmax, nhist) # nhist * nexp
     rates   = np.diff(strains, axis = 0) / np.diff(times, axis = 0) # (nhist - 1) * nexp
