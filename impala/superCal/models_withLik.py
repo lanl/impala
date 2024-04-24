@@ -491,6 +491,68 @@ class ModelF(AbstractModel):
         return discrep_vars
     
 
+#######
+### ModelF_bigdata: Function for Simulator Model Evaluation or Evaluation of Alternative Emulator Model using Bigger Data 
+class ModelF_bigdata(AbstractModel):
+    """ Custom Simulator/Emulator Model """
+    def __init__(self, f, input_names, exp_ind=None, s2='gibbs'): # not sure if this is vectorized
+        """
+        f           : user-defined function taking single input with elements x[0] = first element of theta, x[1] = second element of theta, etc. Function must output predictions for all observations        
+        input_names : list of the names of the inputs to bmod
+        s2          : method for handling experiment-specific noise s2; options are 'MH' (Metropolis-Hastings Sampling), 'fix' (fixed at s2_est from addVecExperiments call), and 'gibbs' (Gibbs sampling)
+        """
+        self.mod = f
+        self.input_names = input_names
+        self.stochastic = False
+        self.yobs = None
+        self.meas_error_cor = 1.#np.diag(self.basis.shape[0])
+        if exp_ind is None:
+            exp_ind = np.array(0)
+        self.nexp = exp_ind.max() + 1
+        self.exp_ind = exp_ind
+        self.nd = 0
+        self.s2 = s2
+        self.vec = np.linspace(1,16200,16200) #define to speed up llik evaluation
+        self.vec2 = np.linspace(1,16200,16200) #define to speed up llik evaluation
+        self.inv = np.linspace(1,16200,16200) #define to speed up lik_cov_inv evaluation
+        self.m = np.linspace(1,16200,16200) #define to speed up discrep_sample evaluation
+        self.vmat = np.linspace(1,16200,16200) #define to speed up discrep_sample evaluation
+        return
+    def eval(self, parmat, pool = None, nugget=False):
+        parmat_array = np.vstack([parmat[v] for v in self.input_names]).T # get correct subset/ordering of inputs
+        if pool is True:
+            return np.apply_along_axis(self.mod, 1, parmat_array)
+        else:
+            nrep = list(parmat.values())[0].shape[0] // self.nexp
+            out_all = np.apply_along_axis(self.mod, 1, parmat_array)
+            
+            #out_sub = np.concatenate([out_all[(i*nrep):(i*nrep+nrep), self.exp_ind==i] for i in range(self.nexp)], 1)
+            out_sub = np.concatenate([out_all[np.ix_(np.arange(i, nrep*self.nexp, self.nexp), np.where(self.exp_ind==i)[0])] for i in range(self.nexp)], 1)
+            return out_sub
+            # this is evaluating all experiments for all thetas, which is overkill
+        # need to have some way of dealing with non-pooled eval fo this and bassPCA version  
+    def discrep_sample(self, yobs, pred, cov, itemp): #Added by Lauren on 11/17/23.
+        self.vec = cov['inv'].reshape(-1,1)* (yobs - pred).reshape(-1,1)
+        self.vmat = np.repeat(cov['inv'].reshape(-1,1),self.nd,axis=1)*self.D
+        S = np.linalg.inv(
+            #np.eye(self.nd) / self.discrep_tau #defined by addVecExperiments
+            np.diag(1/self.discrep_tau) #modification to allow vector-valued discrep_tau
+           + self.D.T @ self.vmat
+            )
+        self.m = self.D.T @ self.vec
+        discrep_vars = sc.chol_sample((S @ self.m).flatten(), S/itemp)
+        return discrep_vars
+    def llik(self, yobs, pred, cov): # assumes diagonal cov
+        self.vec = yobs.flatten() - pred.flatten()
+        self.vec2 = self.vec*self.vec*cov['inv']
+        out = -.5 * cov['ldet'] - .5 * self.vec2.sum()
+        return out
+    def lik_cov_inv(self, s2vec): # default is diagonal covariance matrix
+        self.inv = 1/s2vec
+        ldet = np.log(s2vec).sum()
+        out = {'inv' : self.inv, 'ldet' : ldet}
+        return out
+
 
 
 #######
