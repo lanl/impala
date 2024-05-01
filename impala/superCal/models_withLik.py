@@ -8,7 +8,7 @@
 ### Imports ###
 ###############
 import numpy as np
-import pyBASS as pb
+#import pyBASS as pb
 #import pyBayesPPR as pbppr
 #import physical_models_vec as pm_vec
 from impala import physics as pm_vec
