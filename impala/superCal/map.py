@@ -80,6 +80,7 @@ def get_map_impalapool(setup, n_samples = 1000, theta_init = None, disc_init = N
             llik = np.nansum(loglik_y,axis=0)+np.nansum(np.hstack(loglik_y_disc))
             llik_max = llik.max()
             llik = llik - llik_max  
+            llik[llik < -10**2] = -10**2 #avoid exp underflow issues
             output = np.log(np.exp(llik).mean()) + llik_max
             output = np.array(output)
             output = output.reshape(1,1)
