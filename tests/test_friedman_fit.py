@@ -3,6 +3,11 @@ from scipy.stats import uniform as Uniform
 import numpy as np
 from impala import superCal as sc
 
+# FIXME: Supported for python>=3.8. This is the type for theta and grid in
+# Friedman. Doesn't work for py3.6.
+#
+# from numpy.typing import ArrayLike
+
 class Friedman:
     def __init__(self, grid):
         """
