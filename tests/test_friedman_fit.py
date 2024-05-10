@@ -1,17 +1,16 @@
 from scipy.stats import kstest
 from scipy.stats import uniform as Uniform
 import numpy as np
-from numpy.typing import ArrayLike
 from impala import superCal as sc
 
 class Friedman:
-    def __init__(self, grid: ArrayLike):
+    def __init__(self, grid):
         """
         grid: Grid at which Friedman function is evaluated.
         """
         self.grid = grid
 
-    def __call__(self, theta: ArrayLike):
+    def __call__(self, theta):
         """
         theta: Friedman function parameters.
         """
