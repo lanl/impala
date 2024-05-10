@@ -16,6 +16,8 @@ jobs:
             python-version: 3.6
           - os: ubuntu-latest
             python-version: 3.6
+          - os: windows-latest
+            python-version: 3.6
           # Python version too new for these platforms.
           - os: ubuntu-20.04
             python-version: '3.12'
