@@ -1,10 +1,11 @@
 name: CI
 
-# on: [push, pull_request]
 on:
+  # Run CI on pushes to any branch, but do not run CI on tags.
   push:
-    tags-ignore:
+    branches:
       - '**'
+  # Run CI on all PRs.
   pull_request:
 
 jobs:
