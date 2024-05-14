@@ -1,3 +1,6 @@
+# Retrieve the current package version from setup.py
+version := $(shell python setup.py --version)
+
 tag:
-	git tag v$(python setup.py --version)
+	git tag v$(version)
 	git push --tags
