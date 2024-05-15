@@ -56,7 +56,7 @@ def test_physics():
 
     # FIXME: (alui) What does this plot test? Can we convert this into a
     # numberic test?
-    #
-    # import matplotlib.pyplot as plt
-    # plt.plot(sim_strains.T, sim_stresses.T)
-    # plt.show()
+
+    import matplotlib.pyplot as plt
+    plt.plot(sim_strains.T, sim_stresses.T)
+    plt.show()
