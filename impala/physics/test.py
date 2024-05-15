@@ -1,6 +1,7 @@
 
 import numpy as np
 import physical_models_vec as physics
+import matplotlib.pyplot as plt
 
 consts = {
     'alpha'   : 0.2,
@@ -13,6 +14,7 @@ consts = {
     'chi'     : 1.0,
     'sgB'     : 6.44e-4
 }
+
 params = {
     'theta'  : np.array([0.1]),
     'p'      : np.array([2.]),
@@ -54,6 +56,5 @@ sim_state_histories = ptw.compute_state_history(sim_strain_histories)
 sim_strains  = sim_state_histories[:,1].T # 2d array: ntot, Nhist
 sim_stresses = sim_state_histories[:,2].T # 2d array: ntot, Nhist
 
-import matplotlib.pyplot as plt
 plt.plot(sim_strains.T, sim_stresses.T)
 plt.show()

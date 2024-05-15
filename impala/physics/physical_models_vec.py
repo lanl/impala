@@ -2,7 +2,7 @@
 physical_models_vec.py
 
     A module for material strength behavior to be imported into python scripts for
-    optimizaton or training emulators.  Adapted from strength_models_add_ptw.py
+    optimization or training emulators. Adapted from strength_models_add_ptw.py
 
     Authors:
         DJ Luscher,    djl@lanl.gov
@@ -55,7 +55,7 @@ class Constant_Specific_Heat(BaseModel):
     consts = ['Cv0']
 
     def value(self, *args):
-        return self.parent.parameters.Cv0
+        return self.parent.parameters.Cv0 * np.ones(len(self.parent.state.T))
 
 #class Linear_Specific_Heat(BaseModel):
 #    """
@@ -110,6 +110,26 @@ class Piecewise_Linear_Specific_Heat(BaseModel):
        slope[np.where(tnow > self.parent.parameters.T_t)] =  self.parent.parameters.c1_1
        cnow = intercept + slope * tnow
        return cnow
+
+class Piecewise_Quadratic_Specific_Heat(BaseModel):
+    """
+   Piecewise Quadratic Specific Heat Model
+   Cv (T) = c0_0 + c1_0 * T + c2_0 * T**2 for T<=T_t
+   Cv (T) = c0_1 + c1_1 * T + c2_1 * T**2 for T>T_t
+   """
+    consts = ['T_t','c0_0', 'c1_0', 'c2_0', 'c0_1', 'c1_1', 'c2_1']
+    def value(self, *args):
+        tnow=self.parent.state.T
+        pow_0_coeff = np.repeat(self.parent.parameters.c0_0,len(tnow))
+        pow_1_coeff = np.repeat(self.parent.parameters.c1_0,len(tnow))
+        pow_2_coeff = np.repeat(self.parent.parameters.c2_0,len(tnow))
+
+        pow_0_coeff[np.where(tnow > self.parent.parameters.T_t)] =  self.parent.parameters.c0_1
+        pow_1_coeff[np.where(tnow > self.parent.parameters.T_t)] =  self.parent.parameters.c1_1
+        pow_2_coeff[np.where(tnow > self.parent.parameters.T_t)] =  self.parent.parameters.c2_1
+
+        cnow = pow_0_coeff + pow_1_coeff * tnow + pow_2_coeff * tnow * tnow
+        return cnow
 
 
 # Density Models
@@ -183,7 +203,7 @@ class Constant_Melt_Temperature(BaseModel):
     consts = ['Tmelt0']
 
     def value(self, *args):
-        return self.parent.parameters.Tmelt0
+        return self.parent.parameters.Tmelt0 * np.ones(len(self.parent.state.T))
 
 #class Linear_Melt_Temperature(BaseModel):
 #    """
@@ -239,7 +259,7 @@ class Constant_Shear_Modulus(BaseModel):
     consts = ['G0']
 
     def value(self, *args):
-        return self.parent.parameters.G0
+        return self.parent.parameters.G0 * np.ones(len(self.parent.state.T))
 
 #class Linear_Shear_Modulus(BaseModel):
 #    consts =  ['G0', 'rho0', 'dGdRho' ]#
@@ -345,10 +365,10 @@ class Constant_Yield_Stress(BaseModel):
     """
     Constant Yield Stress Model
     """
-    consts = ['yield_stress']
+    consts = ['yield_stress', 'chi']
 
     def value(self, *args):
-        return self.parent.parameters.yield_stress
+        return self.parent.parameters.yield_stress * np.ones(len(self.parent.state.T))
 
 def fast_pow(a, b):
     """

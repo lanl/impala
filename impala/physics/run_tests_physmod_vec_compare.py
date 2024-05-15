@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
+
 import unittest
-from py_tests import test_physmod_vec_constyield as pmv_cy
-from py_tests import test_physmod_vec_YJC as pmv_yjc
-from py_tests import test_physmod_vec_PTW as pmv_ptw
+
+import test_physmod_vec_constyield as pmv_cy
+import test_physmod_vec_YJC as pmv_yjc
+import test_physmod_vec_PTW as pmv_ptw
 
 """
 This script runs all tests comparing physical models to its vectorized version
@@ -33,7 +35,8 @@ suite.addTest(unittest.makeSuite(pmv_ptw.TestPTWYieldStress_SteinShearConstTm))
 # verbosity = 0: print no test name or dots, just summary
 result = unittest.TextTestRunner(verbosity=2).run(suite)
 
-# Produces exit codes for console interaction based on success or failure of tests
+# Produce exit codes for console interaction,
+# based on the success or failure of tests.
 if result.wasSuccessful():
     exit(0)
 else:

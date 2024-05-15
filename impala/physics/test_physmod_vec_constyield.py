@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
 
-'''
-import physical_models as pmh
-'''
 import physical_models_vec as pmv
-
 import unittest
 import numpy as np
-import sys
 
 
 # ------------------------------------------------------------------------------
-# Constant yield stress model
+# TestConstantYieldStress
+# Constant yield stress model.
 # ------------------------------------------------------------------------------
 
 class TestConstantYieldStress(unittest.TestCase):
+
+    # Functions:
+    # setUp
+    # test_isothermal_lowrate
+    # test_adiabatic_highrate
+    # test_constant_stress
 
     # ------------------------
     # setUp
@@ -50,13 +52,12 @@ class TestConstantYieldStress(unittest.TestCase):
         nhist_pm = 1000
 
         '''
-        # Get results for original physical models code ###
+        # Get results for original physical models code
         shist = pmh.generate_strain_history(
             emax = emax_pm, edot = edot_pm, Nhist = nhist_pm)
         self.model_const_y.initialize(self.params, self.consts)
         self.model_const_y.initialize_state(T=298.)
-        results_const_y = \
-            self.model_const_y.compute_state_history(shist)
+        results_const_y = self.model_const_y.compute_state_history(shist)
         '''
 
         # Get results for vectorized physical models code
@@ -65,7 +66,7 @@ class TestConstantYieldStress(unittest.TestCase):
         shist_vec = pmv.generate_strain_history_new(
             emax = emax_vec, edot = edot_vec, nhist = nhist_pm)
         self.model_vec_const_y.initialize(self.params, self.consts)
-        self.model_vec_const_y.initialize_state(T=298.)
+        self.model_vec_const_y.initialize_state(T=np.array([298.]))
         results_vec_const_y = \
             self.model_vec_const_y.compute_state_history(shist_vec)
 
@@ -106,8 +107,7 @@ class TestConstantYieldStress(unittest.TestCase):
             emax = emax_pm, edot = edot_pm, Nhist = nhist_pm)
         self.model_const_y.initialize(self.params, self.consts)
         self.model_const_y.initialize_state(T=298.)
-        results_const_y = \
-            self.model_const_y.compute_state_history(shist)
+        results_const_y = self.model_const_y.compute_state_history(shist)
         '''
 
         # Get results for vectorized physical models code
@@ -116,7 +116,7 @@ class TestConstantYieldStress(unittest.TestCase):
         shist_vec = pmv.generate_strain_history_new(
             emax = emax_vec, edot = edot_vec, nhist = nhist_pm)
         self.model_vec_const_y.initialize(self.params, self.consts)
-        self.model_vec_const_y.initialize_state(T=298.)
+        self.model_vec_const_y.initialize_state(T=np.array([298.]))
         results_vec_const_y = \
             self.model_vec_const_y.compute_state_history(shist_vec)
 
@@ -156,8 +156,7 @@ class TestConstantYieldStress(unittest.TestCase):
             emax = emax_pm, edot = edot_pm, Nhist = nhist_pm)
         self.model_const_y.initialize(self.params, self.consts)
         self.model_const_y.initialize_state(T=298.)
-        results_const_y = \
-            self.model_const_y.compute_state_history(shist)
+        results_const_y = self.model_const_y.compute_state_history(shist)
         '''
 
         # Get results for vectorized physical models code
@@ -166,7 +165,7 @@ class TestConstantYieldStress(unittest.TestCase):
         shist_vec = pmv.generate_strain_history_new(
             emax = emax_vec, edot = edot_vec, nhist = nhist_pm)
         self.model_vec_const_y.initialize(self.params, self.consts)
-        self.model_vec_const_y.initialize_state(T=298.)
+        self.model_vec_const_y.initialize_state(T=np.array([298.]))
         results_vec_const_y = \
             self.model_vec_const_y.compute_state_history(shist_vec)
 
