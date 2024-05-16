@@ -30,40 +30,6 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
         Parameters are for OFHC copper.
         """
 
-        # self.params = {
-        #     # PTW
-        #     'theta' : 0.025,
-        #     'p'     : 2.,
-        #     's0'    : 0.0085,
-        #     'sInf'  : 0.00055,
-        #     'kappa' : 0.11,
-        #     'gamma' : 1.e-5,
-        #     'y0'    : 0.0011,
-        #     'yInf'  : 0.00010
-        # }
-                # self.consts = {
-        #     # PTW
-        #     'y1'     : 0.094,
-        #     'y2'     : 0.575,
-        #     'beta'   : 0.25,
-        #     'matomic': 63.546,
-        #     'chi'    : 1.0,
-        #     # Constant Spec. Heat
-        #     'Cv0'    : 0.383e-5,
-        #     # Constant Density
-        #     'rho0'   : 8.9375,
-        #     # Constant Melt Temp.
-        #     'Tmelt0' : 1625.,
-        #     # # Constant Shear Mod.
-        #     'G0'     : 0.4578,
-        #     # # Simple Shear Mod.
-        #     # 'G0'     : 0.50889, # Cold shear
-        #     # 'alpha'  : 0.21
-        #     # # SG Shear Mod.
-        #     # 'G0'     : 0.4578, # MBar, 300K Shear mod.
-        #     # 'sgB'    : 3.8e-4, # K^-1
-        # }
-
         self.params_vec = {
             # PTW
             'theta'  : np.array([0.025]),
@@ -99,11 +65,6 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
             # 'sgB'    : 3.8e-4, # K^-1
         }
 
-        '''
-        self.model_ptw_cg0Tm = pmh.MaterialModel(
-            flow_stress_model = pmh.PTW_Yield_Stress,
-        )
-        '''
         self.model_vec_ptw_cg0Tm = pmv.MaterialModel(
             flow_stress_model = pmv.PTW_Yield_Stress,
         )
@@ -121,15 +82,6 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
         emax_pm  = 1.0
         edot_pm  = 1.0e-7
         nhist_pm = 100
-
-        '''
-        # Get results for original physical models code
-        shist = pmh.generate_strain_history(
-            emax = emax_pm, edot = edot_pm, Nhist = nhist_pm)
-        self.model_ptw_cg0Tm.initialize(self.params, self.consts)
-        self.model_ptw_cg0Tm.initialize_state(T=298.)
-        results_ptw_cg0Tm = self.model_ptw_cg0Tm.compute_state_history(shist)
-        '''
 
         # Get results for vectorized physical models code
         emax_vec = np.array([emax_pm])
@@ -149,10 +101,6 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
             results_vec_ptw_cg0Tm[ 0][3][0],
             results_vec_ptw_cg0Tm[-1][3][0]
         ))
-        '''
-        self.assertEqual(results_ptw_cg0Tm[ 0][3], results_vec_ptw_cg0Tm[ 0][3])
-        self.assertEqual(results_ptw_cg0Tm[-1][3], results_vec_ptw_cg0Tm[-1][3])
-        '''
         self.assertEqual(
             results_vec_ptw_cg0Tm[ 0][3],
             results_vec_ptw_cg0Tm[-1][3]
@@ -172,15 +120,6 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
         edot_pm  = 1.0e-2
         nhist_pm = 100
 
-        '''
-        # Get results for original physical models code
-        shist = pmh.generate_strain_history(
-            emax = emax_pm, edot = edot_pm, Nhist = nhist_pm)
-        self.model_ptw_cg0Tm.initialize(self.params, self.consts)
-        self.model_ptw_cg0Tm.initialize_state(T=298.)
-        results_ptw_cg0Tm = self.model_ptw_cg0Tm.compute_state_history(shist)
-        '''
-
         # Get results for vectorized physical models code
         emax_vec = np.array([emax_pm])
         edot_vec = np.array([edot_pm])
@@ -199,16 +138,6 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
             results_vec_ptw_cg0Tm[ 0][3][0],
             results_vec_ptw_cg0Tm[-1][3][0]
         ))
-        '''
-        self.assertEqual(
-            results_ptw_cg0Tm    [ 0][3],
-            results_vec_ptw_cg0Tm[ 0][3]
-        )
-        np.testing.assert_allclose(
-            results_ptw_cg0Tm    [-1][3],
-            results_vec_ptw_cg0Tm[-1][3]
-        )
-        '''
         self.assertNotEqual(
             results_vec_ptw_cg0Tm[ 0][3],
             results_vec_ptw_cg0Tm[-1][3]
@@ -241,15 +170,6 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
         edot_pm  = 1e0
         nhist_pm = 100
 
-        '''
-        # Get results for original physical models code
-        shist = pmh.generate_strain_history(
-            emax = emax_pm, edot = edot_pm, Nhist = nhist_pm)
-        self.model_ptw_cg0Tm.initialize(self.params, self.consts)
-        self.model_ptw_cg0Tm.initialize_state(T=298.)
-        results_ptw_cg0Tm = self.model_ptw_cg0Tm.compute_state_history(shist)
-        '''
-
         # Get results for vectorized physical models code
         emax_vec = np.array([emax_pm])
         edot_vec = np.array([edot_pm])
@@ -271,12 +191,6 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
                   results_vec_ptw_cg0Tm[-1][1][0],
                   results_vec_ptw_cg0Tm[-1][2][0]*1e5
               ))
-        '''
-        np.testing.assert_allclose(
-            results_ptw_cg0Tm,
-            results_vec_ptw_cg0Tm[:,:,0]
-        )
-        '''
 
     # ------------------------
     # test_stress_midhighrate
@@ -306,15 +220,6 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
         edot_pm  = 1e-2
         nhist_pm = 100
 
-        '''
-        # Get results for original physical models code
-        shist = pmh.generate_strain_history(
-            emax = emax_pm, edot = edot_pm, Nhist = nhist_pm)
-        self.model_ptw_cg0Tm.initialize(self.params, self.consts)
-        self.model_ptw_cg0Tm.initialize_state(T=298.)
-        results_ptw_cg0Tm = self.model_ptw_cg0Tm.compute_state_history(shist)
-        '''
-
         # Get results for vectorized physical models code
         emax_vec = np.array([emax_pm])
         edot_vec = np.array([edot_pm])
@@ -336,12 +241,6 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
                   results_vec_ptw_cg0Tm[-1][1][0],
                   results_vec_ptw_cg0Tm[-1][2][0]*1e5
               ))
-        '''
-        np.testing.assert_allclose(
-            results_ptw_cg0Tm,
-            results_vec_ptw_cg0Tm[:,:,0]
-        )
-        '''
 
     # ------------------------
     # test_stress_midlowrate
@@ -371,15 +270,6 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
         edot_pm  = 1e-4
         nhist_pm = 100
 
-        '''
-        # Get results for original physical models code
-        shist = pmh.generate_strain_history(
-            emax = emax_pm, edot = edot_pm, Nhist = nhist_pm)
-        self.model_ptw_cg0Tm.initialize(self.params, self.consts)
-        self.model_ptw_cg0Tm.initialize_state(T=298.)
-        results_ptw_cg0Tm = self.model_ptw_cg0Tm.compute_state_history(shist)
-        '''
-
         # Get results for vectorized physical models code
         emax_vec = np.array([emax_pm])
         edot_vec = np.array([edot_pm])
@@ -401,12 +291,6 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
                   results_vec_ptw_cg0Tm[-1][1][0],
                   results_vec_ptw_cg0Tm[-1][2][0]*1e5
               ))
-        '''
-        np.testing.assert_allclose(
-            results_ptw_cg0Tm,
-            results_vec_ptw_cg0Tm[:,:,0]
-        )
-        '''
 
     # ------------------------
     # test_stress_lowrate
@@ -435,15 +319,6 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
         edot_pm  = 1e-6
         nhist_pm = 100
 
-        '''
-        # Get results for original physical models code
-        shist = pmh.generate_strain_history(
-            emax = emax_pm, edot = edot_pm, Nhist = nhist_pm)
-        self.model_ptw_cg0Tm.initialize(self.params, self.consts)
-        self.model_ptw_cg0Tm.initialize_state(T=298.)
-        results_ptw_cg0Tm = self.model_ptw_cg0Tm.compute_state_history(shist)
-        '''
-
         # Get results for vectorized physical models code
         emax_vec = np.array([emax_pm])
         edot_vec = np.array([edot_pm])
@@ -465,12 +340,6 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
                   results_vec_ptw_cg0Tm[-1][1][0],
                   results_vec_ptw_cg0Tm[-1][2][0]*1e5
               ))
-        '''
-        np.testing.assert_allclose(
-            results_ptw_cg0Tm,
-            results_vec_ptw_cg0Tm[:,:,0]
-        )
-        '''
 
 
 # ------------------------------------------------------------------------------
@@ -567,12 +436,6 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
             # 'sgB'    : 3.8e-4, # K^-1
         }
 
-        '''
-        self.model_ptw_ss_cTm = pmh.MaterialModel(
-            flow_stress_model = pmh.PTW_Yield_Stress,
-            shear_modulus_model = pmh.Simple_Shear_Modulus,
-        )
-        '''
         self.model_vec_ptw_ss_cTm = pmv.MaterialModel(
             flow_stress_model = pmv.PTW_Yield_Stress,
             shear_modulus_model = pmv.Simple_Shear_Modulus,
@@ -592,15 +455,6 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
         edot_pm  = 1.0e-7
         nhist_pm = 100
 
-        '''
-        # Get results for original physical models code
-        shist = pmh.generate_strain_history(
-            emax = emax_pm, edot = edot_pm, Nhist = nhist_pm)
-        self.model_ptw_ss_cTm.initialize(self.params, self.consts)
-        self.model_ptw_ss_cTm.initialize_state(T=298.)
-        results_ptw_ss_cTm = self.model_ptw_ss_cTm.compute_state_history(shist)
-        '''
-
         # Get results for vectorized physical models code
         emax_vec = np.array([emax_pm])
         edot_vec = np.array([edot_pm])
@@ -619,16 +473,6 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
             results_vec_ptw_ss_cTm[ 0][3][0],
             results_vec_ptw_ss_cTm[-1][3][0]
         ))
-        '''
-        self.assertEqual(
-            results_ptw_ss_cTm    [ 0][3],
-            results_vec_ptw_ss_cTm[ 0][3]
-        )
-        self.assertEqual(
-            results_ptw_ss_cTm    [-1][3],
-            results_vec_ptw_ss_cTm[-1][3]
-        )
-        '''
         self.assertEqual(
             results_vec_ptw_ss_cTm[ 0][3],
             results_vec_ptw_ss_cTm[-1][3]
@@ -648,15 +492,6 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
         edot_pm  = 1.0e-2
         nhist_pm = 100
 
-        '''
-        # Get results for original physical models code
-        shist = pmh.generate_strain_history(
-            emax = emax_pm, edot = edot_pm, Nhist = nhist_pm)
-        self.model_ptw_ss_cTm.initialize(self.params, self.consts)
-        self.model_ptw_ss_cTm.initialize_state(T=298.)
-        results_ptw_ss_cTm = self.model_ptw_ss_cTm.compute_state_history(shist)
-        '''
-
         # Get results for vectorized physical models code
         emax_vec = np.array([emax_pm])
         edot_vec = np.array([edot_pm])
@@ -675,16 +510,6 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
             results_vec_ptw_ss_cTm[ 0][3][0],
             results_vec_ptw_ss_cTm[-1][3][0]
         ))
-        '''
-        self.assertEqual(
-            results_ptw_ss_cTm    [ 0][3],
-            results_vec_ptw_ss_cTm[ 0][3]
-        )
-        self.assertEqual(
-            results_ptw_ss_cTm    [-1][3],
-            results_vec_ptw_ss_cTm[-1][3]
-        )
-        '''
         self.assertNotEqual(
             results_vec_ptw_ss_cTm[ 0][3],
             results_vec_ptw_ss_cTm[-1][3]
@@ -718,15 +543,6 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
         edot_pm  = 1e0
         nhist_pm = 100
 
-        '''
-        # Get results for original physical models code
-        shist = pmh.generate_strain_history(
-            emax = emax_pm, edot = edot_pm, Nhist = nhist_pm)
-        self.model_ptw_ss_cTm.initialize(self.params, self.consts)
-        self.model_ptw_ss_cTm.initialize_state(T=298.)
-        results_ptw_ss_cTm = self.model_ptw_ss_cTm.compute_state_history(shist)
-        '''
-
         # Get results for vectorized physical models code
         emax_vec = np.array([emax_pm])
         edot_vec = np.array([edot_pm])
@@ -748,12 +564,6 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
                   results_vec_ptw_ss_cTm[-1][1][0],
                   results_vec_ptw_ss_cTm[-1][2][0]*1e5
               ))
-        '''
-        np.testing.assert_allclose(
-            results_ptw_ss_cTm,
-            results_vec_ptw_ss_cTm[:,:,0]
-        )
-        '''
 
     # ------------------------
     # test_stress_midhighrate
@@ -783,15 +593,6 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
         edot_pm  = 1e-2
         nhist_pm = 100
 
-        '''
-        # Get results for original physical models code
-        shist = pmh.generate_strain_history(
-            emax = emax_pm, edot = edot_pm, Nhist = nhist_pm)
-        self.model_ptw_ss_cTm.initialize(self.params, self.consts)
-        self.model_ptw_ss_cTm.initialize_state(T=298.)
-        results_ptw_ss_cTm = self.model_ptw_ss_cTm.compute_state_history(shist)
-        '''
-
         # Get results for vectorized physical models code
         emax_vec = np.array([emax_pm])
         edot_vec = np.array([edot_pm])
@@ -813,12 +614,6 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
                   results_vec_ptw_ss_cTm[-1][1][0],
                   results_vec_ptw_ss_cTm[-1][2][0]*1e5
               ))
-        '''
-        np.testing.assert_allclose(
-            results_ptw_ss_cTm,
-            results_vec_ptw_ss_cTm[:,:,0]
-        )
-        '''
 
     # ------------------------
     # test_stress_midlowrate
@@ -848,15 +643,6 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
         edot_pm  = 1e-4
         nhist_pm = 100
 
-        '''
-        # Get results for original physical models code
-        shist = pmh.generate_strain_history(
-            emax = emax_pm, edot = edot_pm, Nhist = nhist_pm)
-        self.model_ptw_ss_cTm.initialize(self.params, self.consts)
-        self.model_ptw_ss_cTm.initialize_state(T=298.)
-        results_ptw_ss_cTm = self.model_ptw_ss_cTm.compute_state_history(shist)
-        '''
-
         # Get results for vectorized physical models code
         emax_vec = np.array([emax_pm])
         edot_vec = np.array([edot_pm])
@@ -878,10 +664,6 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
                   results_vec_ptw_ss_cTm[-1][1][0],
                   results_vec_ptw_ss_cTm[-1][2][0]*1e5
               ))
-        np.testing.assert_allclose(
-            results_ptw_ss_cTm,
-            results_vec_ptw_ss_cTm[:,:,0]
-        )
 
     # ------------------------
     # test_stress_lowrate
@@ -911,15 +693,6 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
         edot_pm  = 1e-6
         nhist_pm = 100
 
-        '''
-        # Get results for original physical models code
-        shist = pmh.generate_strain_history(
-            emax = emax_pm, edot = edot_pm, Nhist = nhist_pm)
-        self.model_ptw_ss_cTm.initialize(self.params, self.consts)
-        self.model_ptw_ss_cTm.initialize_state(T=298.)
-        results_ptw_ss_cTm = self.model_ptw_ss_cTm.compute_state_history(shist)
-        '''
-
         # Get results for vectorized physical models code
         emax_vec = np.array([emax_pm])
         edot_vec = np.array([edot_pm])
@@ -941,12 +714,6 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
                   results_vec_ptw_ss_cTm[-1][1][0],
                   results_vec_ptw_ss_cTm[-1][2][0]*1e5
               ))
-        '''
-        np.testing.assert_allclose(
-            results_ptw_ss_cTm,
-            results_vec_ptw_ss_cTm[:,:,0]
-        )
-        '''
 
 
 # ------------------------------------------------------------------------------
@@ -1043,12 +810,6 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
             'sgB'    : 3.8e-4, # K^-1
         }
 
-        '''
-        self.model_ptw_sg_cTm = pmh.MaterialModel(
-            flow_stress_model = pmh.PTW_Yield_Stress,
-            shear_modulus_model = pmh.Stein_Shear_Modulus,
-        )
-        '''
         self.model_vec_ptw_sg_cTm = pmv.MaterialModel(
             flow_stress_model = pmv.PTW_Yield_Stress,
             shear_modulus_model = pmv.Stein_Shear_Modulus,
@@ -1068,15 +829,6 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
         edot_pm  = 1.0e-7
         nhist_pm = 100
 
-        '''
-        # Get results for original physical models code
-        shist = pmh.generate_strain_history(
-            emax = emax_pm, edot = edot_pm, Nhist = nhist_pm)
-        self.model_ptw_sg_cTm.initialize(self.params, self.consts)
-        self.model_ptw_sg_cTm.initialize_state(T=298.)
-        results_ptw_sg_cTm = self.model_ptw_sg_cTm.compute_state_history(shist)
-        '''
-
         # Get results for vectorized physical models code
         emax_vec = np.array([emax_pm])
         edot_vec = np.array([edot_pm])
@@ -1095,16 +847,6 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
             results_vec_ptw_sg_cTm[ 0][3][0],
             results_vec_ptw_sg_cTm[-1][3][0]
         ))
-        '''
-        self.assertEqual(
-            results_ptw_sg_cTm    [ 0][3],
-            results_vec_ptw_sg_cTm[ 0][3]
-        )
-        self.assertEqual(
-            results_ptw_sg_cTm    [-1][3],
-            results_vec_ptw_sg_cTm[-1][3]
-        )
-        '''
         self.assertEqual(
             results_vec_ptw_sg_cTm[ 0][3],
             results_vec_ptw_sg_cTm[-1][3]
@@ -1124,15 +866,6 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
         edot_pm  = 1.0e-2
         nhist_pm = 100
 
-        '''
-        # Get results for original physical models code
-        shist = pmh.generate_strain_history(
-            emax = emax_pm, edot = edot_pm, Nhist = nhist_pm)
-        self.model_ptw_sg_cTm.initialize(self.params, self.consts)
-        self.model_ptw_sg_cTm.initialize_state(T=298.)
-        results_ptw_sg_cTm = self.model_ptw_sg_cTm.compute_state_history(shist)
-        '''
-
         # Get results for vectorized physical models code
         emax_vec = np.array([emax_pm])
         edot_vec = np.array([edot_pm])
@@ -1151,16 +884,6 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
             results_vec_ptw_sg_cTm [0][3][0],
             results_vec_ptw_sg_cTm[-1][3][0]
         ))
-        '''
-        self.assertEqual(
-            results_ptw_sg_cTm    [ 0][3],
-            results_vec_ptw_sg_cTm[ 0][3]
-        )
-        self.assertEqual(
-            results_ptw_sg_cTm    [-1][3],
-            results_vec_ptw_sg_cTm[-1][3]
-        )
-        '''
         self.assertNotEqual(
             results_vec_ptw_sg_cTm[ 0][3],
             results_vec_ptw_sg_cTm[-1][3]
@@ -1194,15 +917,6 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
         edot_pm  = 1e0
         nhist_pm = 100
 
-        '''
-        # Get results for original physical models code
-        shist = pmh.generate_strain_history(
-            emax = emax_pm, edot = edot_pm, Nhist = nhist_pm)
-        self.model_ptw_sg_cTm.initialize(self.params, self.consts)
-        self.model_ptw_sg_cTm.initialize_state(T=298.)
-        results_ptw_sg_cTm = self.model_ptw_sg_cTm.compute_state_history(shist)
-        '''
-
         # Get results for vectorized physical models code
         emax_vec = np.array([emax_pm])
         edot_vec = np.array([edot_pm])
@@ -1224,12 +938,6 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
                   results_vec_ptw_sg_cTm[-1][1][0],
                   results_vec_ptw_sg_cTm[-1][2][0]*1e5
               ))
-        '''
-        np.testing.assert_allclose(
-            results_ptw_sg_cTm,
-            results_vec_ptw_sg_cTm[:,:,0]
-        )
-        '''
 
     # ------------------------
     # test_stress_midhighrate
@@ -1259,15 +967,6 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
         edot_pm  = 1e-2
         nhist_pm = 100
 
-        '''
-        # Get results for original physical models code
-        shist = pmh.generate_strain_history(
-            emax = emax_pm, edot = edot_pm, Nhist = nhist_pm)
-        self.model_ptw_sg_cTm.initialize(self.params, self.consts)
-        self.model_ptw_sg_cTm.initialize_state(T=298.)
-        results_ptw_sg_cTm = self.model_ptw_sg_cTm.compute_state_history(shist)
-        '''
-
         # Get results for vectorized physical models code
         emax_vec = np.array([emax_pm])
         edot_vec = np.array([edot_pm])
@@ -1289,12 +988,6 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
                   results_vec_ptw_sg_cTm[-1][1][0],
                   results_vec_ptw_sg_cTm[-1][2][0]*1e5
               ))
-        '''
-        np.testing.assert_allclose(
-            results_ptw_sg_cTm,
-            results_vec_ptw_sg_cTm[:,:,0]
-        )
-        '''
 
     # ------------------------
     # test_stress_midlowrate
@@ -1324,15 +1017,6 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
         edot_pm  = 1e-4
         nhist_pm = 100
 
-        '''
-        # Get results for original physical models code
-        shist = pmh.generate_strain_history(
-            emax = emax_pm, edot = edot_pm, Nhist = nhist_pm)
-        self.model_ptw_sg_cTm.initialize(self.params, self.consts)
-        self.model_ptw_sg_cTm.initialize_state(T=298.)
-        results_ptw_sg_cTm = self.model_ptw_sg_cTm.compute_state_history(shist)
-        '''
-
         # Get results for vectorized physical models code
         emax_vec = np.array([emax_pm])
         edot_vec = np.array([edot_pm])
@@ -1354,12 +1038,6 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
                   results_vec_ptw_sg_cTm[-1][1][0],
                   results_vec_ptw_sg_cTm[-1][2][0]*1e5
               ))
-        '''
-        np.testing.assert_allclose(
-            results_ptw_sg_cTm,
-            results_vec_ptw_sg_cTm[:,:,0]
-        )
-        '''
 
     # ------------------------
     # test_stress_lowrate
@@ -1389,15 +1067,6 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
         edot_pm  = 1e-6
         nhist_pm = 100
 
-        '''
-        # Get results for original physical models code
-        shist = pmh.generate_strain_history(
-            emax = emax_pm, edot = edot_pm, Nhist = nhist_pm)
-        self.model_ptw_sg_cTm.initialize(self.params, self.consts)
-        self.model_ptw_sg_cTm.initialize_state(T=298.)
-        results_ptw_sg_cTm = self.model_ptw_sg_cTm.compute_state_history(shist)
-        '''
-
         # Get results for vectorized physical models code
         emax_vec = np.array([emax_pm])
         edot_vec = np.array([edot_pm])
@@ -1419,12 +1088,6 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
                   results_vec_ptw_sg_cTm[-1][1][0],
                   results_vec_ptw_sg_cTm[-1][2][0]*1e5
               ))
-        '''
-        np.testing.assert_allclose(
-            results_ptw_sg_cTm,
-            results_vec_ptw_sg_cTm[:,:,0]
-        )
-        '''
 
 
 # ------------------------------------------------------------------------------
