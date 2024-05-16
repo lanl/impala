@@ -30,53 +30,52 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
         Parameters are for OFHC copper.
         """
 
-        self.params = {
-            # PTW
-            'theta' : 0.025,
-            'p'     : 2.,
-            's0'    : 0.0085,
-            'sInf'  : 0.00055,
-            'kappa' : 0.11,
-            'gamma' : 1.e-5,
-            'y0'    : 0.0001,
-            'yInf'  : 0.0001
-        }
+        # self.params = {
+        #     # PTW
+        #     'theta' : 0.025,
+        #     'p'     : 2.,
+        #     's0'    : 0.0085,
+        #     'sInf'  : 0.00055,
+        #     'kappa' : 0.11,
+        #     'gamma' : 1.e-5,
+        #     'y0'    : 0.0011,
+        #     'yInf'  : 0.00010
+        # }
+                # self.consts = {
+        #     # PTW
+        #     'y1'     : 0.094,
+        #     'y2'     : 0.575,
+        #     'beta'   : 0.25,
+        #     'matomic': 63.546,
+        #     'chi'    : 1.0,
+        #     # Constant Spec. Heat
+        #     'Cv0'    : 0.383e-5,
+        #     # Constant Density
+        #     'rho0'   : 8.9375,
+        #     # Constant Melt Temp.
+        #     'Tmelt0' : 1625.,
+        #     # # Constant Shear Mod.
+        #     'G0'     : 0.4578,
+        #     # # Simple Shear Mod.
+        #     # 'G0'     : 0.50889, # Cold shear
+        #     # 'alpha'  : 0.21
+        #     # # SG Shear Mod.
+        #     # 'G0'     : 0.4578, # MBar, 300K Shear mod.
+        #     # 'sgB'    : 3.8e-4, # K^-1
+        # }
 
         self.params_vec = {
             # PTW
-            'theta'  : 0.025,
-            'p'      : 2.,
-            's0'     : 0.0085,
-            'sInf'   : 0.00055,
-            'kappa'  : 0.11,
-            'lgamma' : np.log(1e-5),
-            'y0'     : 0.0001,
-            'yInf'   : 0.0001,
-            'y1'     : 0.094,
-            'y2'     : 0.575,
-        }
-
-        self.consts = {
-            # PTW
-            'y1'     : 0.094,
-            'y2'     : 0.575,
-            'beta'   : 0.25,
-            'matomic': 63.546,
-            'chi'    : 1.0,
-            # Constant Spec. Heat
-            'Cv0'    : 0.383e-5,
-            # Constant Density
-            'rho0'   : 8.9375,
-            # Constant Melt Temp.
-            'Tmelt0' : 1625.,
-            # # Constant Shear Mod.
-            'G0'     : 0.4578,
-            # # Simple Shear Mod.
-            # 'G0'     : 0.50889, # Cold shear
-            # 'alpha'  : 0.21
-            # # SG Shear Mod.
-            # 'G0'     : 0.4578, # MBar, 300K Shear mod.
-            # 'sgB'    : 3.8e-4, # K^-1
+            'theta'  : np.array([0.025]),
+            'p'      : np.array([2.]),
+            's0'     : np.array([0.0085]),
+            'sInf'   : np.array([0.00055]),
+            'kappa'  : np.array([0.11]),
+            'lgamma' : np.array([np.log(1e-5)]),
+            'y0'     : np.array([0.00010]),
+            'yInf'   : np.array([0.00009]),
+            'y1'     : np.array([0.094]),
+            'y2'     : np.array([0.575]),
         }
 
         self.consts_vec = {
@@ -512,16 +511,16 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
 
         self.params_vec = {
             # PTW
-            'theta'  : 0.025,
-            'p'      : 2.,
-            's0'     : 0.0085,
-            'sInf'   : 0.00055,
-            'kappa'  : 0.11,
-            'lgamma' : np.log(1e-5),
-            'y0'     : 0.0001,
-            'yInf'   : 0.0001,
-            'y1'     : 0.094,
-            'y2'     : 0.575,
+            'theta'  : np.array([0.025]),
+            'p'      : np.array([2.]),
+            's0'     : np.array([0.0085]),
+            'sInf'   : np.array([0.00055]),
+            'kappa'  : np.array([0.11]),
+            'lgamma' : np.array([np.log(1e-5)]),
+            'y0'     : np.array([0.00010]),
+            'yInf'   : np.array([0.00009]),
+            'y1'     : np.array([0.094]),
+            'y2'     : np.array([0.575]),
         }
 
         self.consts = {
@@ -988,16 +987,16 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
 
         self.params_vec = {
             # PTW
-            'theta'  : 0.025,
-            'p'      : 2.,
-            's0'     : 0.0085,
-            'sInf'   : 0.00055,
-            'kappa'  : 0.11,
-            'lgamma' : np.log(1e-5),
-            'y0'     : 0.0001,
-            'yInf'   : 0.0001,
-            'y1'     : 0.094,
-            'y2'     : 0.575,
+            'theta'  : np.array([0.025]),
+            'p'      : np.array([2.]),
+            's0'     : np.array([0.0085]),
+            'sInf'   : np.array([0.00055]),
+            'kappa'  : np.array([0.11]),
+            'lgamma' : np.array([np.log(1e-5)]),
+            'y0'     : np.array([0.00010]),
+            'yInf'   : np.array([0.00009]),
+            'y1'     : np.array([0.094]),
+            'y2'     : np.array([0.575]),
         }
 
         self.consts = {
