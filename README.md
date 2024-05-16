@@ -1,5 +1,5 @@
 # impala
-[![CI Status][ci-status-img]](https://github.com/luiarthur/impala/actions)
+[![CI Status][ci-status-img]](https://github.com/lanl/impala/actions)
 
 Python tools for modular Bayesian model calibration.  Posterior exploration
 includes tempering and adaptive MCMC.
