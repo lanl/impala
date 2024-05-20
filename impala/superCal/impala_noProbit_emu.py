@@ -121,8 +121,8 @@ class CalibSetup:
             raise ValueError('len(sd_est.shape) should be 1')
         if len(s2_df.shape) != 1:
             raise ValueError('len(s2_df.shape) should be 1')
-        if s2_ind.dtype != 'int64':
-            raise ValueError('s2_ind.dtype should be int64')
+        if s2_ind.dtype != np.int_:
+            raise ValueError(f's2_ind.dtype should be {np.int_}')
         if len(yobs) != len(s2_ind):
             raise ValueError('len(yobs) and len(s2_ind) should be the same')
         self.ys.append(np.array(yobs))
