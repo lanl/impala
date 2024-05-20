@@ -1,16 +1,11 @@
 name: CI
 
-on:
-  # Run CI on pushes to any branch, but do not run CI on tags.
-  push:
-    branches:
-      - '**'
-  # Run CI on all PRs.
-  pull_request:
+on: [push]
 
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+    if: ${{ !contains(github.event.head_commit.message, 'Merge pull request') }}
     continue-on-error: ${{ matrix.python-version == 3.6 || matrix.os == 'windows-latest' }}
     strategy:
       matrix:
