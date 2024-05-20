@@ -51,7 +51,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Fetch all git tags
-        run: git fetch --depth=1 origin +refs/tags/*:refs/tags/*
+        run: git fetch --tags
       - name: Make tag if updated
         run: |
           python -m pip install --upgrade pip
