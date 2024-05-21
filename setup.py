@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name='impala',
-    version='0.2.6',
+    version='0.2.7',
     description='Bayesian model calibration',
     url='http://www.github.com/lanl/impala',
     author='Devin Francom, others',
