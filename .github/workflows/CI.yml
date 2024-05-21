@@ -42,6 +42,7 @@ jobs:
     # (i.e. skipped due to a PR merge; in that case tests should already have
     # passed).
     if: |
+      always() &&
       github.ref == 'refs/heads/master' &&
       (needs.RunTests.result == 'success' || needs.RunTests.result == 'skipped')
 
