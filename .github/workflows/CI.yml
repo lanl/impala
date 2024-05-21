@@ -43,7 +43,7 @@ jobs:
     # passed).
     if: |
       github.ref == 'refs/heads/master' &&
-      (needs.RunTest.result == 'success' || needs.RunTest.result == 'skipped')
+      (needs.RunTests.result == 'success' || needs.RunTests.result == 'skipped')
 
     steps:
       - uses: actions/checkout@v3
