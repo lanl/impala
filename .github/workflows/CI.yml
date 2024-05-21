@@ -5,7 +5,12 @@ on: [push]
 jobs:
   RunTests:
     runs-on: ${{ matrix.os }}
-    if: ${{ !contains(github.event.head_commit.message, 'Merge pull request') }}
+
+    # Don't run tests when merging PRs, they would have been run already and tests
+    # should have passed. The following checks hat the committer's email
+    # contains noreply; if it does, it's probably from github actions.
+    if: ${{ !contains(github.event.head_commit.committer.email, 'noreply') }}
+
     continue-on-error: ${{ matrix.python-version == 3.6 || matrix.os == 'windows-latest' }}
     strategy:
       matrix:
