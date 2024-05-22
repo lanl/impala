@@ -1,19 +1,20 @@
 name: CI
 
-on: [push]
+on: push
 
 jobs:
   RunTests:
     runs-on: ${{ matrix.os }}
 
     # Don't run tests when merging PRs, they would have been run already and tests
-    # should have passed. The following checks hat the committer's username is web-flow;
-    # if it is, it's probably from github actions.
+    # should have passed. The following checks that the committer's and author's username differ;
+    # if so, the event was probably triggered by github actions.
     # NOTE: Directly editing code on GitHub on the main branch pybasses tests, and is
     # discouraged. If editing code on GitHub, please submit a PR by creating a temporary branch.
     if: |
-      github.ref != 'refs/heads/master' ||
-      !contains(github.event.head_commit.committer.username, 'web-flow')
+      github.ref_name != github.event.repository.default_branch ||
+      github.event.head_commit.committer.username != 
+      github.event.head_commit.author.username
 
     continue-on-error: ${{ matrix.python-version == 3.6 || matrix.os == 'windows-latest' }}
     strategy:
