@@ -19,6 +19,7 @@ Add as many lines as needed.
 suite = unittest.TestSuite()
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Add as many tests as desired. Point to test module and test case.
+assert False
 suite.addTest(unittest.makeSuite(pmv_cy.TestConstantYieldStress))
 suite.addTest(unittest.makeSuite(pmv_yjc.TestJCYieldStress))
 suite.addTest(unittest.makeSuite(pmv_ptw.TestPTWYieldStress_Constg0Tm))

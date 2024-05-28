@@ -1,0 +1,8 @@
+unit_tests:
+  image: python:3.6
+  script:
+    - python --version
+    - pip install numpy
+    - pip install scipy
+    - cd impala/physics
+    - python run_tests_physmod_vec_compare.py
