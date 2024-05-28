@@ -38,6 +38,6 @@ jobs:
         # flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
-        cd ../../impala/physics
+        cd impala/physics
         python run_tests_physmod_vec_compare.py
         # pytest
