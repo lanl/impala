@@ -11,6 +11,7 @@ from numpy.linalg import cholesky, slogdet
 from itertools import repeat
 import multiprocessing as mp
 from collections import namedtuple
+from impala.superCal.impala_noProbit_emu import *
 
 #import pbar
 #np.seterr(under='ignore')
