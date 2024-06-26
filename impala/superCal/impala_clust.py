@@ -10,9 +10,9 @@ from scipy.stats import invwishart
 from numpy.linalg import cholesky, slogdet
 from itertools import repeat
 import multiprocessing as mp
-import impala_noProbit_emu as impa
 from collections import namedtuple
-import pbar
+
+#import pbar
 #np.seterr(under='ignore')
 
 # no probit tranform for hierarchical and DP versions
@@ -190,7 +190,7 @@ class AMcov_clust:
             # calculate experiment-specific mu and cov
             for i in range(self.nexp):
                 self.mu_hist[i][:]  = x[i][:m].mean(axis = 0)
-                self.cov_hist[i][:] = impa.cov_4d_pcm(x[i][:m], self.mu_hist[i])
+                self.cov_hist[i][:] = cov_4d_pcm(x[i][:m], self.mu_hist[i])
 
             # reweight experiment-specific to get cluster-specific mu and cov
             self.cluster_covariance_update(m, curr_delta)
@@ -230,8 +230,8 @@ class AMcov_clust:
                 self.count_100 *= 0
 
     def gen_cand(self, x, m): # one sample per cluster
-        #x_cand = [impa.chol_sample_1per(x[i][m-1], self.S) for i in range(self.nexp)]
-        x_cand = impa.chol_sample_1per(x[m-1], self.S)
+        #x_cand = [chol_sample_1per(x[i][m-1], self.S) for i in range(self.nexp)]
+        x_cand = chol_sample_1per(x[m-1], self.S)
         return x_cand
 
 
@@ -274,18 +274,18 @@ def calibClust(setup, parallel = False):
 
     ## Parameter Declaration
     theta0 = np.empty([setup.nmcmc, setup.ntemps, setup.p])
-    #theta0[0] = impa.chol_sample_1per_constraints(
+    #theta0[0] = chol_sample_1per_constraints(
     #        np.zeros((setup.ntemps, setup.p)), np.array([np.eye(setup.p)] * setup.ntemps),
     #        setup.checkConstraints, setup.bounds_mat, setup.bounds.keys(), setup.bounds,
     #        )
-    theta0_start = impa.initfunc_unif(size=[setup.ntemps, setup.p])
+    theta0_start = initfunc_unif(size=[setup.ntemps, setup.p])
     good = setup.checkConstraints(
-        impa.tran_unif(theta0_start, setup.bounds_mat, setup.bounds.keys()), setup.bounds,
+        tran_unif(theta0_start, setup.bounds_mat, setup.bounds.keys()), setup.bounds,
         )
     while np.any(~good):
-        theta0_start[np.where(~good)] = impa.initfunc_unif(size = [(~good).sum(), setup.p])
+        theta0_start[np.where(~good)] = initfunc_unif(size = [(~good).sum(), setup.p])
         good[np.where(~good)] = setup.checkConstraints(
-            impa.tran_unif(theta0_start[np.where(~good)], setup.bounds_mat, setup.bounds.keys()),
+            tran_unif(theta0_start[np.where(~good)], setup.bounds_mat, setup.bounds.keys()),
             setup.bounds,
             )
     theta0[0] = theta0_start
@@ -310,7 +310,7 @@ def calibClust(setup, parallel = False):
     theta_long_shape = (setup.ntemps * setup.nclustmax, setup.p)
     theta_wide_shape = (setup.ntemps, setup.nclustmax, setup.p)
     theta      = np.empty((setup.nmcmc, setup.ntemps, setup.nclustmax, setup.p))
-    theta[0]   = impa.chol_sample_nper_constraints(
+    theta[0]   = chol_sample_nper_constraints(
            theta0[0], Sigma0[0], setup.nclustmax, setup.checkConstraints,
            setup.bounds_mat, setup.bounds.keys(), setup.bounds,
            )
@@ -340,12 +340,14 @@ def calibClust(setup, parallel = False):
         ]
 
     ## Initialize *Current* Variables
-    pred_curr       = [None] * setup.nexp # [i] x [ntemps, ylens[i]]
-    llik_curr        = [None] * setup.nexp # [i], ntheta[i] x ntemps ### was [i] x [ntemps, ns2[i]]
-    llik_cand  = [None] * setup.nexp # [i], ntheta[i] x ntemps
+    
+    #LAUREN COMMENTED OUT LAST THREE ELEMENTS
+    #pred_curr       = [None] * setup.nexp # [i] x [ntemps, ylens[i]]
+    #llik_curr        = [None] * setup.nexp # [i], ntheta[i] x ntemps ### was [i] x [ntemps, ns2[i]]
+    #llik_cand  = [None] * setup.nexp # [i], ntheta[i] x ntemps
     #dev_sq          = [None] * setup.nexp # [i] x [ntemps, ns2[i]]
-    pred_cand_delta = [None] * setup.nexp # [i] x [ntemps, nclustmax, ylens[i]]
-    llik_cand_delta  = [None] * setup.nexp # [i] x [ntemps, nclustmax, ns2[i]]
+    pred_curr_delta = [None] * setup.nexp # [i] x [ntemps, nclustmax, ylens[i]]
+    llik_curr_delta  = [None] * setup.nexp # [i] x [ntemps, nclustmax, ns2[i]]
     pred_cand_theta = [None] * setup.nexp # [i] x [ntemps, ylens[i]]
     pred_curr_theta = [None] * setup.nexp # [i] x [ntemps, ylens[i]]
     llik_cand_theta  = [None] * setup.nexp # [i] x [ntemps, ns2[i]]
@@ -354,49 +356,33 @@ def calibClust(setup, parallel = False):
     llik_curr_theta_ = np.zeros((setup.ntemps, setup.nclustmax)) #
     marg_lik_cov_curr = [None] * setup.nexp # does not need to get summed over experiments (should be one for each experiment, regardless of cluster)
     for i in range(setup.nexp):
-        pred_curr[i] = setup.models[i].eval(
-            impa.tran_unif(theta_hist[i][0].reshape(-1, setup.p), 
+        ### Initialize predictions for theta_i's
+        pred_curr_theta[i] = setup.models[i].eval(
+            tran_unif(theta_hist[i][0].reshape(-1, setup.p),  #0 for first iteration
                     setup.bounds_mat, setup.bounds.keys()), 
             False,
             )
-
-        pred_cand_theta[i] = setup.models[i].eval(
-            impa.tran_unif(theta_hist[i][0].reshape(-1,setup.p), setup.bounds_mat, setup.bounds.keys()), False,
-            )
-        pred_curr_theta[i] = pred_cand_theta[i].copy()
-        #sse_cand_theta[i] = (pred_cand_theta[i] @ s2_ind_mat[i]) / s2[i][0]
-        #sse_curr_theta[i] = sse_cand_theta[i].copy()
-
+        pred_cand_theta[i] = pred_curr_theta[i].copy()
         marg_lik_cov_curr[i] = [None] * setup.ntemps
-        llik_curr[i] = np.empty([setup.ntemps, setup.ntheta[i]])
         llik_curr_theta[i] = np.empty([setup.ntemps, setup.ntheta[i]])
         for t in range(setup.ntemps):
             marg_lik_cov_curr[i][t] = [None] * setup.ntheta[i]
             s2_stretched = log_s2[i][0][t,setup.theta_ind[i]]
             for j in range(setup.ntheta[i]):
                 marg_lik_cov_curr[i][t][j] = setup.models[i].lik_cov_inv(np.exp(s2_stretched[s2_which_mat[i][j]]))
-                llik_curr[i][t][j] = setup.models[i].llik(setup.ys[i][theta_which_mat[i][j]], pred_curr[i][t][theta_which_mat[i][j]], marg_lik_cov_curr[i][t][j]) 
-                llik_curr_theta[i][t][j] = setup.models[i].llik(setup.ys[i][theta_which_mat[i][j]], pred_curr[i][t][theta_which_mat[i][j]], marg_lik_cov_curr[i][t][j]) 
-        llik_cand[i]  = llik_curr[i].copy()
+                llik_curr_theta[i][t][j] = setup.models[i].llik(setup.ys[i][theta_which_mat[i][j]], pred_curr_theta[i][t][theta_which_mat[i][j]], marg_lik_cov_curr[i][t][j]) 
         llik_cand_theta[i] = llik_curr_theta[i].copy()
 
-
-        #dev_sq[i] = ((pred_curr[i] - setup.ys[i])**2 @ s2_ind_mat[i]) / s2[i][0]
-        #llik_curr[i]  = setup.models[i].llik(setup.ys[i][setup.theta_ind[i]==j], )#dev_sq[i] / s2[i][0]
-        pred_cand_delta[i] = setup.models[i].eval(
-            impa.tran_unif(theta[0].reshape(-1, setup.p), setup.bounds_mat, setup.bounds.keys()), True,
+        ### Initialize predictions for clusters
+        pred_curr_delta[i] = setup.models[i].eval(
+            tran_unif(theta[0].reshape(-1, setup.p), setup.bounds_mat, setup.bounds.keys()), True,
             ).reshape(setup.ntemps, setup.nclustmax, setup.y_lens[i])
-        #sse_cand_delta[i] = (
-        #    (pred_cand_delta[i] @ s2_ind_mat[i]).reshape(setup.ntemps, setup.nclustmax, setup.ns2[i])
-        #    / s2[i][0].reshape(setup.ntemps, 1, setup.ns2[i])
-        #    )
-        llik_cand_delta[i] = np.empty([setup.ntemps, setup.nclustmax, setup.ntheta[i]])
+        llik_curr_delta[i] = np.empty([setup.ntemps, setup.nclustmax, setup.ntheta[i]])
         for t in range(setup.ntemps):
             s2_stretched = log_s2[i][0][t,setup.theta_ind[i]]
             for j in range(setup.ntheta[i]):
                 for k in range(setup.nclustmax):
-                    llik_cand_delta[i][t][k][j] = setup.models[i].llik(setup.ys[i][theta_which_mat[i][j]], pred_cand_delta[i][t][k][theta_which_mat[i][j]], marg_lik_cov_curr[i][t][j]) 
-
+                    llik_curr_delta[i][t][k][j] = setup.models[i].llik(setup.ys[i][theta_which_mat[i][j]], pred_curr_delta[i][t][k][theta_which_mat[i][j]], marg_lik_cov_curr[i][t][j]) 
 
     ## Initialize Adaptive Metropolis related Variables
     #S   = np.empty((setup.ntemps, setup.nclustmax, setup.p, setup.p))
@@ -462,21 +448,11 @@ def calibClust(setup, parallel = False):
         clust_nomem_bool[:] = (clust_mem_count == 0) # fixed at start of iteration
                                 # if (non-extant) cluster j becomes extant, then set this to False.
 
+
+        ##################
+        ### Draw Delta ###
+        ##################
         for i in range(setup.nexp):
-            pred_cand_delta[i][:] = setup.models[i].eval(
-                impa.tran_unif(
-                    theta[m-1].reshape(-1, setup.p).repeat(setup.ns2[i], axis = 0),
-                    setup.bounds_mat, 
-                    setup.bounds.keys(),
-                    ),
-                ).reshape(setup.ntemps, setup.nclustmax, setup.y_lens[i]) ### isnt this just pred_curr??? Speedup.~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~``
-            
-            llik_cand_delta[i] = np.empty([setup.ntemps, setup.nclustmax, setup.ntheta[i]])
-            for t in range(setup.ntemps):
-                for j in range(setup.ntheta[i]):
-                    for k in range(setup.nclustmax):
-                        llik_cand_delta[i][t][k][j] = setup.models[i].llik(setup.ys[i][theta_which_mat[i][j]], pred_cand_delta[i][t][k][theta_which_mat[i][j]], marg_lik_cov_curr[i][t][j]) 
-            # delta[i][m] = delta[i][m-1]
             cluster_sample_unif[i][:] = uniform(size = (setup.ntemps, setup.ns2[i]))
             for j in range(setup.ntheta[i]):
                 # weighting assigned to extant clusters for ij'th within-vectorized experiment
@@ -488,7 +464,7 @@ def calibClust(setup, parallel = False):
                 with np.errstate(divide='ignore', invalid = 'ignore'):
                     cluster_cum_prob[:] = (
                         + np.log(clust_mem_count + djs) # this line doesnt match paper? ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                        + llik_cand_delta[i][:,:,j] * setup.itl.reshape(-1,1)
+                        + llik_curr_delta[i][:,:,j] * setup.itl.reshape(-1,1)
                         )
                 # np.nan_to_num(cluster_cum_prob, False, nan = -np.inf, neginf = -np.inf)
                 #---fix for numerical stability in np.exp
@@ -507,9 +483,22 @@ def calibClust(setup, parallel = False):
             
             delta_ind_mat[i][:] = delta[i][m,:,:,None] == range(setup.nclustmax)
             curr_delta[i][:] = delta[i][m]
+        
+        ##########################
+        ### Update Theta Evals ###
+        ########################## 
+        for i in range(setup.nexp):
+            pred_curr_theta[i][:] = setup.models[i].eval(
+                tran_unif(theta[m-1, theta_unravel[i], delta[i][m].ravel()],
+                        setup.bounds_mat, setup.bounds.keys())
+                ) #update after delta update before
+            for t in range(setup.ntemps):
+                for j in range(setup.ntheta[i]):
+                    llik_curr_theta[i][t][j] = setup.models[i].llik( setup.ys[i][theta_which_mat[i][j]], pred_curr_theta[i][t][theta_which_mat[i][j]], marg_lik_cov_curr[i][t][j])
+
+                
         #------------------------------------------------------------------------------------------
         ## adaptive Metropolis per Cluster
-
         if False:
             if m > 300:
                 for i in range(setup.nexp):
@@ -528,7 +517,7 @@ def calibClust(setup, parallel = False):
             elif m == 300:
                 for i in range(setup.nexp):
                     mu[i][:]  = theta_hist[i][:m].mean(axis = 0)
-                    cov[i][:] = impa.cov_4d_pcm(theta_hist[i][:m], mu[i])
+                    cov[i][:] = cov_4d_pcm(theta_hist[i][:m], mu[i])
                 cluster_covariance_update(
                     S, mS, nS, m, curr_delta, cov, mu, 
                     setup.nexp, setup.nclustmax, temps,
@@ -537,33 +526,28 @@ def calibClust(setup, parallel = False):
             else:
                 pass
         #------------------------------------------------------------------------------------------
-        # MCMC within Gibbs update for thetas (in cluster)
+        
+        ###################
+        ### Draw Thetas ###
+        ###################
+
         llik_cand_theta_[:] = 0.
         llik_curr_theta_[:] = 0.
         theta[m]      = theta[m-1]
         theta_eval[:] = theta[m-1]
-        #theta_cand[:] = impa.chol_sample_1per(theta[m-1], cov_theta_cand.S)
 
         cov_theta_cand.update(theta_hist, m, curr_delta)
-        #------------------------------------------------------------------------------------------
-        # MCMC update for thetas
         theta_cand = cov_theta_cand.gen_cand(theta, m)
-
         good_values[:] = setup.checkConstraints(
-            impa.tran_unif(theta_cand.reshape(theta_long_shape), setup.bounds_mat, setup.bounds.keys()), 
+            tran_unif(theta_cand.reshape(theta_long_shape), setup.bounds_mat, setup.bounds.keys()), 
             setup.bounds,
             ).reshape(setup.ntemps, setup.nclustmax)
         theta_eval[good_values] = theta_cand[good_values]
         for i in range(setup.nexp):
             pred_cand_theta[i][:] = setup.models[i].eval(
-                impa.tran_unif(theta_eval[theta_unravel[i], delta[i][m].ravel()], 
+                tran_unif(theta_eval[theta_unravel[i], delta[i][m].ravel()], 
                         setup.bounds_mat, setup.bounds.keys())
                 )
-            pred_curr_theta[i][:] = setup.models[i].eval(
-                impa.tran_unif(theta[m-1, theta_unravel[i], delta[i][m].ravel()],
-                        setup.bounds_mat, setup.bounds.keys())
-                )
-            
             for t in range(setup.ntemps):
                 for j in range(setup.ntheta[i]):
                     llik_cand_theta[i][t][j] = setup.models[i].llik(
@@ -571,23 +555,13 @@ def calibClust(setup, parallel = False):
                         pred_cand_theta[i][t][theta_which_mat[i][j]], 
                         marg_lik_cov_curr[i][t][j]
                     )
-                    llik_curr_theta[i][t][j] = setup.models[i].llik( # this one should be unnecessary ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                    # this one should be unnecessary ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                    # this one should be unnecessary ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                    # this one should be unnecessary ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                        setup.ys[i][theta_which_mat[i][j]], 
-                        pred_curr_theta[i][t][theta_which_mat[i][j]], 
-                        marg_lik_cov_curr[i][t][j]
-                    )
                     llik_cand_theta_[t][curr_delta[i][t,j]] += llik_cand_theta[i][t][j]
                     llik_curr_theta_[t][curr_delta[i][t,j]] += llik_curr_theta[i][t][j]
 
-# we only care about updating extant clusters (clusters with members) here
-
         alpha[:] = - np.inf
         alpha[good_values] = (itl_mat_theta * (llik_cand_theta_ - llik_curr_theta_)
-            + impa.mvnorm_logpdf_(theta_cand, theta0[m-1], Sigma0_inv_curr, Sigma0_ldet_curr)
-            - impa.mvnorm_logpdf_(theta[m-1], theta0[m-1], Sigma0_inv_curr, Sigma0_ldet_curr)
+            + mvnorm_logpdf_(theta_cand, theta0[m-1], Sigma0_inv_curr, Sigma0_ldet_curr)
+            - mvnorm_logpdf_(theta[m-1], theta0[m-1], Sigma0_inv_curr, Sigma0_ldet_curr)
             )[good_values]
         accept[:] = np.log(uniform(size = alpha.shape)) < alpha
         theta[m,accept] = theta_cand[accept]
@@ -597,10 +571,13 @@ def calibClust(setup, parallel = False):
                 theta[m, theta_unravel[i], delta[i][m].ravel()
                     ].reshape(setup.ntemps, setup.ns2[i], setup.p)
                 )
-            pred_curr[i][:] = setup.models[i].eval(
-                impa.tran_unif(theta_hist[i][m].reshape(-1,setup.p),setup.bounds_mat, setup.bounds.keys()),
+            pred_curr_theta[i][:] = setup.models[i].eval(
+                tran_unif(theta_hist[i][m].reshape(-1,setup.p),setup.bounds_mat, setup.bounds.keys()),
                 False,
                 )
+            llik_curr_theta[i][:] = llik_cand_theta[i][:]
+
+                
         count += accept.sum(axis = 1)
         cov_theta_cand.count_100 += accept.sum(axis = 1)
 
@@ -611,15 +588,13 @@ def calibClust(setup, parallel = False):
         ntheta[:] = theta_ext.sum(axis = 1)
 
 
-        #------------------------------------------------------------------------------------------
-        ## Gibbs update s2
-
-        ## update s2
+        ########################
+        ###  Gibbs update s2 ###
+        ########################
         for i in range(setup.nexp):
 
             if setup.models[i].s2=='gibbs':
-                ## gibbs update s2       
-                dev_sq = (pred_curr[i] - setup.ys[i])**2 @ s2_ind_mat[i] # squared deviations
+                dev_sq = (pred_curr_theta[i] - setup.ys[i])**2 @ s2_ind_mat[i] # squared deviations
                 log_s2[i][m] = np.log(1 / np.random.gamma(
                         itl_mat_s2[i] * (setup.ny_s2[i] / 2 + setup.ig_a[i] + 1) - 1,
                         1 / (itl_mat_s2[i] * (setup.ig_b[i] + dev_sq / 2)),
@@ -628,7 +603,7 @@ def calibClust(setup, parallel = False):
                     s2_stretched = log_s2[i][m][t,setup.theta_ind[i]]
                     for j in range(setup.ntheta[i]):
                         marg_lik_cov_curr[i][t][j] = setup.models[i].lik_cov_inv(np.exp(s2_stretched[s2_which_mat[i][j]]))
-                        llik_curr[i][t][j] = setup.models[i].llik(setup.ys[i][s2_which_mat[i][j]], pred_curr[i][t][s2_which_mat[i][j]], marg_lik_cov_curr[i][t][j])
+                        llik_curr_theta[i][t][j] = setup.models[i].llik(setup.ys[i][s2_which_mat[i][j]], pred_curr_theta[i][t][s2_which_mat[i][j]], marg_lik_cov_curr[i][t][j])
                 
             elif setup.models[i].s2=='fix':
                     log_s2[i][m] = np.log(setup.sd_est[i]**2)
@@ -637,35 +612,33 @@ def calibClust(setup, parallel = False):
                         s2_stretched = log_s2[i][m][t,setup.theta_ind[i]]
                         for j in range(setup.ntheta[i]):
                             marg_lik_cov_curr[i][t][j] = setup.models[i].lik_cov_inv(np.exp(s2_stretched[s2_which_mat[i][j]]))
-                            llik_curr[i][t][j] = setup.models[i].llik(setup.ys[i][s2_which_mat[i][j]], pred_curr[i][t][s2_which_mat[i][j]], marg_lik_cov_curr[i][t][j])
-                    
-
-                    #for t in range(setup.ntemps):
-                    #    for j in range(setup.ntheta[i]):
-                    #        marg_lik_cov_curr[i][t][j] = setup.models[i].lik_cov_inv(np.exp(log_s2[i][m][t, setup.s2_ind[i]])[setup.s2_ind[i]==j])
-                    #        llik_curr[i][t][j] = setup.models[i].llik(setup.ys[i][setup.theta_ind[i]==j], pred_curr[i][t][setup.theta_ind[i]==j], marg_lik_cov_curr[i][t][j])
+                            llik_curr_theta[i][t][j] = setup.models[i].llik(setup.ys[i][s2_which_mat[i][j]], pred_curr_theta[i][t][s2_which_mat[i][j]], marg_lik_cov_curr[i][t][j])
 
             else:
                 print('TODO: fill in s2 sampling without gibbs')
 
 
+            
+        ##########################
+        ### Update Delta Evals ### (THIS IS THE SLOW CHUNK THAT IS MESSING WITH RUNTIME!!!! Problem is compute_state_history looping over NHist)
+        ##########################
+        for i in range(setup.nexp):
+            pred_curr_delta[i][:] = setup.models[i].eval(  #(IN PARTICULAR, THIS CALL!!!!)
+                tran_unif(
+                    theta[m].reshape(-1, setup.p).repeat(setup.ns2[i], axis = 0),
+                    setup.bounds_mat, 
+                    setup.bounds.keys(),
+                    ),
+                ).reshape(setup.ntemps, setup.nclustmax, setup.y_lens[i]) 
+            for t in range(setup.ntemps):
+                for j in range(setup.ntheta[i]):
+                    for k in range(setup.nclustmax):
+                        llik_curr_delta[i][t][k][j] = setup.models[i].llik(setup.ys[i][theta_which_mat[i][j]], pred_curr_delta[i][t][k][theta_which_mat[i][j]], marg_lik_cov_curr[i][t][j]) 
 
-
-
-
-
-        if False:
-
-            for i in range(setup.nexp):
-                dev_sq[i][:] = (pred_curr[i] - setup.ys[i])**2 @ s2_ind_mat[i]
-                s2[i][m] = 1 / np.random.gamma(
-                    (itl_mat_s2[i] * setup.ny_s2[i] / 2 + setup.ig_a[i] + 1) - 1,
-                    1 / (itl_mat_s2[i] * (setup.ig_b[i] +  dev_sq[i] / 2)),
-                    )
-                sse_curr[i][:] = dev_sq[i] / s2[i][m]
-        
-        
-        ## Gibbs update theta0
+                
+        ###########################
+        ### Gibbs Update Theta0 ###
+        ###########################
         cc[:] = np.linalg.inv(
             np.einsum('t,tpq->tpq', ntheta * setup.itl, Sigma0_inv_curr) + theta0_prior_prec,
             )
@@ -675,23 +648,22 @@ def calibClust(setup, parallel = False):
             + np.einsum('t,tl->tl', setup.itl, np.einsum('t,tlk,tk->tl', ntheta, Sigma0_inv_curr, tbar))
             + np.dot(theta0_prior_prec, theta0_prior_mean)
             )
-        theta0[m][:] = impa.chol_sample_1per_constraints(
+        theta0[m][:] = chol_sample_1per_constraints(
             np.einsum('tlk,tk->tl', cc, dd), cc,
             setup.checkConstraints, setup.bounds_mat, setup.bounds.keys(), setup.bounds,
             )
 
-        #------------------------------------------------------------------------------------------
-        ## Gibbs update Sigma0
+        ###########################       
+        ### Gibbs update Sigma0 ###
+        ###########################
         mat[:] *= 0.
-        #for i in range(setup.nexp): # This loop appears to be extra (just inflating) - devin
-        
+        #for i in range(setup.nexp): # This loop appears to be extra (just inflating) - devin       
         #mat3 = mat*0
         #mat3 += np.einsum(
         #        'tnp,tnq->tpq', 
         #        (theta[m] - theta0[m].reshape(setup.ntemps, 1, setup.p))* theta_ext.reshape(setup.ntemps, setup.nclustmax, 1), 
         #        (theta[m] - theta0[m].reshape(setup.ntemps, 1, setup.p))* theta_ext.reshape(setup.ntemps, setup.nclustmax, 1),
         #        )
-
         mat += np.einsum(
                 't,tnp,tnq->tpq',
                 setup.itl,
@@ -704,7 +676,6 @@ def calibClust(setup, parallel = False):
         #for ii in np.where(theta_ext.reshape(setup.ntemps, setup.nclustmax, 1))[1]:
         #    mat2 += (theta[m,0,ii,:]-theta0[m,0,:]).reshape(setup.p,1) @ (theta[m,0,ii,:]-theta0[m,0,:]).reshape(setup.p,1).T
             #theta[m,0,np.where(theta_ext.reshape(setup.ntemps, setup.nclustmax, 1))[1],:].T @ theta[m,0,np.where(theta_ext.reshape(setup.ntemps, setup.nclustmax, 1))[1],:]
-
         Sigma0_scales[:] = Sigma0_prior_scale + mat
         Sigma0_dfs[:]    = Sigma0_prior_df + theta_ext.sum(axis = 1) * setup.itl
         for t in range(setup.ntemps):
@@ -713,12 +684,10 @@ def calibClust(setup, parallel = False):
         Sigma0_inv_curr[:] = np.linalg.inv(Sigma0[m])
 
 
-        #if m>5000 :
-        #    print('ss')
-
-        #------------------------------------------------------------------------------------------
-        ## Gibbs update for theta (not in cluster)
-        theta_cand[:] = impa.chol_sample_nper_constraints(
+        ###############################################
+        ### Gibbs Update for Theta (Not in Cluster) ###
+        ###############################################
+        theta_cand[:] = chol_sample_nper_constraints(
                 theta0[m], Sigma0[m], setup.nclustmax, setup.checkConstraints,
                 setup.bounds_mat, setup.bounds.keys(), setup.bounds,
                 )
@@ -728,50 +697,54 @@ def calibClust(setup, parallel = False):
         # TODO: add decorrelation step here?
 
 
-        #------------------------------------------------------------------------------------------
-        ## Gibbs Update eta
+        ########################
+        ### Gibbs Update eta ###
+        ########################
         eta[m] = sample_eta(eta[m-1], ntheta, sum(setup.ns2[i] for i in range(setup.nexp)), setup.eta_prior_shape, setup.eta_prior_rate)
-        #------------------------------------------------------------------------------------------
-        ## tempering swaps
+        
+        
+        #######################
+        ### Tempering Swaps ###
+        #######################
         if m > setup.start_temper and setup.ntemps > 1:
             for _ in range(setup.nswap):
                 sw = np.random.choice(setup.ntemps, 2 * setup.nswap_per, replace = False).reshape(-1,2)
                 sw_alpha[:] = 0. # reset swap probability
                 sw_alpha[:] = sw_alpha + (setup.itl[sw.T[1]] - setup.itl[sw.T[0]]) * (
-                    - impa.mvnorm_logpdf(theta0[m][sw.T[1]], theta0_prior_mean,
+                    - mvnorm_logpdf(theta0[m][sw.T[1]], theta0_prior_mean,
                                         theta0_prior_prec, theta0_prior_ldet)
-                    + impa.mvnorm_logpdf(theta0[m][sw.T[0]], theta0_prior_mean,
+                    + mvnorm_logpdf(theta0[m][sw.T[0]], theta0_prior_mean,
                                         theta0_prior_prec, theta0_prior_ldet)
-                    - impa.invwishart_logpdf(Sigma0[m][sw.T[1]], Sigma0_prior_df, Sigma0_prior_scale)
-                    + impa.invwishart_logpdf(Sigma0[m][sw.T[0]], Sigma0_prior_df, Sigma0_prior_scale)
-                    - impa.gamma_logpdf(eta[m][sw.T[1]], 2, 0.1)
-                    + impa.gamma_logpdf(eta[m][sw.T[0]], 2, 0.1)
+                    - invwishart_logpdf(Sigma0[m][sw.T[1]], Sigma0_prior_df, Sigma0_prior_scale)
+                    + invwishart_logpdf(Sigma0[m][sw.T[0]], Sigma0_prior_df, Sigma0_prior_scale)
+                    - gamma_logpdf(eta[m][sw.T[1]], 2, 0.1)
+                    + gamma_logpdf(eta[m][sw.T[0]], 2, 0.1)
                     )
                 for i in range(setup.nexp):
 
                     sw_alpha[:] = sw_alpha + (setup.itl[sw.T[1]] - setup.itl[sw.T[0]]) * (
                         # for t_0
                         + setup.s2_prior_kern[i](np.exp(log_s2[i][m][sw.T[0]]), setup.ig_a[i], setup.ig_b[i]).sum(axis=1)
-                        + (impa.mvnorm_logpdf_(theta[m,sw.T[0]], theta0[m, sw.T[0]],
+                        + (mvnorm_logpdf_(theta[m,sw.T[0]], theta0[m, sw.T[0]],
                                 Sigma0_inv_curr[sw.T[0]], Sigma0_ldet_curr[sw.T[0]]) * theta_ext[sw.T[0]]).sum(axis = 1)
                         #- 0.5 * (setup.ny_s2[i] * np.log(s2[i][m])).sum(axis = 1)[sw.T[0]]
                         #- 0.5 * sse_curr[i][sw.T[0]].sum(axis = 1)
-                        + llik_curr[i][sw.T[0]].sum(axis=1)
+                        + llik_curr_theta[i][sw.T[0]].sum(axis=1)
                         # for t_1
                         - setup.s2_prior_kern[i](np.exp(log_s2[i][m][sw.T[1]]), setup.ig_a[i], setup.ig_b[i]).sum(axis=1)
-                        - (impa.mvnorm_logpdf_(theta[m,sw.T[1]], theta0[m,sw.T[1]],
+                        - (mvnorm_logpdf_(theta[m,sw.T[1]], theta0[m,sw.T[1]],
                                 Sigma0_inv_curr[sw.T[1]], Sigma0_ldet_curr[sw.T[1]]) * theta_ext[sw.T[1]]).sum(axis = 1)
                         #+ 0.5 * (setup.ny_s2[i] * np.log(s2[i][m])).sum(axis = 1)[sw.T[1]]
                         #+ 0.5 * sse_curr[i][sw.T[1]].sum(axis = 1)
-                        - llik_curr[i][sw.T[1]].sum(axis=1)
+                        - llik_curr_theta[i][sw.T[1]].sum(axis=1)
                         )
 
 
                     if False:
                         sw_alpha[:] = sw_alpha + (setup.itl[sw.T[1]] - setup.itl[sw.T[0]]) * (
                             # for t_0
-                            + impa.invgamma_logpdf(s2[i][m][sw.T[0]], setup.ig_a[i], setup.ig_b[i])
-                            + (impa.mvnorm_logpdf_(theta[m,sw.T[0]], theta0[m,sw.T[0]],
+                            + invgamma_logpdf(s2[i][m][sw.T[0]], setup.ig_a[i], setup.ig_b[i])
+                            + (mvnorm_logpdf_(theta[m,sw.T[0]], theta0[m,sw.T[0]],
                                     Sigma0_inv_curr[sw.T[0]], Sigma0_ldet_curr[sw.T[0]],
                                     ) * theta_ext[sw.T[0]]).sum(axis = 1)
                             - 0.5 * (setup.ny_s2[i] * np.log(s2[i][m])).sum(axis = 1)[sw.T[0]]
@@ -799,13 +772,18 @@ def calibClust(setup, parallel = False):
                         delta[i][m,tt[0]], delta[i][m,tt[1]]           = \
                                             delta[i][m,tt[1]].copy(), delta[i][m,tt[0]].copy()
                         log_s2[i][m,tt[0]], log_s2[i][m,tt[1]] = log_s2[i][m,tt[1]].copy(), log_s2[i][m,tt[0]].copy()
-                        pred_curr[i][tt[0]], pred_curr[i][tt[1]]       = \
-                                            pred_curr[i][tt[1]].copy(), pred_curr[i][tt[0]].copy()
-                        llik_curr[i][tt[0]], llik_curr[i][tt[1]]         = \
-                                            llik_curr[i][tt[1]].copy(), llik_curr[i][tt[0]].copy()
+                        pred_curr_theta[i][tt[0]], pred_curr_theta[i][tt[1]]       = \
+                                            pred_curr_theta[i][tt[1]].copy(), pred_curr_theta[i][tt[0]].copy()
+                        llik_curr_theta[i][tt[0]], llik_curr_theta[i][tt[1]]         = \
+                                            llik_curr_theta[i][tt[1]].copy(), llik_curr_theta[i][tt[0]].copy()
+                        pred_curr_delta[i][tt[0]], pred_curr_delta[i][tt[1]]       = \
+                                            pred_curr_delta[i][tt[1]].copy(), pred_curr_delta[i][tt[0]].copy()
+                        llik_curr_delta[i][tt[0]], llik_curr_delta[i][tt[1]]         = \
+                                            llik_curr_delta[i][tt[1]].copy(), llik_curr_delta[i][tt[0]].copy()
                     theta_ext[tt[0]], theta_ext[tt[1]] = theta_ext[tt[1]].copy(), theta_ext[tt[0]].copy()
         print('\rCalibration MCMC {:.01%} Complete'.format(m / setup.nmcmc), end='')
     #------------------------------------------------------------------------------------------
+    pred_curr = pred_curr_theta
     t1 = time.time()
     print('\rCalibration MCMC Complete. Time: {:f} seconds.'.format(t1 - t0))
     count_temper = count_temper + count_temper.T - np.diag(np.diag(count_temper))
