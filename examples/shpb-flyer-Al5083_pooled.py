@@ -8,9 +8,6 @@ np.seterr(under='ignore')
 
 #############################################################################
 # TODO:
-# Warping diagnostics
-# Emulator diagnostics
-# Better discrepancy in v space - we want a time shift, generate a warping function like that and generate the corresponding v to see what shape discrepancy should be
 # Add SHPB experiments
 
 #############################################################################
