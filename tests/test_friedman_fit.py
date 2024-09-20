@@ -115,5 +115,5 @@ def test_friedman_fit():
     # Test that the true values of theta are in the 95% credible interval.
     lower = np.quantile(theta_posterior, .025, 0)
     upper = np.quantile(theta_posterior, .975, 0)
-    assert np.alltrue(lower < param_truth['theta'])
-    assert np.alltrue(param_truth['theta'] < upper)
+    assert np.all(lower < param_truth['theta'])
+    assert np.all(param_truth['theta'] < upper)
