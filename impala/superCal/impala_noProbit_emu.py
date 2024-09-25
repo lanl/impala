@@ -22,9 +22,7 @@ from collections import namedtuple
 #from itertools import repeat
 #import multiprocessing as mp
 #import pandas as pd
-import impala.superCal.pbar as pbar
-#from . import pbar
-#import pbar 
+from .pbar import pbar
 np.seterr(under='ignore')
 
 # no probit tranform for hierarchical and DP versions
@@ -123,8 +121,8 @@ class CalibSetup:
             raise ValueError('len(sd_est.shape) should be 1')
         if len(s2_df.shape) != 1:
             raise ValueError('len(s2_df.shape) should be 1')
-        if s2_ind.dtype != 'int64':
-            raise ValueError('s2_ind.dtype should be int64')
+        if s2_ind.dtype != np.int_:
+            raise ValueError(f's2_ind.dtype should be {np.int_}')
         if len(yobs) != len(s2_ind):
             raise ValueError('len(yobs) and len(s2_ind) should be the same')
         self.ys.append(np.array(yobs))
@@ -690,9 +688,9 @@ def calibHier(setup):
     good_values = [np.zeros(alpha[i].shape, dtype = bool) for i in range(setup.nexp)]
     good_values_mat = [
         good_values[i].reshape(setup.ntheta[i] * setup.ntemps) for i in range(setup.nexp)
-        ]
+    ]
     ## start MCMC
-    for m in pbar.pbar(range(1, setup.nmcmc)):
+    for m in pbar(range(1, setup.nmcmc)):
 
         for i in range(setup.nexp):
             theta[i][m] = theta[i][m-1].copy() # current set to previous, will change if accepted
@@ -1228,7 +1226,7 @@ def calibPool(setup):
     llik = np.empty(setup.nmcmc)
 
     ## start MCMC
-    for m in pbar.pbar(range(1, setup.nmcmc)):
+    for m in pbar(range(1, setup.nmcmc)):
         
 
         theta[m] = theta[m-1].copy() # current set to previous, will change if accepted

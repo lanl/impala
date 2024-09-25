@@ -8,7 +8,7 @@
 ### Imports ###
 ###############
 import numpy as np
-import pyBASS as pb
+#import pyBASS as pb
 #import pyBayesPPR as pbppr
 #import physical_models_vec as pm_vec
 from impala import physics as pm_vec
@@ -487,7 +487,7 @@ class ModelF(AbstractModel):
             + self.D.T @ (cov['inv'].flatten() * np.eye(len(yobs))) @ self.D
             )
         m = self.D.T @ (cov['inv'] * np.eye(len(yobs))) @ (yobs - pred)
-        discrep_vars = sc.chol_sample(S @ m, S/itemp)
+        discrep_vars = chol_sample(S @ m, S/itemp)
         return discrep_vars
     
 
@@ -540,7 +540,7 @@ class ModelF_bigdata(AbstractModel):
            + self.D.T @ self.vmat
             )
         self.m = self.D.T @ self.vec
-        discrep_vars = sc.chol_sample((S @ self.m).flatten(), S/itemp)
+        discrep_vars = chol_sample((S @ self.m).flatten(), S/itemp)
         return discrep_vars
     def llik(self, yobs, pred, cov): # assumes diagonal cov
         self.vec = yobs.flatten() - pred.flatten()

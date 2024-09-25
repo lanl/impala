@@ -55,7 +55,7 @@ class Constant_Specific_Heat(BaseModel):
     consts = ['Cv0']
 
     def value(self, *args):
-        return self.parent.parameters.Cv0
+        return self.parent.parameters.Cv0 * np.ones(len(self.parent.state.T))
 
 #class Linear_Specific_Heat(BaseModel):
 #    """
@@ -203,7 +203,7 @@ class Constant_Melt_Temperature(BaseModel):
     consts = ['Tmelt0']
 
     def value(self, *args):
-        return self.parent.parameters.Tmelt0
+        return self.parent.parameters.Tmelt0 * np.ones(len(self.parent.state.T))
 
 #class Linear_Melt_Temperature(BaseModel):
 #    """
@@ -259,7 +259,7 @@ class Constant_Shear_Modulus(BaseModel):
     consts = ['G0']
 
     def value(self, *args):
-        return self.parent.parameters.G0
+        return self.parent.parameters.G0 * np.ones(len(self.parent.state.T))
 
 #class Linear_Shear_Modulus(BaseModel):
 #    consts =  ['G0', 'rho0', 'dGdRho' ]#
@@ -365,10 +365,10 @@ class Constant_Yield_Stress(BaseModel):
     """
     Constant Yield Stress Model
     """
-    consts = ['yield_stress']
+    consts = ['yield_stress', 'chi']
 
     def value(self, *args):
-        return self.parent.parameters.yield_stress
+        return self.parent.parameters.yield_stress * np.ones(len(self.parent.state.T))
 
 def fast_pow(a, b):
     """
