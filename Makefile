@@ -1,2 +1,8 @@
+RUN := uv run
+
 test:
-	conda run --no-capture-output -n impala python -m pytest -s
+	$(RUN) python -m pytest -s
+
+fmt:
+	ruff check
+	ruff format --diff

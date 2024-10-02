@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+authors = [
+  {name = "Devin Francom", email = "dfrancom@lanl.gov"}
+]
+maintainers = [
+  {name = "Devin Francom", email = "dfrancom@lanl.gov"}
+]
+license = {text = "BSD 3-Clause"}
+name = "impala"
+version = "0.3.0"
+description = "Bayesian model calibration"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "matplotlib>=3.9.2",
+    "numpy>=2.1.1",
+    "seaborn>=0.13.2",
+    "scipy>=1.14.1",
+]
+urls.repository = "https://github.com/lanl/impala"
+keywords = [
+    "emulation",
+    "model calibration",
+    "Bayesian inference"
+]
+classifiers = [
+    'License :: OSI Approved :: BSD License',
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+[tool.ruff]
+line-length = 80
+lint.extend-select = ["I"]
+lint.extend-unsafe-fixes = ["F401"]
+lint.exclude = ["**/__init__.py"]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.3.3",
+]
