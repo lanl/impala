@@ -39,7 +39,7 @@ classifiers = [
 line-length = 80
 lint.extend-select = ["I"]
 lint.extend-unsafe-fixes = ["F401"]
-lint.exclude = ["**/__init__.py"]
+lint.exclude = ["**/__init__.py", "tests/_*.py"]
 
 [tool.uv]
 dev-dependencies = [
