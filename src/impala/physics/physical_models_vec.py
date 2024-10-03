@@ -14,8 +14,8 @@ import numpy as np
 
 np.seterr(all="raise")
 # import ipdb
-import copy
 from math import pi
+
 from scipy.special import erf
 
 ## Error Definitions
@@ -475,7 +475,8 @@ def fast_pow(a, b):
     return out
 
 
-pos = lambda a: (abs(a) + a) / 2  # same as max(0,a)
+def pos(a):
+    return (abs(a) + a) / 2  # same as max(0,a)
 
 
 class JC_Yield_Stress(BaseModel):

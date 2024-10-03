@@ -7,17 +7,17 @@
 ###############
 ### Imports ###
 ###############
+import abc
+from itertools import cycle
+
 import numpy as np
+from scipy.interpolate import interp1d
+from scipy.linalg import cho_factor, cholesky
 
 # import pyBASS as pb
 # import pyBayesPPR as pbppr
 # import physical_models_vec as pm_vec
 from impala import physics as pm_vec
-from itertools import cycle
-from scipy.interpolate import interp1d
-from scipy.linalg import cho_factor, cho_solve, cholesky
-import scipy.linalg.lapack as la
-import abc
 
 ########################
 ### Helper Functions ###
@@ -877,8 +877,9 @@ def interpolate_experiment(args):
 #######
 ### getoptions_ModelMaterialStrength: Provides current options for ModelMaterialStrength physical models
 def getoptions_ModelMaterialStrength():
-    import impala
     import re
+
+    import impala
 
     mod_options = dir(impala.physics.physical_models_vec)
     flow_stress_model = list(
@@ -914,8 +915,9 @@ def showdef_ModelMaterialStrength(func_name):
     """
     func_name: string listing a function listed in get_ModelMaterialStrength_options(), e.g., showdef_ModelMaterialStrength('Linear_Specific_Heat')
     """
-    import impala
     import inspect
+
+    import impala
 
     my_func = getattr(impala.physics, func_name)
     print(inspect.getsource(my_func))

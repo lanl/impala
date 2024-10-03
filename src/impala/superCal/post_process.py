@@ -1,14 +1,14 @@
+import matplotlib.pyplot as plt
 import numpy as np
-from impala import superCal as sc
-import matplotlib.pyplot as plt
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
-from scipy.stats import gaussian_kde
-from scipy.interpolate import interp1d
-import seaborn as sns
-from matplotlib.lines import Line2D
 import pandas as pd
 import scipy.stats as ss
+import seaborn as sns
+from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.lines import Line2D
+from scipy.interpolate import interp1d
+from scipy.stats import gaussian_kde
+
+from impala import superCal as sc
 
 
 def func_prediction_plot(
@@ -290,7 +290,7 @@ def ptw_prediction_plots_cluster(
     ]
 
     thetas = calib_out.theta[mcmc_use, 0]
-    deltas = [calib_out.delta[i][mcmc_use] for i in range(setup.nexp)]
+    [calib_out.delta[i][mcmc_use] for i in range(setup.nexp)]
     nclustmax = max(calib_out.out.delta[i].max() for i in range(setup.nexp)) + 1
     dcounts = np.zeros((mcmc_use.shape[0], nclustmax))
     for it, s in enumerate(mcmc_use):
@@ -673,7 +673,7 @@ def pairwise_theta_plot_cluster(
     setup, calib_out, path, mcmc_use, alpha=0.05, highlight=None
 ):
     thetas = calib_out.theta[mcmc_use, 0]
-    deltas = [calib_out.delta[i][mcmc_use] for i in range(setup.nexp)]
+    [calib_out.delta[i][mcmc_use] for i in range(setup.nexp)]
     nclustmax = max(calib_out.delta[i].max() for i in range(setup.nexp)) + 1
     dcounts = np.zeros((mcmc_use.shape[0], nclustmax))
     for it, s in enumerate(mcmc_use):
@@ -812,8 +812,8 @@ def cluster_matrix(delta_list, ns2, nclustmax, nburn=20000, nthin=10):
     # subset delta to post burn-in
     delta_relist = [d[nburn::nthin] for d in delta_list]
     # Declare constants
-    nsamp = delta_relist[0].shape[0]
-    nexp = len(delta_relist)
+    delta_relist[0].shape[0]
+    len(delta_relist)
     # create a combined delta array (for all experiments/vectorized experiments)
     # Boolean array, so (True iff member of cluster)
     breaks = np.hstack((0, np.cumsum(ns2)))
@@ -993,7 +993,7 @@ def save_parent_strength(setup, ptw_mod, calib_out, mcmc_use, path):
         setup.bounds.keys(),
         setup.bounds,
     )
-    theta_parent_native = sc.unnormalize(theta_parent, setup.bounds_mat)
+    sc.unnormalize(theta_parent, setup.bounds_mat)
 
     # sub_dict = {k: calib_out.theta_parent_native[k][mcmc_use] for k in calib_out.theta_parent_native.keys()}
     # params = pd.DataFrame(sub_dict)
@@ -1033,7 +1033,7 @@ def get_bounds(
     edot, strain, temp, results_csv, write_path, percentiles=[0.05, 0.5, 0.95]
 ):
     # rank parent distribution samples by stress at particular strain, strain rate, temperature, save to file
-    edot_star = edot * 1e-6  # first term is per second
+    edot * 1e-6  # first term is per second
 
     df = pd.read_csv(results_csv, nrows=1, header=None)
     mods = df.loc[0, :].values.tolist()
@@ -1089,7 +1089,7 @@ def get_bounds(
 
 def get_samples_rank(edot, strain, temp, results_csv, write_path):
     # rank parent distribution samples by stress at particular strain, strain rate, temperature, save all samples to file, for sky
-    edot_star = edot * 1e-6  # first term is per second
+    edot * 1e-6  # first term is per second
 
     df = pd.read_csv(results_csv, nrows=1, header=None)
     mods = df.loc[0, :].values.tolist()

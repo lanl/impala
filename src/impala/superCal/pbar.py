@@ -2,9 +2,9 @@
 Basic progress bar.
 """
 
-from datetime import timedelta, datetime
-import time
 import sys
+import time
+from datetime import datetime, timedelta
 
 
 def pbrange(*args, **kwargs):

@@ -1,9 +1,10 @@
-import numpy as np
-from impala import superCal as sc
-import matplotlib.pyplot as plt
-import pyBASS as pb
 import fdasrsf as fs
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+import pyBASS as pb
+
+from impala import superCal as sc
 
 np.seterr(under="ignore")
 
@@ -317,7 +318,7 @@ setup.setTemperatureLadder(1.05 ** np.arange(20))
 setup.setMCMC(25000, 1000, 1, 100)
 out = sc.calibPool(setup)
 
-import dill
+
 # dill.dump_session('./../../Desktop/al-al-flyer_pool.pkl')
 # dill.load_session('./../../Desktop/al-al-flyer_pool.pkl')
 
@@ -493,8 +494,8 @@ plt.show()
 figure = plt.figure()
 # xx_true = Xtrain[ind_true][None, :]
 # pairs plot of parameters
-import seaborn as sns
 import pandas as pd
+import seaborn as sns
 
 dat = pd.DataFrame(out.theta[uu, 0, :])
 # dat = dat.append(pd.DataFrame(xx_true))

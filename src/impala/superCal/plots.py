@@ -1,24 +1,20 @@
-from math import ceil, sqrt
-
-from pygments import highlight
-
-# from models_withLik import interpolate_experiment
-from impala.superCal import interpolate_experiment
-import seaborn as sns
-import numpy as np
-import impala.superCal as impala
 import matplotlib.pyplot as plt
-
-plt.rcParams.update({"figure.max_open_warning": 0})
+import numpy as np
+import seaborn as sns
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.lines import Line2D
-from scipy.stats import gaussian_kde
-from scipy.interpolate import interp1d
 from numpy.random import uniform
+from scipy.interpolate import interp1d
+from scipy.stats import gaussian_kde
 
+import impala.superCal as impala
+
+# from models_withLik import interpolate_experiment
+
+plt.rcParams.update({"figure.max_open_warning": 0})
 
 # diagnostic plots to include:
-#    - traces of theta, s2, but for hier which ones? All?
+#   - traces of theta, s2, but for hier which ones? All?
 #   - tempering and MCMC counts
 class Diagnostics(object):
     def __init__(self, setup, out):
@@ -372,7 +368,7 @@ class PTW_Plotter(object):
         ]
 
         thetas = self.out.theta[sel, 0]
-        deltas = [self.out.delta[i][sel] for i in range(self.setup.nexp)]
+        [self.out.delta[i][sel] for i in range(self.setup.nexp)]
         nclustmax = (
             max(self.out.delta[i].max() for i in range(self.setup.nexp)) + 1
         )
@@ -711,7 +707,7 @@ class PTW_Plotter(object):
     def pairwise_theta_plot_cluster(self, path=None):
         sel = np.arange(20000, self.setup.nmcmc, 10)
         thetas = self.out.theta[sel, 0]
-        deltas = [self.out.delta[i][sel] for i in range(self.setup.nexp)]
+        [self.out.delta[i][sel] for i in range(self.setup.nexp)]
         nclustmax = (
             max(self.out.delta[i].max() for i in range(self.setup.nexp)) + 1
         )
@@ -854,8 +850,7 @@ class PTW_Plotter(object):
         # subset delta to post burn-in
         delta_relist = [d[nburn::nthin] for d in delta_list]
         # Declare constants
-        nsamp = delta_relist[0].shape[0]
-        nexp = len(delta_relist)
+        delta_relist[0].shape[0]
         # create a combined delta array (for all experiments/vectorized experiments)
         # Boolean array, so (True iff member of cluster)
         breaks = np.hstack((0, np.cumsum(ns2)))
@@ -892,6 +887,3 @@ class PTW_Plotter(object):
         return
 
     pass
-
-
-# EOF

@@ -7,23 +7,13 @@ Created on Mon Apr 24 09:30:15 2023
 """
 
 ### Imports
-from scipy.optimize import basinhopping
-from scipy.optimize import minimize
-import gc
-import pandas as pd
+
 import numpy as np
-import seaborn as sns
-import scipy.stats
-from impala import superCal as sc
-from impala import physics as pm_vec
-from scipy.optimize import NonlinearConstraint
-from scipy.stats import halfcauchy
-import sklearn
 import pyswarm
-from scipy.stats import qmc
-import time
-import os
-import multiprocess as mp
+from scipy.optimize import NonlinearConstraint, basinhopping
+from scipy.stats import halfcauchy, invgamma
+
+from impala import superCal as sc
 
 
 ### Function for obtaining the MAP estimator associated
@@ -125,7 +115,7 @@ def get_map_impalapool(
             setup.bounds,
         )
         if (
-            CONSTRAINTS[0] == True
+            CONSTRAINTS[0] is True
             and (theta_cur <= 0).sum() == 0
             and (theta_cur >= 1).sum() == 0
         ):
@@ -222,11 +212,10 @@ def get_map_impalapool(
             maxiter=niter,
         )
     elif optmethod == "grid":
-        from scipy.stats import qmc
-        import time
-        import os
+
         import multiprocess as mp
         from scipy.optimize import minimize
+        from scipy.stats import qmc
 
         sampler = qmc.LatinHypercube(d=setup.p)
         sample = sampler.random(n=10000)

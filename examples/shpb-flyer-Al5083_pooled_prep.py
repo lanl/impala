@@ -1,9 +1,8 @@
+import os
+
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy.interpolate.interpolate import interp1d
-import matplotlib.pyplot as plt
-
-
-import os
 
 path_104 = os.path.abspath(
     "../../../Downloads/realTime-master-AlAl-data_trial5/AlAl/data_trial5/104S/"

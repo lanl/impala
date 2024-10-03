@@ -16,14 +16,14 @@ jobs:
       github.event.head_commit.committer.username != 
       github.event.head_commit.author.username
 
-    continue-on-error: ${{ matrix.python-version == 3.6 || matrix.os == 'windows-latest' }}
+    continue-on-error: ${{ matrix.python-version == 3.8 || matrix.os == 'windows-latest' }}
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ['3.12']
         include:
           - os: ubuntu-20.04
-            python-version: 3.6
+            python-version: 3.8
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python ${{ matrix.python-version }}

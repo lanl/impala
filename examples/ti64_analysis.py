@@ -7,15 +7,17 @@ import matplotlib
 
 ## Force matplotlib to not use any Xwindows backend.
 matplotlib.use("Agg")
-from impala import superCal as sc
+import os
+import sqlite3 as sq
+
 import matplotlib.pyplot as plt
-import impala.superCal.post_process as pp
 import numpy as np
 
 # import dill
 import pandas as pd
-import sqlite3 as sq
-import os
+
+import impala.superCal.post_process as pp
+from impala import superCal as sc
 
 np.seterr(under="ignore")
 

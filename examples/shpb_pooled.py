@@ -3,9 +3,10 @@
 ## using SHPB/quasistatic data.
 ##########################################################################################
 
-import numpy as np
-from impala import superCal as sc
 import matplotlib.pyplot as plt
+import numpy as np
+
+from impala import superCal as sc
 
 np.seterr(under="ignore")
 
@@ -166,7 +167,6 @@ consts_jc = {
     "chi": 1.0,
     "sgB": 6.44e-4,
     "Tref": 298.0,
-    "chi": 1.0,
     "edot0": 6.44e-4,
 }
 bounds_jc = {

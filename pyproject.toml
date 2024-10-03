@@ -14,13 +14,7 @@ name = "impala"
 version = "0.3.0"
 description = "Bayesian model calibration"
 readme = "README.md"
-requires-python = ">=3.10"
-dependencies = [
-    "matplotlib>=3.9.2",
-    "numpy>=2.1.1",
-    "seaborn>=0.13.2",
-    "scipy>=1.14.1",
-]
+requires-python = ">=3.8"
 urls.repository = "https://github.com/lanl/impala"
 keywords = [
     "emulation",
@@ -30,9 +24,17 @@ keywords = [
 classifiers = [
     'License :: OSI Approved :: BSD License',
     "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "matplotlib>=3.7.5",
+    "numpy>=1.24.4",
+    "seaborn>=0.13.2",
+    "scipy>=1.10.1",
 ]
 
 [tool.ruff]
@@ -43,5 +45,6 @@ lint.exclude = ["**/__init__.py", "tests/_*.py"]
 
 [tool.uv]
 dev-dependencies = [
+    "notebook>=7.2.2",
     "pytest>=8.3.3",
 ]

@@ -8,17 +8,16 @@
 ### Imports ###
 ###############
 
-import numpy as np
 import time
-import scipy
-from scipy import stats
-from scipy.special import multigammaln
-from numpy.random import uniform, normal, beta, choice, gamma
-from math import sqrt, floor, log
-from scipy.special import erf, erfinv, gammaln
-from scipy.stats import invwishart
-from numpy.linalg import cholesky, slogdet
 from collections import namedtuple
+from math import floor, log, sqrt
+
+import numpy as np
+import scipy
+from numpy.linalg import cholesky, slogdet
+from numpy.random import normal, uniform
+from scipy.special import erf, erfinv, gammaln, multigammaln
+from scipy.stats import invwishart
 
 # from itertools import repeat
 # import multiprocessing as mp
@@ -70,7 +69,8 @@ class CalibSetup:
         self.bounds_mat = np.array([v for v in bounds.values()])
         self.p = bounds.__len__()
         if constraint_func is None:
-            constraint_func = lambda *x: True
+            def constraint_func(*x):
+                return True
         if constraint_func == "bounds":
             constraint_func = cf_bounds
         self.checkConstraints = constraint_func
@@ -1565,7 +1565,7 @@ def calibPool(setup):
     """
     t0 = time.time()
     theta = np.empty([setup.nmcmc, setup.ntemps, setup.p])
-    n_s2 = np.sum(setup.ns2)
+    np.sum(setup.ns2)
     log_s2 = [
         np.ones([setup.nmcmc, setup.ntemps, setup.ns2[i]])
         for i in range(setup.nexp)
