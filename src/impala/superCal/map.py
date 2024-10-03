@@ -9,7 +9,7 @@ Created on Mon Apr 24 09:30:15 2023
 ### Imports
 
 import numpy as np
-import pyswarm
+import pyswarm  # TODO: need to add as dependency. Ask Lauren?
 from scipy.optimize import NonlinearConstraint, basinhopping
 from scipy.stats import halfcauchy, invgamma
 
@@ -212,8 +212,7 @@ def get_map_impalapool(
             maxiter=niter,
         )
     elif optmethod == "grid":
-
-        import multiprocess as mp
+        import multiprocess as mp  # TODO: Add as dependency.
         from scipy.optimize import minimize
         from scipy.stats import qmc
 
