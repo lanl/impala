@@ -55,7 +55,7 @@ class Constant_Specific_Heat(BaseModel):
     consts = ['Cv0']
 
     def value(self, *args):
-        return self.parent.parameters.Cv0 * np.ones(len(self.parent.state.T))
+        return self.parent.parameters.Cv0
 
 #class Linear_Specific_Heat(BaseModel):
 #    """
@@ -203,7 +203,7 @@ class Constant_Melt_Temperature(BaseModel):
     consts = ['Tmelt0']
 
     def value(self, *args):
-        return self.parent.parameters.Tmelt0 * np.ones(len(self.parent.state.T))
+        return self.parent.parameters.Tmelt0
 
 #class Linear_Melt_Temperature(BaseModel):
 #    """
@@ -226,9 +226,10 @@ class Linear_Melt_Temperature(BaseModel):
 
     consts=['tm0', 'tm1']
     def value(self, *args):
+        mp    = self.parent.parameters
         rnow=self.parent.state.rho
         
-        tmeltnow=self.parent.parameters.tm0+self.parent.parameters.tm1*rnow
+        tmeltnow=mp.tm0+mp.tm1*rnow
         return tmeltnow
 
 class Quadratic_Melt_Temperature(BaseModel):
@@ -259,7 +260,7 @@ class Constant_Shear_Modulus(BaseModel):
     consts = ['G0']
 
     def value(self, *args):
-        return self.parent.parameters.G0 * np.ones(len(self.parent.state.T))
+        return self.parent.parameters.G0
 
 #class Linear_Shear_Modulus(BaseModel):
 #    consts =  ['G0', 'rho0', 'dGdRho' ]#
@@ -326,7 +327,7 @@ class BGP_PW_Shear_Modulus(BaseModel):
         temp  = self.parent.state.T
         tmelt = self.parent.state.Tmelt
  
-        cold_shear  = mp.G0*np.exp(6.*mp.gamma_1*(np.power(mp.rho_0,-1./3.)-np.power(rho,-1./3.))\
+        cold_shear  = mp.G0*np.power(rho/mp.rho_0, 4./3.)*np.exp(6.*mp.gamma_1*(np.power(mp.rho_0,-1./3.)-np.power(rho,-1./3.))\
                     + 2*mp.gamma_2/mp.q2*(np.power(mp.rho_0,-mp.q2)-np.power(rho,-mp.q2)))
         gnow = cold_shear*(1.- mp.alpha* (temp/tmelt))
 
@@ -365,10 +366,10 @@ class Constant_Yield_Stress(BaseModel):
     """
     Constant Yield Stress Model
     """
-    consts = ['yield_stress', 'chi']
+    consts = ['yield_stress']
 
     def value(self, *args):
-        return self.parent.parameters.yield_stress * np.ones(len(self.parent.state.T))
+        return self.parent.parameters.yield_stress
 
 def fast_pow(a, b):
     """
