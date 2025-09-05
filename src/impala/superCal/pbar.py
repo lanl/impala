@@ -2,9 +2,10 @@
 Basic progress bar.
 """
 
-from datetime import timedelta, datetime
-import time
 import sys
+import time
+from datetime import datetime, timedelta
+
 
 def pbrange(*args, **kwargs):
     """
@@ -21,6 +22,7 @@ def pbrange(*args, **kwargs):
     """
 
     return pbar(range(*args), **kwargs)
+
 
 class pbar:
     """
@@ -40,7 +42,10 @@ class pbar:
             pb.extra = {f"{i}^2": i ** 2}
             time.sleep(s)
     """
-    def __init__(self, iterable, min_interval=0.2, show=lambda: True, fname=None):
+
+    def __init__(
+        self, iterable, min_interval=0.2, show=lambda: True, fname=None
+    ):
         self.iterator = iterable.__iter__()
         self.iters = iterable.__len__()
         self.min_interval = min_interval
@@ -56,7 +61,9 @@ class pbar:
         if self.extra is None:
             return ""
         else:
-            return " | " + " | ".join(f"{name}: {value}" for name, value in self.extra.items())
+            return " | " + " | ".join(
+                f"{name}: {value}" for name, value in self.extra.items()
+            )
 
     def clean(self, x):
         return str(x).split(".")[0]
@@ -81,9 +88,7 @@ class pbar:
 
     def print(self, toc):
         if self.i == 0:
-            self.bar = (
-                f"{self.clean(datetime.now()) }"
-            )
+            self.bar = f"{self.clean(datetime.now())}"
             print(f"[{self.bar}]", end="\r", flush=True)
         elif toc - self.tic > self.min_interval or self.i == self.iters:
             elapsed = toc - self.genesis
@@ -92,7 +97,7 @@ class pbar:
             eta = wall * (self.iters / self.i - 1)
             perc = int(100 * self.i / self.iters)
             self.bar = (
-                f"{self.clean(datetime.now()) } | "
+                f"{self.clean(datetime.now())} | "
                 f"{self.i}/{self.iters} ({perc}%) | "
                 f"WALL: {self.clean(wall)} | "
                 f"ETA: {self.clean(eta)} | "
@@ -106,5 +111,3 @@ class pbar:
 
     def __exit__(self, *args, **kwargs):
         sys.stdout = self.stdout
-
-

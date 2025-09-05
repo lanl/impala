@@ -7,7 +7,7 @@ includes tempering and adaptive MCMC.
 ## Installation
 Use
 ```bash
-pip install git+https://github.com/lanl/impala.git
+pip install impala-calib
 ```
 
 ## Examples

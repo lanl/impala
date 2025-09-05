@@ -1,0 +1,68 @@
+[build-system]
+requires = ["setuptools>=68.1", "versioningit"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "impala-calib"
+dynamic = ["version"]
+description = "Bayesian model calibration tool"
+authors = [
+    {name = "Devin Francom", email = "dfrancom@lanl.gov"},
+    {name = "DJ Lushcer", email = "djl@lanl.gov"},
+    {name = "Peter Trubey", email = "ptrubey@lanl.gov"},
+]
+readme = "README.md"
+license = "BSD-3-Clause"
+license-files = ["LICENSE.md"]
+requires-python = ">=3.9"
+dependencies = [
+    "matplotlib>=3.7.3",
+    "multiprocess>=0.70.18",
+    "numpy>=1.24.4",
+    "pyswarm>=0.6",
+    "scipy>=1.10.1",
+    "seaborn>=0.13.0",
+]
+classifiers = [
+    'Operating System :: OS Independent',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13',
+    'Programming Language :: Python :: 3.14',
+]
+
+[project.urls]
+repository = "http://www.github.com/lanl/impala"
+Repository = "https://github.com/lanl/impala"
+Issues = "https://github.com/lanl/impala/issues"
+
+[tool.versioningit.vcs]
+method = "git"
+default-tag = "0.0.1"
+
+[dependency-groups]
+dev = [
+    "notebook>=7.4.5",
+    "pre-commit>=4.3.0",
+    "pytest>=7.0.1",
+]
+
+[tool.ruff]
+line-length = 80
+exclude = ["examples/*.ipynb"]  # TODO: remove after src/ is linted.
+
+[tool.ruff.format]
+preview = true
+
+[tool.ruff.lint]
+extend-select = ["I"]  # W505 (doc-line-too-long); D (pydocstyle)
+ignore = ["E731"]
+pydocstyle.convention = "numpy"
+pycodestyle.max-doc-length = 80
+
+# Ignore test file documentation linting.
+[tool.ruff.lint.extend-per-file-ignores]
+"tests/**/*.py" = ["D"]
+"src/**/__init__.py" = ["F", "E402"]
