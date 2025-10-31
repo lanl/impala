@@ -14,8 +14,28 @@ import numpy as np
 np.seterr(all = 'raise')
 #import ipdb
 import copy
+import math
 from math import pi
-from scipy.special import erf
+try:
+    from numba import jit
+
+    @jit(nopython=True)
+    def erf(x):
+        '''In contrast to scipy.special.erf(), this implementation of erf() supports numba.jit compilation'''
+        out = np.empty(x.shape)
+        for i,xi in enumerate(x):
+            out[i] = math.erf(xi)
+        return out
+
+except ImportError:
+    from scipy.special import erf
+    from functools import partial
+
+    def jit(func=None,forceobj=True,nopython=False):
+        '''define a dummy decorator if numba is unavailable at runtime'''
+        if func is None:
+            return partial(jit, forceobj=forceobj,nopython=nopython)
+        return func
 
 ## Error Definitions
 
@@ -401,7 +421,53 @@ class JC_Yield_Stress(BaseModel):
             )
         return Y
 
+@jit(nopython=True)
+def _PTW_corefct(p,kappa,s0,sInf,y0,yInf,y1,y2,beta,theta,lgamma,xiDot,edot,t_hom,eps,small=1.0e-10):
+    '''jit-compiled subroutine of the PTW_Yield_Stress class'''
+    argErf = kappa * t_hom * (lgamma + np.log( xiDot / edot ))
+    Erfres = erf( argErf )
+
+    saturation1 = s0 - ( s0 - sInf ) * Erfres
+    saturation2 = s0 * np.exp(beta * (-lgamma + np.log(edot / xiDot)))
+    sat_cond = saturation1 > saturation2
+    tau_s = np.copy(saturation2)
+    tau_s[np.where(sat_cond)] = saturation1[sat_cond]
+
+    ayield = y0 - ( y0 - yInf ) * Erfres
+    byield = y1 * np.exp( -y2*(lgamma + np.log( xiDot / edot )))
+    cyield = s0 * np.exp( -beta*(lgamma + np.log( xiDot / edot )))
+
+    y_cond = (byield < cyield)
+    dyield = np.copy(cyield)
+    dyield[np.where(y_cond)] = byield[y_cond]
+
+    y_cond2 = ayield > dyield
+    tau_y = np.copy(dyield)
+    tau_y[np.where(y_cond2)] = ayield[y_cond2]
+    scaled_stress = tau_s
+    ind = np.where((p > small) * (np.abs(tau_s - tau_y) > small))
+    eArg1 = (p * (tau_s - tau_y) / (s0 - tau_y))[ind]
+    eArg2 = (eps * p * theta)[ind] / (s0 - tau_y)[ind] / (np.exp(eArg1) - 1.0) # eArg1 already subsetted by ind
+    if (np.any((1.0 - (1.0 - np.exp(- eArg1)) * np.exp(-eArg2)) <= 0) or \
+            np.any(np.isinf(1.0 - (1.0 - np.exp(- eArg1)) * np.exp(-eArg2)))):
+        print('bad')
+    theLog = np.log(1.0 - (1.0 - np.exp(- eArg1)) * np.exp(-eArg2))
+    scaled_stress[ind] = (tau_s[ind] + ( s0[ind] - tau_y[ind] ) * theLog / p[ind] )
+    ind2 = np.where((p <= small) * (tau_s>tau_y))
+    scaled_stress[ind2] = (
+        + tau_s[ind2]
+        - (tau_s - tau_y)[ind2] * np.exp(- eps[ind2] * theta[ind2] / (tau_s - tau_y)[ind2])
+        )
+    return scaled_stress
+
+@jit(nopython=True)
+def PTW_goodparam(s0,sInf,y0,yInf,y1,y2,beta):
+    '''checks if the given PTW parameter set is valid'''
+    return ((sInf < s0) * (yInf < y0) * (y0 < s0)   *
+        (yInf < sInf) * (y1 > s0) * (y2 > beta))
+
 class PTW_Yield_Stress(BaseModel):
+    '''This class implements the PTW flow stress model'''
     params = ['theta','p','s0','sInf','kappa','lgamma','y0','yInf','y1', 'y2']
     consts = ['rho0', 'beta', 'matomic', 'chi']
 
@@ -421,14 +487,7 @@ class PTW_Yield_Stress(BaseModel):
         tmelt = self.parent.state.Tmelt
         shear = self.parent.state.G
 
-        #if (np.any(mp.sInf > mp.s0) or np.any(mp.yInf > mp.y0) or
-        #        np.any(mp.y0 > mp.s0) or np.any(mp.yInf > mp.sInf) or np.any(mp.y1 < mp.s0) or np.any(mp.y2 < mp.beta)):
-        #    raise ConstraintError
-
-        good = (
-            (mp.sInf < mp.s0) * (mp.yInf < mp.y0) * (mp.y0 < mp.s0)   *
-            (mp.yInf < mp.sInf) * (mp.y1 > mp.s0) * (mp.y2 > mp.beta)
-            )
+        good = PTW_goodparam(mp.s0,mp.sInf,mp.y0,mp.yInf,mp.y1,mp.y2,mp.beta)
         if np.any(~good):
             #return np.array([-999.]*len(good))
             raise ConstraintError('PTW bad val')
@@ -452,88 +511,9 @@ class PTW_Yield_Stress(BaseModel):
         xfact = np.sqrt ( shear / mp.rho0 )
         #PTW characteristic strain rate [ 1/s ]
         xiDot = 0.5 * ainv * xfact * pow(6.022E29, 1.0 / 3.0) * 1.0E4
-
-        #if np.any(mp.gamma * xiDot / edot <= 0) or np.any(np.isinf(mp.gamma * xiDot / edot)):
-        #    print("bad")
-        argErf = mp.kappa * t_hom * (mp.lgamma + np.log( xiDot / edot ))
-
-        saturation1 = mp.s0 - ( mp.s0 - mp.sInf ) * erf( argErf )
-        #saturation2 = mp.s0 * np.power( edot / mp.gamma / xiDot , mp.beta )
-        #saturation2 = mp.s0 * (edot / mp.gamma / xiDot)**mp.beta
-        saturation2 = mp.s0 * np.exp(mp.beta * (-mp.lgamma + np.log(edot / xiDot)))
-        #if saturation1 > saturation2:
-        #    tau_s=saturation1 # thermal activation regime
-        #else:
-        #    tau_s=saturation2 # phonon drag regime
-
-        sat_cond = saturation1 > saturation2
-        #tau_s = sat_cond*saturation1 + (~sat_cond)*saturation2
-        tau_s = np.copy(saturation2)
-        tau_s[np.where(sat_cond)] = saturation1[sat_cond]
-
-        ayield = mp.y0 - ( mp.y0 - mp.yInf ) * erf( argErf )
-        #byield = mp.y1 * np.power( mp.gamma * xiDot / edot , -mp.y2 )
-        #cyield = mp.s0 * np.power( mp.gamma * xiDot / edot , -mp.beta)
-
-        byield = mp.y1 * np.exp( -mp.y2*(mp.lgamma + np.log( xiDot / edot )))
-        cyield = mp.s0 * np.exp( -mp.beta*(mp.lgamma + np.log( xiDot / edot )))
-
-        #if byield < cyield:
-        #    dyield = byield    # intermediate regime
-        #else:
-        #    dyield = cyield    # phonon drag regime
-
-        y_cond = (byield < cyield)
-        #dyield = y_cond*byield + (~y_cond)*cyield
-        dyield = np.copy(cyield)
-        dyield[np.where(y_cond)] = byield[y_cond]
-
-        #if ayield > dyield:
-        #    tau_y = ayield     # thermal activation regime
-        #else:
-        #    tau_y = dyield     # intermediate or high rate
-
-        y_cond2 = ayield > dyield
-        #tau_y = y_cond2*ayield + (~y_cond2)*dyield
-        tau_y = np.copy(dyield)
-        tau_y[np.where(y_cond2)] = ayield[y_cond2]
-
-
-        # if mp.p > 0:
-        #     if tau_s == tau_y:
-        #         scaled_stress = tau_s
-        #     else:
-        #         try:
-        #             eArg1  = mp.p * (tau_s - tau_y) / (mp.s0 - tau_y)
-        #             eArg2  = eps * mp.p * mp.theta / (mp.s0 - tau_y) / (exp(eArg1) - 1.0)
-        #             theLog = log(1.0 - (1.0 - exp(- eArg1)) * exp(-eArg2))
-        #         except (FloatingPointError, OverflowError) as e:
-        #             raise PTWStressError from e
-        #         scaled_stress = (tau_s + ( mp.s0 - tau_y ) * theLog / mp.p )
-        # else:
-        #     if tau_s > tau_y:
-        #         scaled_stress = ( tau_s - ( tau_s - tau_y )
-        #                         * exp( - eps * mp.theta / (tau_s - tau_y) ) )
-        #     else:
-        #         scaled_stress = tau_s
-
-        small = 1.0e-10
-        scaled_stress = tau_s
-        ind = np.where((mp.p > small) * (np.abs(tau_s - tau_y) > small))
-        eArg1 = (mp.p * (tau_s - tau_y) / (mp.s0 - tau_y))[ind]
-        eArg2 = (eps * mp.p * mp.theta)[ind] / (mp.s0 - tau_y)[ind] / (np.exp(eArg1) - 1.0) # eArg1 already subsetted by ind
-        if (np.any((1.0 - (1.0 - np.exp(- eArg1)) * np.exp(-eArg2)) <= 0) or \
-                np.any(np.isinf(1.0 - (1.0 - np.exp(- eArg1)) * np.exp(-eArg2)))):
-            print('bad')
-        theLog = np.log(1.0 - (1.0 - np.exp(- eArg1)) * np.exp(-eArg2))
-        scaled_stress[ind] = (tau_s[ind] + ( mp.s0[ind] - tau_y[ind] ) * theLog / mp.p[ind] )
-        ind2 = np.where((mp.p <= small) * (tau_s>tau_y))
-        scaled_stress[ind2] = (
-            + tau_s[ind2]
-            - (tau_s - tau_y)[ind2] * np.exp(- eps[ind2] * mp.theta[ind2] / (tau_s - tau_y)[ind2])
-            )
+        
         # should be flow stress in units of Mbar
-        out = scaled_stress * shear * 2.0
+        out = _PTW_corefct(mp.p,mp.kappa,mp.s0,mp.sInf,mp.y0,mp.yInf,mp.y1,mp.y2,mp.beta,mp.theta,mp.lgamma,xiDot,edot,t_hom,eps,small=1.0e-10) * shear * 2.0
         out[np.where(~good)] = -999.
         return out
 
