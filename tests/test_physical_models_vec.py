@@ -1,8 +1,11 @@
+import os
 import numpy as np
+import pandas as pd
 import impala.physics.physical_models_vec as physics
 
-# FIXME: (alui) Unsure what this test does. Used to be in
-# impala/physics/test.py
+test_path = os.path.dirname(__file__)
+
+# regression test for PTW
 def test_physics():
     consts = {
         'alpha'  : 0.2,
@@ -54,9 +57,12 @@ def test_physics():
     sim_strains = sim_state_histories[:,1].T  # 2d array: ntot, Nhist
     sim_stresses = sim_state_histories[:,2].T # 2d array: ntot, Nhist
 
-    # FIXME: (alui) What does this plot test? Can we convert this into a
-    # numberic test?
+    strainstress_new = pd.DataFrame(np.asarray([sim_strains[0], sim_stresses[0]]).T)
+    strainstress_new.to_csv(os.path.join(test_path,'testphysics_strainstress_new.csv'))
+    strainstress_old = pd.read_csv(os.path.join(test_path,'testphysics_strainstress_old.csv'),index_col=0)
+    assert np.allclose(strainstress_old,strainstress_new)
 
-    import matplotlib.pyplot as plt
-    plt.plot(sim_strains.T, sim_stresses.T)
-    plt.show()
+    #import matplotlib.pyplot as plt
+    #plt.plot(sim_strains.T, sim_stresses.T)
+    #plt.savefig("testphysics_strainstress.pdf",format='pdf',bbox_inches='tight')
+    # plt.show()
