@@ -32,4 +32,4 @@ LANL software release C19112
 
 Authors: Devin Francom, Peter Trubey, others
 
-[ci-status-img]: https://github.com/lanl/impala/workflows/CI/badge.svg
+[ci-status-img]: https://img.shields.io/github/actions/workflow/status/lanl/impala/CI.yml?style=flat-square&label=CI
