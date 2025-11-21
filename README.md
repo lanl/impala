@@ -5,9 +5,16 @@ Python tools for modular Bayesian model calibration.  Posterior exploration
 includes tempering and adaptive MCMC.
 
 ## Installation
-Use
-```bash
-pip install git+https://github.com/lanl/impala.git
+You can install `impala` via **pip** or **uv**.
+
+**pip**
+```sh
+pip install impala-calib
+```
+
+**uv**
+```sh
+uv add impala-calib
 ```
 
 ## Examples
