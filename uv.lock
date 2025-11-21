@@ -291,7 +291,6 @@ name = "impala-calib"
 source = { editable = "." }
 dependencies = [
     { name = "matplotlib" },
-    { name = "numba" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
@@ -304,11 +303,13 @@ dev = [
     { name = "pre-commit" },
     { name = "pytest" },
 ]
+numba = [
+    { name = "numba" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "matplotlib", specifier = ">=3.7.3" },
-    { name = "numba", specifier = ">=0.61.2" },
     { name = "numpy", specifier = ">=1.24.4" },
     { name = "scipy", specifier = ">=1.10.1" },
     { name = "seaborn", specifier = ">=0.13.2" },
@@ -319,6 +320,7 @@ dev = [
     { name = "pre-commit", specifier = ">=4.4.0" },
     { name = "pytest", specifier = ">=9.0.1" },
 ]
+numba = [{ name = "numba", specifier = ">=0.62.1" }]
 
 [[package]]
 name = "iniconfig"
