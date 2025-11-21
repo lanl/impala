@@ -62,4 +62,6 @@ def test_physics():
     strainstress_old = pd.read_csv(
         data_dir / "physics_strainstress_baseline.csv", index_col=0
     ).values
+
+    # Test that the current model output matches the baseline.
     assert np.allclose(strainstress_old, strainstress_new)
