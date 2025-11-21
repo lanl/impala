@@ -15,7 +15,6 @@ pip install git+https://github.com/lanl/impala.git
 
 ## References
 
-
 ************
 
 Copyright 2020. Triad National Security, LLC. All rights reserved.
