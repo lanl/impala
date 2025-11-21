@@ -5,16 +5,22 @@ Python tools for modular Bayesian model calibration.  Posterior exploration
 includes tempering and adaptive MCMC.
 
 ## Installation
-Use
-```bash
-pip install git+https://github.com/lanl/impala.git
+You can install `impala` via **pip** or **uv**.
+
+**pip**
+```sh
+pip install impala-calib
+```
+
+**uv**
+```sh
+uv add impala-calib
 ```
 
 ## Examples
 * [Example 1](examples/ex_friedman.ipynb)    
 
 ## References
-
 
 ************
 
@@ -33,4 +39,4 @@ LANL software release C19112
 
 Authors: Devin Francom, Peter Trubey, others
 
-[ci-status-img]: https://github.com/lanl/impala/workflows/CI/badge.svg
+[ci-status-img]: https://img.shields.io/github/actions/workflow/status/lanl/impala/CI.yml?style=flat-square&label=CI
