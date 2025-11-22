@@ -272,26 +272,7 @@ import pandas as pd
 import seaborn as sns
 dat = pd.DataFrame(sc.tran_unif(mat, setup_pool.bounds_mat, setup_pool.bounds.keys()))
 dat['col'] = ['blue']*len(uu) + ['red'] + ['green']
-### Error for "s": [3]*len(uu) + [30]*2}
-#g = sns.pairplot(dat, plot_kws={"s": [3]*len(uu) + [30]*2}, corner=True, diag_kind='hist', hue='col')
-###
-
-#dat['point_type'] = ['normal'] * len(uu) + ['special1'] + ['special2']
-
-# JeeYeon
-# Create the pairplot using Seaborn’s semantic mapping
-
-sizes = np.r_[np.full(len(uu), 9), 100, 100]  
-
-g = sns.pairplot(
-    dat,
-    hue='col',
-    diag_kind='hist',
-    corner=True,
-    plot_kws={'s': sizes, 'legend': False}  
-)
-g.add_legend()
-
+g = sns.pairplot(dat, plot_kws={"s": [3]*len(uu) + [30]*2}, corner=True, diag_kind='hist', hue='col')
 #g.set(xlim=(0,1), ylim = (0,1))
 for i in range(out_pool.theta.shape[2]):
     g.axes[i,i].set_xlim(setup_pool.bounds[dat.keys()[i]])

@@ -13,23 +13,23 @@ np.seterr(under='ignore')
 #############################################################################
 ## get data
 
-sim_inputs = np.genfromtxt('./../impala/data/Al-5083/flyer_data/sim_input.csv', delimiter=',', skip_header=1)
+sim_inputs = np.genfromtxt('~/impala/data/Al-5083/flyer_data/sim_input.csv', delimiter=',', skip_header=1)
 input_names = ['A', 'B', 'C', 'n', 'm', 'v1', 'v2', 'v3', 'G1', 'del2', 'del3']
 
-xx104 = np.genfromtxt('./../impala/data/Al-5083/flyer_data/xsims104.csv', delimiter=',')
-xx105 = np.genfromtxt('./../impala/data/Al-5083/flyer_data/xsims105.csv', delimiter=',')
-xx106 = np.genfromtxt('./../impala/data/Al-5083/flyer_data/xsims106.csv', delimiter=',')
+xx104 = np.genfromtxt('~/impala/data/Al-5083/flyer_data/xsims104.csv', delimiter=',')
+xx105 = np.genfromtxt('~/impala/data/Al-5083/flyer_data/xsims105.csv', delimiter=',')
+xx106 = np.genfromtxt('~/impala/data/Al-5083/flyer_data/xsims106.csv', delimiter=',')
 xx_all_list = [xx104, xx105, xx106]
 
-sims104 = np.genfromtxt('./../impala/data/Al-5083/flyer_data/sims104.csv', delimiter=',')
-sims105 = np.genfromtxt('./../impala/data/Al-5083/flyer_data/sims105.csv', delimiter=',')
-sims106 = np.genfromtxt('./../impala/data/Al-5083/flyer_data/sims106.csv', delimiter=',')
+sims104 = np.genfromtxt('~/impala/data/Al-5083/flyer_data/sims104.csv', delimiter=',')
+sims105 = np.genfromtxt('~/impala/data/Al-5083/flyer_data/sims105.csv', delimiter=',')
+sims106 = np.genfromtxt('~/impala/data/Al-5083/flyer_data/sims106.csv', delimiter=',')
 sims_all_list = [sims104, sims105, sims106]
 #sims_all = np.hstack(sims_all_list)
 
-obs104 = np.genfromtxt('./../impala/data/Al-5083/flyer_data/obs104.csv', delimiter=',')
-obs105 = np.genfromtxt('./../impala/data/Al-5083/flyer_data/obs105.csv', delimiter=',')
-obs106 = np.genfromtxt('./../impala/data/Al-5083/flyer_data/obs106.csv', delimiter=',')
+obs104 = np.genfromtxt('~/impala/data/Al-5083/flyer_data/obs104.csv', delimiter=',')
+obs105 = np.genfromtxt('~/impala/data/Al-5083/flyer_data/obs105.csv', delimiter=',')
+obs106 = np.genfromtxt('~/impala/data/Al-5083/flyer_data/obs106.csv', delimiter=',')
 obs_all_list = [obs104, obs105, obs106]
 #obs_all = np.hstack(obs_all_list)
 
@@ -298,7 +298,7 @@ leg.legendHandles[1].set_color('lightblue')
 leg.legendHandles[2].set_color('black')
 figure.set_size_inches(10,5)
 plt.tight_layout()
-plt.savefig('./../../Desktop/pred_vv.png', dpi=300)
+plt.savefig('~/impala_runs/Al5083/plots/pred_vv.png', dpi=300)
 plt.show()
 
 figure, axis = plt.subplots(1,nexp)
@@ -318,7 +318,7 @@ leg.legendHandles[1].set_color('lightblue')
 leg.legendHandles[2].set_color('black')
 figure.set_size_inches(10,5)
 plt.tight_layout()
-plt.savefig('./../../Desktop/pred_warping.png', dpi=300)
+plt.savefig('~/impala_runs/Al5083/plots/pred_warping.png', dpi=300)
 plt.show()
 
 
@@ -361,7 +361,7 @@ g.set(xlim=(0,1), ylim = (0,1))
 g.fig.set_size_inches(10,10)
 g
 plt.tight_layout()
-plt.savefig('./../../Desktop/params.png', dpi=300)
+plt.savefig('~/impala_runs/Al5083/plots/params.png', dpi=300)
 plt.show()
 plt.show()
 
@@ -388,7 +388,7 @@ leg.legendHandles[1].set_color('lightblue')
 leg.legendHandles[2].set_color('black')
 figure.set_size_inches(10,5)
 plt.tight_layout()
-plt.savefig('./../../Desktop/pred_misaligned.png', dpi=300)
+plt.savefig('~/impala_runs/Al5083/plots/pred_misaligned.png', dpi=300)
 plt.show()
 
 axis[0,0].title.set_text('Misaligned')
