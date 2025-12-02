@@ -625,7 +625,7 @@ class PTW_Yield_Stress(BaseModel):
         good = PTW_goodparam(
             mp.s0, mp.sInf, mp.y0, mp.yInf, mp.y1, mp.y2, mp.beta
         )
-        if np.any(~good):
+        if np.any(np.logical_not(good)):
             # return np.array([-999.]*len(good))
             raise ConstraintError("PTW bad val")
 
@@ -671,7 +671,7 @@ class PTW_Yield_Stress(BaseModel):
             * shear
             * 2.0
         )
-        out[np.where(~good)] = -999.0
+        out[np.where(np.logical_not(good))] = -999.0
         return out
 
 
