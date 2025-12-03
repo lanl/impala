@@ -1,8 +1,6 @@
-#!/usr/bin/env python3
 import statistics as stat
 import unittest
 
-# import sys
 import numpy as np
 
 from impala.physics import physical_models_vec as pmh
@@ -187,7 +185,3 @@ class TestJCYieldStress(unittest.TestCase):
         ])
 
         self.assertTrue(rel_diff < stress_tol)
-
-
-if __name__ == "__main__":
-    unittest.main()

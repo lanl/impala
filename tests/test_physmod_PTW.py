@@ -1,8 +1,5 @@
-#!/usr/bin/env python3
-import statistics as stat
 import unittest
 
-# import sys
 import numpy as np
 
 from impala.physics import physical_models_vec as pmh
@@ -118,7 +115,7 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
         # Set maximum relative tolerance between FLAG and Python
         stress_tol = 0.01
         stress_FLAG = 521.416e-5  # Units MBar
-        rel_diff = abs(stress_emax - stress_FLAG) / stat.mean([
+        rel_diff = abs(stress_emax - stress_FLAG) / np.mean([
             stress_emax,
             stress_FLAG,
         ])
@@ -160,7 +157,7 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
         # Set maximum relative tolerance between FLAG and Python
         stress_tol = 0.09
         stress_FLAG = 458.198e-5  # Units MBar
-        rel_diff = abs(stress_emax - stress_FLAG) / stat.mean([
+        rel_diff = abs(stress_emax - stress_FLAG) / np.mean([
             stress_emax,
             stress_FLAG,
         ])
@@ -202,7 +199,7 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
         # Set maximum relative tolerance between FLAG and Python
         stress_tol = 0.11
         stress_FLAG = 418.512e-5  # Units MBar
-        rel_diff = abs(stress_emax - stress_FLAG) / stat.mean([
+        rel_diff = abs(stress_emax - stress_FLAG) / np.mean([
             stress_emax,
             stress_FLAG,
         ])
@@ -244,7 +241,7 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
         # Set maximum relative tolerance between FLAG and Python
         stress_tol = 0.09
         stress_FLAG = 385.751e-5  # Units MBar
-        rel_diff = abs(stress_emax - stress_FLAG) / stat.mean([
+        rel_diff = abs(stress_emax - stress_FLAG) / np.mean([
             stress_emax,
             stress_FLAG,
         ])
@@ -358,7 +355,7 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
         # Set maximum relative tolerance between FLAG and Python
         stress_tol = 0.06
         stress_FLAG = 485.301e-5  # Units MBar
-        rel_diff = abs(stress_emax - stress_FLAG) / stat.mean([
+        rel_diff = abs(stress_emax - stress_FLAG) / np.mean([
             stress_emax,
             stress_FLAG,
         ])
@@ -396,7 +393,7 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
         # Set maximum relative tolerance between FLAG and Python
         stress_tol = 0.02
         stress_FLAG = 439.790e-5  # Units MBar
-        rel_diff = abs(stress_emax - stress_FLAG) / stat.mean([
+        rel_diff = abs(stress_emax - stress_FLAG) / np.mean([
             stress_emax,
             stress_FLAG,
         ])
@@ -438,7 +435,7 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
         # Set maximum relative tolerance between FLAG and Python
         stress_tol = 0.01
         stress_FLAG = 401.108e-5  # Units MBar
-        rel_diff = abs(stress_emax - stress_FLAG) / stat.mean([
+        rel_diff = abs(stress_emax - stress_FLAG) / np.mean([
             stress_emax,
             stress_FLAG,
         ])
@@ -480,7 +477,7 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
         # Set maximum relative tolerance between FLAG and Python
         stress_tol = 0.02
         stress_FLAG = 375.227e-5  # Units MBar
-        rel_diff = abs(stress_emax - stress_FLAG) / stat.mean([
+        rel_diff = abs(stress_emax - stress_FLAG) / np.mean([
             stress_emax,
             stress_FLAG,
         ])
@@ -594,7 +591,7 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
         # Set maximum relative tolerance between FLAG and Python
         stress_tol = 0.04
         stress_FLAG = 427.011e-5  # Units MBar
-        rel_diff = abs(stress_emax - stress_FLAG) / stat.mean([
+        rel_diff = abs(stress_emax - stress_FLAG) / np.mean([
             stress_emax,
             stress_FLAG,
         ])
@@ -632,7 +629,7 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
         # Set maximum relative tolerance between FLAG and Python
         stress_tol = 0.02
         stress_FLAG = 410.483e-5  # Units MBar
-        rel_diff = abs(stress_emax - stress_FLAG) / stat.mean([
+        rel_diff = abs(stress_emax - stress_FLAG) / np.mean([
             stress_emax,
             stress_FLAG,
         ])
@@ -674,7 +671,7 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
         # Set maximum relative tolerance between FLAG and Python
         stress_tol = 0.01
         stress_FLAG = 373.629e-5  # Units MBar
-        rel_diff = abs(stress_emax - stress_FLAG) / stat.mean([
+        rel_diff = abs(stress_emax - stress_FLAG) / np.mean([
             stress_emax,
             stress_FLAG,
         ])
@@ -716,7 +713,7 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
         # Set maximum relative tolerance between FLAG and Python
         stress_tol = 0.02
         stress_FLAG = 351.103e-5  # Units MBar
-        rel_diff = abs(stress_emax - stress_FLAG) / stat.mean([
+        rel_diff = abs(stress_emax - stress_FLAG) / np.mean([
             stress_emax,
             stress_FLAG,
         ])

@@ -1,7 +1,5 @@
-#!/usr/bin/env python3
 import unittest
 
-# import sys
 import numpy as np
 
 from impala.physics import physical_models_vec as pmh
@@ -63,7 +61,3 @@ class TestConstantYieldStress(unittest.TestCase):
         # [time, strain, stress, temp, shear_mod, density]
         for time_i in results_const_y:
             self.assertEqual(self.consts["yield_stress"], time_i[2])
-
-
-if __name__ == "__main__":
-    unittest.main()
