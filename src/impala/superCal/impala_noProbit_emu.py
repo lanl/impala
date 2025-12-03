@@ -302,12 +302,12 @@ def chol_sample_1per_constraints(means, covs, cf, bounds_mat, bounds_keys, bound
     chols = cholesky(covs)
     cand = means + np.einsum('ijk,ik->ij', chols, normal(size = means.shape))
     good = cf(tran_unif(cand, bounds_mat, bounds_keys), bounds)
-    while np.any(~good):
-        cand[np.where(~good)] = (
-            + means[~good]
-            + np.einsum('ijk,ik->ij', chols[~good], normal(size = ((~good).sum(), means.shape[1])))
+    while np.any(np.logical_not(good)):
+        cand[np.where(np.logical_not(good))] = (
+            + means[np.logical_not(good)]
+            + np.einsum('ijk,ik->ij', chols[np.logical_not(good)], normal(size = ((np.logical_not(good)).sum(), means.shape[1])))
             )
-        good[~good] = cf(tran_unif(cand[~good], bounds_mat, bounds_keys), bounds)
+        good[np.logical_not(good)] = cf(tran_unif(cand[np.logical_not(good)], bounds_mat, bounds_keys), bounds)
     return cand
 
 def chol_sample_nper_constraints(means, covs, n, cf, bounds_mat, bounds_keys, bounds):
@@ -317,13 +317,13 @@ def chol_sample_nper_constraints(means, covs, n, cf, bounds_mat, bounds_keys, bo
             np.einsum('ijk,ink->inj', chols, normal(size = (means.shape[0], n, means.shape[1])))
     for i in range(cand.shape[0]):
         goodi = cf(tran_unif(cand[i], bounds_mat, bounds_keys),bounds)
-        while np.any(~goodi):
-            cand[i, np.where(~goodi)[0]] = (
+        while np.any(np.logical_not(goodi)):
+            cand[i, np.where(np.logical_not(goodi))[0]] = (
                 + means[i]
-                + np.einsum('ik,nk->ni', chols[i], normal(size = ((~goodi).sum(), means.shape[1])))
+                + np.einsum('ik,nk->ni', chols[i], normal(size = ((np.logical_not(goodi)).sum(), means.shape[1])))
                 )
-            goodi[np.where(~goodi)[0]] = (
-                cf(tran_unif(cand[i,np.where(~goodi)[0]], bounds_mat, bounds_keys), bounds)
+            goodi[np.where(np.logical_not(goodi))[0]] = (
+                cf(tran_unif(cand[i,np.where(np.logical_not(goodi))[0]], bounds_mat, bounds_keys), bounds)
                 )
     return cand
 
@@ -580,10 +580,10 @@ def calibHier(setup):
     good = setup.checkConstraints(
         tran_unif(theta0_start, setup.bounds_mat, setup.bounds.keys()), setup.bounds,
         )
-    while np.any(~good):
-        theta0_start[np.where(~good)] = initfunc_unif(size = [(~good).sum(), setup.p])
-        good[np.where(~good)] = setup.checkConstraints(
-            tran_unif(theta0_start[np.where(~good)], setup.bounds_mat, setup.bounds.keys()),
+    while np.any(np.logical_not(good)):
+        theta0_start[np.where(np.logical_not(good))] = initfunc_unif(size = [(np.logical_not(good)).sum(), setup.p])
+        good[np.where(np.logical_not(good))] = setup.checkConstraints(
+            tran_unif(theta0_start[np.where(np.logical_not(good))], setup.bounds_mat, setup.bounds.keys()),
             setup.bounds,
             )
     theta0[0] = theta0_start
@@ -1163,10 +1163,10 @@ def calibPool(setup):
         ]
     theta_start = initfunc_unif(size=[setup.ntemps, setup.p])
     good = setup.checkConstraints(tran_unif(theta_start, setup.bounds_mat, setup.bounds.keys()), setup.bounds)
-    while np.any(~good):
-        theta_start[np.where(~good)] = initfunc_unif(size = [(~good).sum(), setup.p])
-        good[np.where(~good)] = setup.checkConstraints(
-            tran_unif(theta_start[np.where(~good)], setup.bounds_mat, setup.bounds.keys()),
+    while np.any(np.logical_not(good)):
+        theta_start[np.where(np.logical_not(good))] = initfunc_unif(size = [(np.logical_not(good)).sum(), setup.p])
+        good[np.where(np.logical_not(good))] = setup.checkConstraints(
+            tran_unif(theta_start[np.where(np.logical_not(good))], setup.bounds_mat, setup.bounds.keys()),
             setup.bounds,
             )
     theta[0] = theta_start

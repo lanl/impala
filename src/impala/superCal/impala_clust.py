@@ -283,10 +283,10 @@ def calibClust(setup, parallel = False):
     good = setup.checkConstraints(
         tran_unif(theta0_start, setup.bounds_mat, setup.bounds.keys()), setup.bounds,
         )
-    while np.any(~good):
-        theta0_start[np.where(~good)] = initfunc_unif(size = [(~good).sum(), setup.p])
-        good[np.where(~good)] = setup.checkConstraints(
-            tran_unif(theta0_start[np.where(~good)], setup.bounds_mat, setup.bounds.keys()),
+    while np.any(np.logical_not(good)):
+        theta0_start[np.where(np.logical_not(good))] = initfunc_unif(size = [(np.logical_not(good)).sum(), setup.p])
+        good[np.where(np.logical_not(good))] = setup.checkConstraints(
+            tran_unif(theta0_start[np.where(np.logical_not(good))], setup.bounds_mat, setup.bounds.keys()),
             setup.bounds,
             )
     theta0[0] = theta0_start
