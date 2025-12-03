@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 import numpy as np
@@ -7,7 +6,7 @@ import pandas as pd
 import impala.physics.physical_models_vec as physics
 
 
-# regression test for PTW
+# Regression test for PTW
 def test_physics():
     test_dir = Path(__file__).parent
     data_dir = test_dir / "data"
