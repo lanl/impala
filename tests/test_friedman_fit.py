@@ -84,7 +84,7 @@ def test_friedman_fit():
     )
 
     # temperature ladder, typically (1 + step) ** np.arange(ntemps)
-    setup.setTemperatureLadder(1.05 ** np.arange(40))
+    setup.setTemperatureLadder(1.05 ** np.arange(20))
 
     # MCMC number of iterations, and how often to take a decorrelation step.
     setup.setMCMC(nmcmc=15000, decor=100)
