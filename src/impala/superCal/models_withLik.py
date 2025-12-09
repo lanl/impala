@@ -97,6 +97,7 @@ class ModelBassPca_mult(AbstractModel):
         self.nexp = exp_ind.max() + 1
         self.exp_ind = exp_ind
         self.s2 = s2
+        self.constants = None
         if s2=='gibbs':
             raise "Cannot use Gibbs s2 for emulator models."
         return
@@ -175,6 +176,7 @@ class ModelBpprPca_mult(AbstractModel):
         self.nexp = exp_ind.max() + 1
         self.exp_ind = exp_ind
         self.s2 = s2
+        self.constants = None
         if s2=='gibbs':
             raise "Cannot use Gibbs s2 for emulator models."
         return
@@ -261,6 +263,7 @@ class ModelBassPca_func(AbstractModel):
         self.nexp = exp_ind.max() + 1
         self.exp_ind = exp_ind
         self.s2 = s2
+        self.constants = None
         if s2=='gibbs':
             raise "Cannot use Gibbs s2 for emulator models."
         return
@@ -374,6 +377,7 @@ class ModelBpprPca_func(AbstractModel):
         self.nexp = exp_ind.max() + 1
         self.exp_ind = exp_ind
         self.s2 = s2
+        self.constants = None
         if s2=='gibbs':
             raise "Cannot use Gibbs s2 for emulator models."
         return
@@ -465,7 +469,7 @@ class ModelF(AbstractModel):
         self.exp_ind = exp_ind
         self.nd = 0
         self.s2 = s2
-        return
+        self.constants = None
 
     def eval(self, parmat, pool = None, nugget=False):
         parmat_array = np.vstack([parmat[v] for v in self.input_names]).T # get correct subset/ordering of inputs
@@ -517,7 +521,8 @@ class ModelF_bigdata(AbstractModel):
         self.inv = np.linspace(1,16200,16200) #define to speed up lik_cov_inv evaluation
         self.m = np.linspace(1,16200,16200) #define to speed up discrep_sample evaluation
         self.vmat = np.linspace(1,16200,16200) #define to speed up discrep_sample evaluation
-        return
+        self.constants = None
+
     def eval(self, parmat, pool = None, nugget=False):
         parmat_array = np.vstack([parmat[v] for v in self.input_names]).T # get correct subset/ordering of inputs
         if pool is True:

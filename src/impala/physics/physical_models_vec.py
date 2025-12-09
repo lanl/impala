@@ -51,7 +51,7 @@ class PTWStressError(FloatingPointError):
 ## Model Definitions
 
 
-class BaseModel(object):
+class BaseModel():
     """
     Base Class for property Models (flow stress, specific heat, melt, density,
     etc.).  Must be instantiated as a child of MaterialModel
@@ -700,38 +700,32 @@ class Stein_Flow_Stress(BaseModel):
 ## Parameters Definition
 
 
-class ModelParameters(object):
+class ModelParameters():
     params = []
     consts = []
     parent = None
 
     def update_parameters(self, x):
-        if type(x) is np.ndarray:
-            self.__dict__.update({x: y for x, y in zip(self.params, x)})
-        elif type(x) is dict:
+        if isinstance(x , np.ndarray):
+            self.__dict__.update(dict(zip(self.params, x)))
+        elif isinstance(x , dict):
             for key in self.params:
                 self.__dict__[key] = x[key]
-        elif type(x) is list:
-            try:
-                assert len(x) == len(self.params)
-            except AssertionError:
-                print("Incorrect number of parameters!")
-                raise
-            for i in range(len(self.params)):
-                self.__dict__[self.params[i]] = x[i]
+        elif isinstance(x , list):
+            assert len(x) == len(self.params) , "Incorrect number of parameters!"
+            for i,xi in enumerate(self.params):
+                self.__dict__[self.params[i]] = xi
         else:
-            raise ValueError("Type {} is not supported.".format(type(x)))
-        return
+            raise ValueError(f"Type {type(x)} is not supported.")
 
     def __init__(self, parent):
         self.parent = parent
-        return
 
 
 ## State Definition
 
 
-class MaterialState(object):
+class MaterialState():
     T = None
     Tmelt = None
     stress = None
@@ -751,7 +745,7 @@ class MaterialState(object):
 ## Material Model Definition
 
 
-class MaterialModel(object):
+class MaterialModel():
     def __init__(
         self,
         parameters=ModelParameters,
@@ -809,7 +803,6 @@ class MaterialModel(object):
 
         self.parameters.params = params
         self.parameters.consts = consts
-        return
 
     def get_parameter_list(
         self,
@@ -853,20 +846,28 @@ class MaterialModel(object):
         self.state.Tmelt = self.melt_model.value()
         self.state.G = self.shear_modulus.value()
         self.state.stress = self.flow_stress.value(edot)
-        return
 
     def update_parameters(self, x):
         self.parameters.update_parameters(x)
-        return
 
     def initialize(self, parameters, constants):
         """
         Initialize the model at a given set of parameters, constants
         """
+        ## if user assumed one or more parameters constant, they would be in the constants var instead;
+        ## check for this first:
+        if not isinstance(self.parameters.params,list):
+            self.parameters.params = list(self.parameters.params)
+        if not isinstance(self.parameters.consts, set):
+            self.parameters.consts = set(self.parameters.consts)
+        user_constants = set(self.parameters.params).difference(parameters)
+        for usercnst in user_constants:
+            self.parameters.consts |= {usercnst}
         try:
             self.parameters.__dict__.update(
-                {key: parameters[key] for key in self.parameters.params},
+                {key: parameters[key] for key in set(self.parameters.params).difference(user_constants)},
             )
+            self.parameters.__dict__ |= {key: constants[key] for key in user_constants}
         except KeyError:
             print(
                 "{} missing from list of supplied parameters".format(

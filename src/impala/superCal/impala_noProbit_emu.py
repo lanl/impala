@@ -23,6 +23,7 @@ from collections import namedtuple
 #import multiprocessing as mp
 #import pandas as pd
 from .pbar import pbar
+from ..physics import PTW_goodparam
 np.seterr(under='ignore')
 
 # no probit tranform for hierarchical and DP versions
@@ -147,6 +148,7 @@ class CalibSetup:
             model.discrep_tau = discrep_tau
 
         self.models.append(model)
+        self.constants = self.models[0].constants
         self.nexp += 1
         self.sd_est.append(sd_est)
         self.s2_df.append(s2_df)
@@ -245,17 +247,21 @@ class CalibSetup:
 ### Helper Functions ###
 ########################
 
-def constraints_ptw(x, bounds):
-    good = (x['sInf'] < x['s0']) * (x['yInf'] < x['y0']) * (x['y0'] < x['s0']) * (x['yInf'] < x['sInf']) * (x['s0'] < x['y1'])
-    for k in list(bounds.keys()):
-        good = good * (x[k] < bounds[k][1]) * (x[k] > bounds[k][0])
+def constraints_ptw(x, bounds, constants={}):
+    '''Checks if the given PTW parameter set is valid. Required input variables: parameters 'x' and their (calibration) bounds 'bounds;
+       Any parameter the user chose to keep constant during a calibration goes into the optional variable 'constants' instead of x and bounds.'''
+    y = constants | x 
+    good = PTW_goodparam(s0=y['s0'],sInf=y['sInf'],y0=y['y0'],yInf=y['yInf'],y1=y['y1'],y2=y['y2'],beta=y['beta'])
+    for k,v in bounds.items():
+        good = good * (x[k] < v[1]) * (x[k] > v[0])
     return good
 
-def cf_bounds(x, bounds):
+def cf_bounds(x, bounds, constants={}):
+    '''default for bounds checking, variable 'constants' is not used here and present only to have a consistent api.'''
     k = list(bounds.keys())[0]
     good = x[k] < bounds[k][1]
-    for k in list(bounds.keys()):
-        good = good * (x[k] < bounds[k][1]) * (x[k] > bounds[k][0])
+    for k,v in bounds.items():
+        good = good * (x[k] < v[1]) * (x[k] > v[0])
     return good
 
 def normalize(x, bounds):
@@ -297,11 +303,11 @@ def chol_sample_1per(means, covs):
 def chol_sample_nper(means, covs, n):
     return means + np.einsum('ijk,ilk->ilj', cholesky(covs), normal(size = (*means.shape, n)))
 
-def chol_sample_1per_constraints(means, covs, cf, bounds_mat, bounds_keys, bounds):
+def chol_sample_1per_constraints(means, covs, cf, bounds_mat, bounds_keys, bounds, consts):
     """ Sample with constraints.  If fail constraints, resample. """
     chols = cholesky(covs)
     cand = means + np.einsum('ijk,ik->ij', chols, normal(size = means.shape))
-    good = cf(tran_unif(cand, bounds_mat, bounds_keys), bounds)
+    good = cf(tran_unif(cand, bounds_mat, bounds_keys), bounds, consts)
     while np.any(np.logical_not(good)):
         cand[np.where(np.logical_not(good))] = (
             + means[np.logical_not(good)]
@@ -310,13 +316,13 @@ def chol_sample_1per_constraints(means, covs, cf, bounds_mat, bounds_keys, bound
         good[np.logical_not(good)] = cf(tran_unif(cand[np.logical_not(good)], bounds_mat, bounds_keys), bounds)
     return cand
 
-def chol_sample_nper_constraints(means, covs, n, cf, bounds_mat, bounds_keys, bounds):
+def chol_sample_nper_constraints(means, covs, n, cf, bounds_mat, bounds_keys, bounds, consts):
     """ Sample with constraints.  If fail constraints, resample. """
     chols = cholesky(covs)
     cand = means.reshape(means.shape[0], 1, means.shape[1]) + \
             np.einsum('ijk,ink->inj', chols, normal(size = (means.shape[0], n, means.shape[1])))
     for i in range(cand.shape[0]):
-        goodi = cf(tran_unif(cand[i], bounds_mat, bounds_keys),bounds)
+        goodi = cf(tran_unif(cand[i], bounds_mat, bounds_keys),bounds, consts)
         while np.any(np.logical_not(goodi)):
             cand[i, np.where(np.logical_not(goodi))[0]] = (
                 + means[i]
@@ -578,13 +584,13 @@ def calibHier(setup):
         ]
     theta0_start = initfunc_unif(size=[setup.ntemps, setup.p])
     good = setup.checkConstraints(
-        tran_unif(theta0_start, setup.bounds_mat, setup.bounds.keys()), setup.bounds,
+        tran_unif(theta0_start, setup.bounds_mat, setup.bounds.keys()), setup.bounds, setup.constants
         )
     while np.any(np.logical_not(good)):
         theta0_start[np.where(np.logical_not(good))] = initfunc_unif(size = [(np.logical_not(good)).sum(), setup.p])
         good[np.where(np.logical_not(good))] = setup.checkConstraints(
             tran_unif(theta0_start[np.where(np.logical_not(good))], setup.bounds_mat, setup.bounds.keys()),
-            setup.bounds,
+            setup.bounds, setup.constants
             )
     theta0[0] = theta0_start
     Sigma0[0] = np.eye(setup.p) * 0.25**2
@@ -604,7 +610,7 @@ def calibHier(setup):
     for i in range(setup.nexp):
         theta[i][0] = chol_sample_nper_constraints(
                 theta0[0], Sigma0[0], setup.ntheta[i], setup.checkConstraints, 
-                setup.bounds_mat, setup.bounds.keys(), setup.bounds,
+                setup.bounds_mat, setup.bounds.keys(), setup.bounds, setup.constants
                 )
         pred_curr[i] = setup.models[i].eval(
                 tran_unif(theta[i][0].reshape(setup.ntemps * setup.ntheta[i], setup.p),
@@ -740,7 +746,7 @@ def calibHier(setup):
             theta_cand_mat[i][:] = theta_cand[i].reshape(setup.ntemps * setup.ntheta[i], setup.p)
             # Check constraints
             good_values_mat[i][:] = setup.checkConstraints(
-                tran_unif(theta_cand_mat[i], setup.bounds_mat, setup.bounds.keys()), setup.bounds,
+                tran_unif(theta_cand_mat[i], setup.bounds_mat, setup.bounds.keys()), setup.bounds, setup.constants
                 )
             good_values[i][:] = good_values_mat[i].reshape(setup.ntemps, setup.ntheta[i])
             # Generate Predictions at new Theta values
@@ -812,7 +818,7 @@ def calibHier(setup):
                     theta_cand_mat[i][:] = theta_cand[i].reshape(setup.ntheta[i]*setup.ntemps, setup.p)
                     # Compute constraint flags
                     good_values_mat[i][:] = setup.checkConstraints(
-                        tran(theta_cand_mat[i], setup.bounds_mat, setup.bounds.keys()), setup.bounds,
+                        tran(theta_cand_mat[i], setup.bounds_mat, setup.bounds.keys()), setup.bounds, setup.constants
                         )
                     # Generate predictions at "good" candidate values
                     theta_eval_mat[i][good_values_mat[i]] = theta_cand_mat[i][good_values_mat[i]]
@@ -983,7 +989,7 @@ def calibHier(setup):
             )
         theta0[m][:] = chol_sample_1per_constraints(
             np.einsum('tlk,tk->tl', cc, dd), cc,
-            setup.checkConstraints, setup.bounds_mat, setup.bounds.keys(), setup.bounds,
+            setup.checkConstraints, setup.bounds_mat, setup.bounds.keys(), setup.bounds, setup.constants
             )
 
         ## Gibbs update Sigma0
@@ -1009,7 +1015,7 @@ def calibHier(setup):
                 theta0_cand = theta0[m].copy()
                 theta0_cand[:,k] += z
                 good_values_theta0 = setup.checkConstraints(
-                    tran_unif(theta0_cand, setup.bounds_mat, setup.bounds.keys()), setup.bounds,
+                    tran_unif(theta0_cand, setup.bounds_mat, setup.bounds.keys()), setup.bounds, setup.constants
                     )
                 
                 for i in range(setup.nexp):
@@ -1020,7 +1026,7 @@ def calibHier(setup):
                     theta_cand_mat[i][:] = theta_cand[i].reshape(setup.ntheta[i]*setup.ntemps, setup.p)
                     # Compute constraint flags
                     good_values_mat[i][:] = setup.checkConstraints(
-                        tran_unif(theta_cand_mat[i], setup.bounds_mat, setup.bounds.keys()), setup.bounds,
+                        tran_unif(theta_cand_mat[i], setup.bounds_mat, setup.bounds.keys()), setup.bounds, setup.constants
                         )
                     # Generate predictions at "good" candidate values
                     theta_eval_mat[i][good_values_mat[i]] = theta_cand_mat[i][good_values_mat[i]]
@@ -1117,7 +1123,7 @@ def calibHier(setup):
 
     #theta_parent_01 = chol_sample_1per_constraints(
     #    theta0[:,0], Sigma0[:,0], setup.checkConstraints,
-    #    setup.bounds_mat, setup.bounds.keys(), setup.bounds,
+    #    setup.bounds_mat, setup.bounds.keys(), setup.bounds, setup.constants
     #    )
 
 
@@ -1162,12 +1168,12 @@ def calibPool(setup):
         for i in range(setup.nexp)
         ]
     theta_start = initfunc_unif(size=[setup.ntemps, setup.p])
-    good = setup.checkConstraints(tran_unif(theta_start, setup.bounds_mat, setup.bounds.keys()), setup.bounds)
+    good = setup.checkConstraints(tran_unif(theta_start, setup.bounds_mat, setup.bounds.keys()), setup.bounds, setup.constants)
     while np.any(np.logical_not(good)):
         theta_start[np.where(np.logical_not(good))] = initfunc_unif(size = [(np.logical_not(good)).sum(), setup.p])
         good[np.where(np.logical_not(good))] = setup.checkConstraints(
             tran_unif(theta_start[np.where(np.logical_not(good))], setup.bounds_mat, setup.bounds.keys()),
-            setup.bounds,
+            setup.bounds, setup.constants
             )
     theta[0] = theta_start
 
@@ -1283,7 +1289,7 @@ def calibPool(setup):
         #     + np.einsum('ijk,ik->ij', cholesky(cov_theta_cand.S), normal(size = (setup.ntemps, setup.p)))
         #     )
         good_values = setup.checkConstraints(
-            tran_unif(theta_cand, setup.bounds_mat, setup.bounds.keys()), setup.bounds,
+            tran_unif(theta_cand, setup.bounds_mat, setup.bounds.keys()), setup.bounds, setup.constants
             )
         #------------------------------------------------------------------------------------------
         # get predictions and SSE
@@ -1334,7 +1340,7 @@ def calibPool(setup):
                 theta_cand = theta[m].copy()
                 theta_cand[:,k] = initfunc_unif(size = setup.ntemps) # independence proposal, will vectorize of columns
                 good_values = setup.checkConstraints(
-                    tran_unif(theta_cand, setup.bounds_mat, setup.bounds.keys()), setup.bounds,
+                    tran_unif(theta_cand, setup.bounds_mat, setup.bounds.keys()), setup.bounds, setup.constants
                     )
                 pred_cand = [_.copy() for _ in pred_curr]
                 llik_cand[:] = llik_curr.copy()
