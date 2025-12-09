@@ -409,12 +409,37 @@ class Simple_Shear_Modulus(BaseModel):
 
         return mp.G0 * (1.0 - mp.alpha * (temp / tmelt))
 
+@jit(nopython=True)
+def _BGP_PW_Shear_Modulus(rho,G0,rho_0,gamma_1,gamma_2,q2,alpha,temp,tmelt):
+    '''BPG model provides cold shear, i.e. shear modulus at zero temperature as a function of density.
+      PW describes the (linear) temperature dependence of the shear modulus. (Same dependency as
+      in Simple_Shear_modulus.)
+      With these two models combined, we get the shear modulus as a function of density and temperature;
+      see Burakovsky, Greeff, Preston, Phys. Rev. B67 (2003) 094107, DOI:10.1103/PhysRevB.67.094107 '''
+    cold_shear = G0 * np.power(rho/rho_0, 4./3.) * np.exp(
+        6.0
+        * gamma_1
+        * (1/np.cbrt(rho_0) - 1/np.cbrt(rho))
+        + 2
+        * gamma_2
+        / q2
+        * (np.power(rho_0, -q2) - np.power(rho, -q2))
+    )
+    gnow = cold_shear * (1.0 - alpha * (temp / tmelt))
+
+    gnow[np.where(temp >= tmelt)] = 0.0
+    gnow[np.where(gnow < 0)] = 0.0
+
+    # if temp >= tmelt: gnow = 0.0
+    # if gnow < 0.0:    gnow = 0.0
+    return gnow
 
 class BGP_PW_Shear_Modulus(BaseModel):
-    # BPG model provides cold shear, i.e. shear modulus at zero temperature as a function of density.
-    # PW describes the (lienar) temperature dependence of the shear modulus. (Same dependency as
-    # in Simple_Shear_modulus.)
-    # With these two models combined, we get the shear modulus as a function of density and temperature.
+    '''BPG model provides cold shear, i.e. shear modulus at zero temperature as a function of density.
+      PW describes the (linear) temperature dependence of the shear modulus. (Same dependency as
+      in Simple_Shear_modulus.)
+      With these two models combined, we get the shear modulus as a function of density and temperature;
+      see Burakovsky, Greeff, Preston, Phys. Rev. B67 (2003) 094107, DOI:10.1103/PhysRevB.67.094107 '''
 
     consts = ["G0", "rho_0", "gamma_1", "gamma_2", "q2", "alpha"]
 
@@ -423,23 +448,7 @@ class BGP_PW_Shear_Modulus(BaseModel):
         rho = self.parent.state.rho
         temp = self.parent.state.T
         tmelt = self.parent.state.Tmelt
-
-        cold_shear = mp.G0 * np.exp(
-            6.0
-            * mp.gamma_1
-            * (np.power(mp.rho_0, -1.0 / 3.0) - np.power(rho, -1.0 / 3.0))
-            + 2
-            * mp.gamma_2
-            / mp.q2
-            * (np.power(mp.rho_0, -mp.q2) - np.power(rho, -mp.q2))
-        )
-        gnow = cold_shear * (1.0 - mp.alpha * (temp / tmelt))
-
-        gnow[np.where(temp >= tmelt)] = 0.0
-        gnow[np.where(gnow < 0)] = 0.0
-
-        # if temp >= tmelt: gnow = 0.0
-        # if gnow < 0.0:    gnow = 0.0
+        gnow = _BGP_PW_Shear_Modulus(rho=rho,G0=mp.G0,rho_0=mp.rho_0,gamma_1=mp.gamma_1,gamma_2=mp.gamma_2,q2=mp.q2,alpha=mp.alpha,temp=temp,tmelt=tmelt)
         return gnow
 
 
@@ -537,18 +546,19 @@ def _PTW_corefct(
     small=1.0e-10,
 ):
     """jit-compiled subroutine of the PTW_Yield_Stress class"""
-    argErf = kappa * t_hom * (lgamma + np.log(xiDot / edot))
+    log_xid_ed = np.log(xiDot / edot)
+    argErf = kappa * t_hom * (lgamma + log_xid_ed)
     Erfres = erf(argErf)
 
     saturation1 = s0 - (s0 - sInf) * Erfres
-    saturation2 = s0 * np.exp(beta * (-lgamma + np.log(edot / xiDot)))
+    saturation2 = s0 * np.exp(beta * (-lgamma - log_xid_ed))
     sat_cond = saturation1 > saturation2
     tau_s = np.copy(saturation2)
     tau_s[np.where(sat_cond)] = saturation1[sat_cond]
 
     ayield = y0 - (y0 - yInf) * Erfres
-    byield = y1 * np.exp(-y2 * (lgamma + np.log(xiDot / edot)))
-    cyield = s0 * np.exp(-beta * (lgamma + np.log(xiDot / edot)))
+    byield = y1 * np.exp(-y2 * (lgamma + log_xid_ed))
+    cyield = s0 * np.exp(-beta * (lgamma + log_xid_ed))
 
     y_cond = byield < cyield
     dyield = np.copy(cyield)
