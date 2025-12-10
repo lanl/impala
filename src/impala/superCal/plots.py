@@ -82,7 +82,7 @@ class PTW_Plotter(object):
 
         theta_parent = impala.chol_sample_1per_constraints(
                 self.out.theta0[sel, 0], self.out.Sigma0[sel, 0], self.setup.checkConstraints,
-                self.setup.bounds_mat, self.setup.bounds.keys(), self.setup.bounds,
+                self.setup.bounds_mat, self.setup.bounds.keys(), self.setup.bounds, self.setup.constants
                 )
         
         for i in range(self.setup.nexp):
@@ -338,7 +338,7 @@ class PTW_Plotter(object):
         sel = uu#np.arange(20000, self.setup.nmcmc, 10)
         theta_parent = impala.chol_sample_1per_constraints(
             self.out.theta0[sel,0], self.out.Sigma0[sel,0], self.setup.checkConstraints,
-            self.setup.bounds_mat, self.setup.bounds.keys(), self.setup.bounds,
+            self.setup.bounds_mat, self.setup.bounds.keys(), self.setup.bounds, self.setup.constants
             )
         theta_names = list(self.setup.bounds.keys())
         theta0_unst = impala.unnormalize(self.out.theta0[sel, 0, :], self.setup.bounds_mat)

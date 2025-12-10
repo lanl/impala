@@ -277,7 +277,7 @@ def calibClust(setup, parallel = False):
     theta0 = np.empty([setup.nmcmc, setup.ntemps, setup.p])
     #theta0[0] = chol_sample_1per_constraints(
     #        np.zeros((setup.ntemps, setup.p)), np.array([np.eye(setup.p)] * setup.ntemps),
-    #        setup.checkConstraints, setup.bounds_mat, setup.bounds.keys(), setup.bounds,
+    #        setup.checkConstraints, setup.bounds_mat, setup.bounds.keys(), setup.bounds, setup.constants
     #        )
     theta0_start = initfunc_unif(size=[setup.ntemps, setup.p])
     good = setup.checkConstraints(
@@ -313,7 +313,7 @@ def calibClust(setup, parallel = False):
     theta      = np.empty((setup.nmcmc, setup.ntemps, setup.nclustmax, setup.p))
     theta[0]   = chol_sample_nper_constraints(
            theta0[0], Sigma0[0], setup.nclustmax, setup.checkConstraints,
-           setup.bounds_mat, setup.bounds.keys(), setup.bounds,
+           setup.bounds_mat, setup.bounds.keys(), setup.bounds, setup.constants
            )
     theta_hist = [np.empty((setup.nmcmc, setup.ntemps, setup.ntheta[i], setup.p)) for i in range(setup.nexp)]
     theta_cand = np.empty(theta_wide_shape)
@@ -651,7 +651,7 @@ def calibClust(setup, parallel = False):
             )
         theta0[m][:] = chol_sample_1per_constraints(
             np.einsum('tlk,tk->tl', cc, dd), cc,
-            setup.checkConstraints, setup.bounds_mat, setup.bounds.keys(), setup.bounds,
+            setup.checkConstraints, setup.bounds_mat, setup.bounds.keys(), setup.bounds, setup.constants
             )
 
         ###########################       
@@ -690,7 +690,7 @@ def calibClust(setup, parallel = False):
         ###############################################
         theta_cand[:] = chol_sample_nper_constraints(
                 theta0[m], Sigma0[m], setup.nclustmax, setup.checkConstraints,
-                setup.bounds_mat, setup.bounds.keys(), setup.bounds,
+                setup.bounds_mat, setup.bounds.keys(), setup.bounds, setup.constants
                 )
         theta[m,~theta_ext] = theta_cand[~theta_ext]    
 

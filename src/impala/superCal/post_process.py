@@ -94,7 +94,7 @@ def ptw_prediction_plots_hier(setup, calib_out, path, mcmc_use, ylim=None, alpha
 
     theta_parent = sc.chol_sample_1per_constraints(
             calib_out.theta0[mcmc_use, 0], calib_out.Sigma0[mcmc_use, 0], setup.checkConstraints,
-            setup.bounds_mat, setup.bounds.keys(), setup.bounds,
+            setup.bounds_mat, setup.bounds.keys(), setup.bounds, setup.constants
             )
     
     for i in range(setup.nexp):
@@ -266,7 +266,7 @@ def pairwise_theta_plot_hier(setup, calib_out, path, mcmc_use, alpha=0.05, highl
         highlight = [range(setup.ntheta[k]) for k in range(setup.nexp)]
     theta_parent = sc.chol_sample_1per_constraints(
         calib_out.theta0[mcmc_use,0], calib_out.Sigma0[mcmc_use,0], setup.checkConstraints,
-        setup.bounds_mat, setup.bounds.keys(), setup.bounds,
+        setup.bounds_mat, setup.bounds.keys(), setup.bounds, setup.constants
         )
     theta_names = list(setup.bounds.keys())
     theta0_unst = sc.unnormalize(calib_out.theta0[mcmc_use, 0, :], setup.bounds_mat)
@@ -645,7 +645,7 @@ def save_parent_strength(setup, ptw_mod, calib_out, mcmc_use, path):
 
     theta_parent = sc.chol_sample_1per_constraints(
         calib_out.theta0[mcmc_use,0], calib_out.Sigma0[mcmc_use,0], setup.checkConstraints,
-        setup.bounds_mat, setup.bounds.keys(), setup.bounds,
+        setup.bounds_mat, setup.bounds.keys(), setup.bounds, setup.constants
         )
     theta_parent_native = sc.unnormalize(theta_parent, setup.bounds_mat)
 
