@@ -64,13 +64,14 @@ class CalibSetup:
         self.tl = np.array(1.)
         self.itl = 1/self.tl
         self.bounds = bounds # should be a dict so we can use parameter names
-        self.bounds_mat =np.array([v for v in bounds.values()])
+        self.bounds_mat =np.array(list(bounds.values()))
         self.p = bounds.__len__()
         if constraint_func is None:
             constraint_func = lambda *x: True
         if constraint_func=='bounds':
             constraint_func = cf_bounds
-        self.checkConstraints = constraint_func
+        # self.checkConstraints = constraint_func  ## see wrapper below (maintains run-script compatibility with earlier impala versions)
+        self._constraint_func = constraint_func
         self.nmcmc = 10000
         self.nburn = 5000
         self.thin = 5
@@ -88,7 +89,23 @@ class CalibSetup:
         self.theta_ind = []
         self.nswap = 5
         self.s2_prior_kern = []
-        return
+        self.constants = None
+    
+    def checkConstraints(self,x,*args):
+        '''Calls the constraint function set by the user. Argument x contains the parameters to be checked
+           using self.bounds and self.constants (required if parameters are kept constant by the user.
+           Optional variables *args can be used to override the latter two, i.e. if len(args)=1, 
+           only self.bounds is overridden with the user-provided input, if len(args)=2, both are.
+           Further additional arguments are currently ignored.'''
+        bounds = self.bounds
+        consts = self.constants
+        lenargs = len(args)
+        if lenargs>=1:
+            bounds = args[0]
+        if lenargs>=2:
+            consts = args[1]
+        return self._constraint_func(x,bounds,consts)
+
     def addVecExperiments(self, yobs, model, sd_est, s2_df, s2_ind, meas_error_cor=None, 
             theta_ind=None, D=None, discrep_tau=1):
         """
@@ -583,14 +600,11 @@ def calibHier(setup):
         for i in range(setup.nexp)
         ]
     theta0_start = initfunc_unif(size=[setup.ntemps, setup.p])
-    good = setup.checkConstraints(
-        tran_unif(theta0_start, setup.bounds_mat, setup.bounds.keys()), setup.bounds, setup.constants
-        )
+    good = setup.checkConstraints(tran_unif(theta0_start, setup.bounds_mat, setup.bounds.keys()))
     while np.any(np.logical_not(good)):
         theta0_start[np.where(np.logical_not(good))] = initfunc_unif(size = [(np.logical_not(good)).sum(), setup.p])
         good[np.where(np.logical_not(good))] = setup.checkConstraints(
-            tran_unif(theta0_start[np.where(np.logical_not(good))], setup.bounds_mat, setup.bounds.keys()),
-            setup.bounds, setup.constants
+            tran_unif(theta0_start[np.where(np.logical_not(good))], setup.bounds_mat, setup.bounds.keys())
             )
     theta0[0] = theta0_start
     Sigma0[0] = np.eye(setup.p) * 0.25**2
@@ -745,9 +759,7 @@ def calibHier(setup):
             #theta_cand[i][:] = chol_sample_1per(theta[i][m-1], S[i])
             theta_cand_mat[i][:] = theta_cand[i].reshape(setup.ntemps * setup.ntheta[i], setup.p)
             # Check constraints
-            good_values_mat[i][:] = setup.checkConstraints(
-                tran_unif(theta_cand_mat[i], setup.bounds_mat, setup.bounds.keys()), setup.bounds, setup.constants
-                )
+            good_values_mat[i][:] = setup.checkConstraints(tran_unif(theta_cand_mat[i], setup.bounds_mat, setup.bounds.keys()))
             good_values[i][:] = good_values_mat[i].reshape(setup.ntemps, setup.ntheta[i])
             # Generate Predictions at new Theta values
             theta_eval_mat[i][good_values_mat[i]] = theta_cand_mat[i][good_values_mat[i]]
@@ -818,7 +830,7 @@ def calibHier(setup):
                     theta_cand_mat[i][:] = theta_cand[i].reshape(setup.ntheta[i]*setup.ntemps, setup.p)
                     # Compute constraint flags
                     good_values_mat[i][:] = setup.checkConstraints(
-                        tran(theta_cand_mat[i], setup.bounds_mat, setup.bounds.keys()), setup.bounds, setup.constants
+                        tran(theta_cand_mat[i], setup.bounds_mat, setup.bounds.keys())
                         )
                     # Generate predictions at "good" candidate values
                     theta_eval_mat[i][good_values_mat[i]] = theta_cand_mat[i][good_values_mat[i]]
@@ -1014,9 +1026,7 @@ def calibHier(setup):
                 z = np.random.normal()*.1
                 theta0_cand = theta0[m].copy()
                 theta0_cand[:,k] += z
-                good_values_theta0 = setup.checkConstraints(
-                    tran_unif(theta0_cand, setup.bounds_mat, setup.bounds.keys()), setup.bounds, setup.constants
-                    )
+                good_values_theta0 = setup.checkConstraints(tran_unif(theta0_cand, setup.bounds_mat, setup.bounds.keys()))
                 
                 for i in range(setup.nexp):
                     # Find new candidate values for theta
@@ -1025,9 +1035,7 @@ def calibHier(setup):
                     theta_cand[i][:,:,k] += z
                     theta_cand_mat[i][:] = theta_cand[i].reshape(setup.ntheta[i]*setup.ntemps, setup.p)
                     # Compute constraint flags
-                    good_values_mat[i][:] = setup.checkConstraints(
-                        tran_unif(theta_cand_mat[i], setup.bounds_mat, setup.bounds.keys()), setup.bounds, setup.constants
-                        )
+                    good_values_mat[i][:] = setup.checkConstraints(tran_unif(theta_cand_mat[i], setup.bounds_mat, setup.bounds.keys()))
                     # Generate predictions at "good" candidate values
                     theta_eval_mat[i][good_values_mat[i]] = theta_cand_mat[i][good_values_mat[i]]
                     good_values[i][:] = (good_values_mat[i].reshape(setup.ntemps, setup.ntheta[i]).T * good_values_theta0).T
@@ -1168,12 +1176,11 @@ def calibPool(setup):
         for i in range(setup.nexp)
         ]
     theta_start = initfunc_unif(size=[setup.ntemps, setup.p])
-    good = setup.checkConstraints(tran_unif(theta_start, setup.bounds_mat, setup.bounds.keys()), setup.bounds, setup.constants)
+    good = setup.checkConstraints(tran_unif(theta_start, setup.bounds_mat, setup.bounds.keys()))
     while np.any(np.logical_not(good)):
         theta_start[np.where(np.logical_not(good))] = initfunc_unif(size = [(np.logical_not(good)).sum(), setup.p])
         good[np.where(np.logical_not(good))] = setup.checkConstraints(
-            tran_unif(theta_start[np.where(np.logical_not(good))], setup.bounds_mat, setup.bounds.keys()),
-            setup.bounds, setup.constants
+            tran_unif(theta_start[np.where(np.logical_not(good))], setup.bounds_mat, setup.bounds.keys())
             )
     theta[0] = theta_start
 
@@ -1288,9 +1295,7 @@ def calibPool(setup):
         #     + theta[m-1]
         #     + np.einsum('ijk,ik->ij', cholesky(cov_theta_cand.S), normal(size = (setup.ntemps, setup.p)))
         #     )
-        good_values = setup.checkConstraints(
-            tran_unif(theta_cand, setup.bounds_mat, setup.bounds.keys()), setup.bounds, setup.constants
-            )
+        good_values = setup.checkConstraints(tran_unif(theta_cand, setup.bounds_mat, setup.bounds.keys()))
         #------------------------------------------------------------------------------------------
         # get predictions and SSE
         pred_cand = [_.copy() for _ in pred_curr]
@@ -1339,9 +1344,7 @@ def calibPool(setup):
             for k in range(setup.p):
                 theta_cand = theta[m].copy()
                 theta_cand[:,k] = initfunc_unif(size = setup.ntemps) # independence proposal, will vectorize of columns
-                good_values = setup.checkConstraints(
-                    tran_unif(theta_cand, setup.bounds_mat, setup.bounds.keys()), setup.bounds, setup.constants
-                    )
+                good_values = setup.checkConstraints(tran_unif(theta_cand, setup.bounds_mat, setup.bounds.keys()))
                 pred_cand = [_.copy() for _ in pred_curr]
                 llik_cand[:] = llik_curr.copy()
 
