@@ -1,14 +1,14 @@
+import matplotlib.pyplot as plt
 import numpy as np
-from impala import superCal as sc
-import matplotlib.pyplot as plt
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_pdf import PdfPages
-from scipy.stats import gaussian_kde
-from scipy.interpolate import interp1d
-import seaborn as sns
-from matplotlib.lines import Line2D
 import pandas as pd
 import scipy.stats as ss
+import seaborn as sns
+from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.lines import Line2D
+from scipy.interpolate import interp1d
+from scipy.stats import gaussian_kde
+
+from impala import superCal as sc
 
 
 def func_prediction_plot(

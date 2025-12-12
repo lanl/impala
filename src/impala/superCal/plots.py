@@ -1,20 +1,18 @@
-from math import ceil, sqrt
 
-from pygments import highlight
 
 # from models_withLik import interpolate_experiment
-from impala.superCal import interpolate_experiment
-import seaborn as sns
-import numpy as np
-import impala.superCal as impala
 import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+
+import impala.superCal as impala
 
 plt.rcParams.update({"figure.max_open_warning": 0})
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.lines import Line2D
-from scipy.stats import gaussian_kde
-from scipy.interpolate import interp1d
 from numpy.random import uniform
+from scipy.interpolate import interp1d
+from scipy.stats import gaussian_kde
 
 
 # diagnostic plots to include:

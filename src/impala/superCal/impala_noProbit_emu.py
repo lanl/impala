@@ -8,23 +8,23 @@
 ### Imports ###
 ###############
 
-import numpy as np
 import time
-import scipy
-from scipy import stats
-from scipy.special import multigammaln
-from numpy.random import uniform, normal, beta, choice, gamma
-from math import sqrt, floor, log
-from scipy.special import erf, erfinv, gammaln
-from scipy.stats import invwishart
-from numpy.linalg import cholesky, slogdet
 from collections import namedtuple
+from math import floor, log, sqrt
+
+import numpy as np
+import scipy
+from numpy.linalg import cholesky, slogdet
+from numpy.random import normal, uniform
+from scipy.special import erf, erfinv, gammaln, multigammaln
+from scipy.stats import invwishart
+
+from ..physics import PTW_goodparam
 
 # from itertools import repeat
 # import multiprocessing as mp
 # import pandas as pd
 from .pbar import pbar
-from ..physics import PTW_goodparam
 
 np.seterr(under="ignore")
 

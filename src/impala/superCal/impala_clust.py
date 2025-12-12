@@ -1,18 +1,16 @@
-import numpy as np
-import time
-import scipy
-from scipy import stats
-from scipy.special import multigammaln
-from numpy.random import uniform, normal, beta, choice, gamma
-from math import sqrt, floor, log
-from scipy.special import erf, erfinv, gammaln
-from scipy.stats import invwishart
-from numpy.linalg import cholesky, slogdet
-from itertools import repeat
 import multiprocessing as mp
+import time
 from collections import namedtuple
-import impala
+from math import sqrt
+
+import numpy as np
+import scipy
+from numpy.linalg import slogdet
+from numpy.random import beta, choice, gamma, uniform
+from scipy.stats import invwishart
+
 from impala.superCal.impala_noProbit_emu import *
+
 # import pbar
 # np.seterr(under='ignore')
 
