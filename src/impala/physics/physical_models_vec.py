@@ -505,21 +505,23 @@ class Simple_Shear_Modulus(BaseModel):
 
         return mp.G0 * (1.0 - mp.alpha * (temp / tmelt))
 
+
 @jit(nopython=True)
-def _BGP_PW_Shear_Modulus(rho,G0,rho_0,gamma_1,gamma_2,q2,alpha,temp,tmelt):
-    '''BPG model provides cold shear, i.e. shear modulus at zero temperature as a function of density.
-      PW describes the (linear) temperature dependence of the shear modulus. (Same dependency as
-      in Simple_Shear_modulus.)
-      With these two models combined, we get the shear modulus as a function of density and temperature;
-      see Burakovsky, Greeff, Preston, Phys. Rev. B67 (2003) 094107, DOI:10.1103/PhysRevB.67.094107 '''
-    cold_shear = G0 * np.power(rho/rho_0, 4./3.) * np.exp(
-        6.0
-        * gamma_1
-        * (1/np.cbrt(rho_0) - 1/np.cbrt(rho))
-        + 2
-        * gamma_2
-        / q2
-        * (np.power(rho_0, -q2) - np.power(rho, -q2))
+def _BGP_PW_Shear_Modulus(
+    rho, G0, rho_0, gamma_1, gamma_2, q2, alpha, temp, tmelt
+):
+    """BPG model provides cold shear, i.e. shear modulus at zero temperature as a function of density.
+    PW describes the (linear) temperature dependence of the shear modulus. (Same dependency as
+    in Simple_Shear_modulus.)
+    With these two models combined, we get the shear modulus as a function of density and temperature;
+    see Burakovsky, Greeff, Preston, Phys. Rev. B67 (2003) 094107, DOI:10.1103/PhysRevB.67.094107"""
+    cold_shear = (
+        G0
+        * np.power(rho / rho_0, 4.0 / 3.0)
+        * np.exp(
+            6.0 * gamma_1 * (1 / np.cbrt(rho_0) - 1 / np.cbrt(rho))
+            + 2 * gamma_2 / q2 * (np.power(rho_0, -q2) - np.power(rho, -q2))
+        )
     )
     gnow = cold_shear * (1.0 - alpha * (temp / tmelt))
 
@@ -530,12 +532,13 @@ def _BGP_PW_Shear_Modulus(rho,G0,rho_0,gamma_1,gamma_2,q2,alpha,temp,tmelt):
     # if gnow < 0.0:    gnow = 0.0
     return gnow
 
+
 class BGP_PW_Shear_Modulus(BaseModel):
-    '''BPG model provides cold shear, i.e. shear modulus at zero temperature as a function of density.
-      PW describes the (linear) temperature dependence of the shear modulus. (Same dependency as
-      in Simple_Shear_modulus.)
-      With these two models combined, we get the shear modulus as a function of density and temperature;
-      see Burakovsky, Greeff, Preston, Phys. Rev. B67 (2003) 094107, DOI:10.1103/PhysRevB.67.094107 '''
+    """BPG model provides cold shear, i.e. shear modulus at zero temperature as a function of density.
+    PW describes the (linear) temperature dependence of the shear modulus. (Same dependency as
+    in Simple_Shear_modulus.)
+    With these two models combined, we get the shear modulus as a function of density and temperature;
+    see Burakovsky, Greeff, Preston, Phys. Rev. B67 (2003) 094107, DOI:10.1103/PhysRevB.67.094107"""
 
     consts = ["G0", "rho_0", "gamma_1", "gamma_2", "q2", "alpha"]
 
@@ -544,7 +547,17 @@ class BGP_PW_Shear_Modulus(BaseModel):
         rho = self.parent.state.rho
         temp = self.parent.state.T
         tmelt = self.parent.state.Tmelt
-        gnow = _BGP_PW_Shear_Modulus(rho=rho,G0=mp.G0,rho_0=mp.rho_0,gamma_1=mp.gamma_1,gamma_2=mp.gamma_2,q2=mp.q2,alpha=mp.alpha,temp=temp,tmelt=tmelt)
+        gnow = _BGP_PW_Shear_Modulus(
+            rho=rho,
+            G0=mp.G0,
+            rho_0=mp.rho_0,
+            gamma_1=mp.gamma_1,
+            gamma_2=mp.gamma_2,
+            q2=mp.q2,
+            alpha=mp.alpha,
+            temp=temp,
+            tmelt=tmelt,
+        )
         return gnow
 
 
