@@ -8,6 +8,10 @@ physical_models_vec.py
         DJ Luscher,    djl@lanl.gov
         Peter Trubey,  ptrubey@lanl.gov
         Devin Francom, dfrancom@lanl.gov
+        JeeYeon Plohr, jplohr@lanl.gov
+        Sky Sjue, sjue@lanl.gov
+        Lauren VanDervort, @lvandervort@lanl.gov
+        Daniel N Blaschke, dblaschke@lanl.gov
 """
 
 import math
@@ -70,7 +74,9 @@ class BaseModel():
         self.parent = parent
 
 
+########################
 # Specific Heat Models
+########################
 
 
 class Constant_Specific_Heat(BaseModel):
@@ -129,6 +135,24 @@ class Quadratic_Specific_Heat(BaseModel):
         return cnow
 
 
+class Cubic_Specific_Heat(BaseModel):
+    """
+    Cubic Specific Heat Model
+    """
+
+    consts = ["c0", "c1", "c2", "c3"]
+
+    def value(self, *args):
+        tnow = self.parent.state.T
+        cnow = (
+            self.parent.parameters.c0
+            + self.parent.parameters.c1 * tnow
+            + self.parent.parameters.c2 * tnow**2
+            + self.parent.parameters.c3 * tnow**3
+        )
+        return cnow
+
+
 class Piecewise_Linear_Specific_Heat(BaseModel):
     """
     Piecewise Linear Specific Heat Model
@@ -181,7 +205,58 @@ class Piecewise_Quadratic_Specific_Heat(BaseModel):
         return cnow
 
 
+class Piecewise_Cubic_Specific_Heat(BaseModel):
+    """
+    Cubic Specific Heat Model
+    Piecewise Quadratic Specific Heat Model
+    Cv (T) = c0_0 + c1_0 * T + c2_0 * T**2  + c3_0 * T**3 for T<=T_t
+    Cv (T) = c0_1 + c1_1 * T + c2_1 * T**2  + c3_1 * T**3 for T>T_t
+    """
+
+    consts = [
+        "T_t",
+        "c0_0",
+        "c1_0",
+        "c2_0",
+        "c3_0",
+        "c0_1",
+        "c1_1",
+        "c2_1",
+        "c3_1",
+    ]
+
+    def value(self, *args):
+        tnow = self.parent.state.T
+        pow_0_coeff = np.repeat(self.parent.parameters.c0_0, len(tnow))
+        pow_1_coeff = np.repeat(self.parent.parameters.c1_0, len(tnow))
+        pow_2_coeff = np.repeat(self.parent.parameters.c2_0, len(tnow))
+        pow_3_coeff = np.repeat(self.parent.parameters.c3_0, len(tnow))
+
+        pow_0_coeff[np.where(tnow > self.parent.parameters.T_t)] = (
+            self.parent.parameters.c0_1
+        )
+        pow_1_coeff[np.where(tnow > self.parent.parameters.T_t)] = (
+            self.parent.parameters.c1_1
+        )
+        pow_2_coeff[np.where(tnow > self.parent.parameters.T_t)] = (
+            self.parent.parameters.c2_1
+        )
+        pow_3_coeff[np.where(tnow > self.parent.parameters.T_t)] = (
+            self.parent.parameters.c3_1
+        )
+
+        cnow = (
+            pow_0_coeff
+            + pow_1_coeff * tnow
+            + pow_2_coeff * tnow * tnow
+            + pow_3_coeff * tnow * tnow * tnow
+        )
+        return cnow
+
+
+########################
 # Density Models
+########################
 
 
 class Constant_Density(BaseModel):
@@ -258,7 +333,9 @@ class Cubic_Density(BaseModel):
         return rnow
 
 
+########################
 # Melt Temperature Models
+########################
 
 
 class Constant_Melt_Temperature(BaseModel):
@@ -317,6 +394,25 @@ class Quadratic_Melt_Temperature(BaseModel):
             + self.parent.parameters.tm1 * rnow
             + self.parent.parameters.tm2 * rnow**2
         )
+        return tmeltnow
+
+
+class Cubic_Melt_Temperature(BaseModel):
+    """
+    Cubic Melt Temperature Model
+    """
+
+    consts = ["tm0", "tm1", "tm2", "tm3"]
+
+    def value(self, *args):
+        rnow = self.parent.state.rho
+        tmeltnow = (
+            self.parent.parameters.tm0
+            + self.parent.parameters.tm1 * rnow
+            + self.parent.parameters.tm2 * rnow**2
+            + self.parent.parameters.tm3 * rnow**3
+        )
+        # print(tmeltnow)
         return tmeltnow
 
 
@@ -410,11 +506,39 @@ class Simple_Shear_Modulus(BaseModel):
         return mp.G0 * (1.0 - mp.alpha * (temp / tmelt))
 
 
+@jit(nopython=True)
+def _BGP_PW_Shear_Modulus(
+    rho, G0, rho_0, gamma_1, gamma_2, q2, alpha, temp, tmelt
+):
+    """BPG model provides cold shear, i.e. shear modulus at zero temperature as a function of density.
+    PW describes the (linear) temperature dependence of the shear modulus. (Same dependency as
+    in Simple_Shear_modulus.)
+    With these two models combined, we get the shear modulus as a function of density and temperature;
+    see Burakovsky, Greeff, Preston, Phys. Rev. B67 (2003) 094107, DOI:10.1103/PhysRevB.67.094107"""
+    cold_shear = (
+        G0
+        * np.power(rho / rho_0, 4.0 / 3.0)
+        * np.exp(
+            6.0 * gamma_1 * (1 / np.cbrt(rho_0) - 1 / np.cbrt(rho))
+            + 2 * gamma_2 / q2 * (np.power(rho_0, -q2) - np.power(rho, -q2))
+        )
+    )
+    gnow = cold_shear * (1.0 - alpha * (temp / tmelt))
+
+    gnow[np.where(temp >= tmelt)] = 0.0
+    gnow[np.where(gnow < 0)] = 0.0
+
+    # if temp >= tmelt: gnow = 0.0
+    # if gnow < 0.0:    gnow = 0.0
+    return gnow
+
+
 class BGP_PW_Shear_Modulus(BaseModel):
-    # BPG model provides cold shear, i.e. shear modulus at zero temperature as a function of density.
-    # PW describes the (lienar) temperature dependence of the shear modulus. (Same dependency as
-    # in Simple_Shear_modulus.)
-    # With these two models combined, we get the shear modulus as a function of density and temperature.
+    """BPG model provides cold shear, i.e. shear modulus at zero temperature as a function of density.
+    PW describes the (linear) temperature dependence of the shear modulus. (Same dependency as
+    in Simple_Shear_modulus.)
+    With these two models combined, we get the shear modulus as a function of density and temperature;
+    see Burakovsky, Greeff, Preston, Phys. Rev. B67 (2003) 094107, DOI:10.1103/PhysRevB.67.094107"""
 
     consts = ["G0", "rho_0", "gamma_1", "gamma_2", "q2", "alpha"]
 
@@ -423,23 +547,17 @@ class BGP_PW_Shear_Modulus(BaseModel):
         rho = self.parent.state.rho
         temp = self.parent.state.T
         tmelt = self.parent.state.Tmelt
-
-        cold_shear = mp.G0 * np.exp(
-            6.0
-            * mp.gamma_1
-            * (np.power(mp.rho_0, -1.0 / 3.0) - np.power(rho, -1.0 / 3.0))
-            + 2
-            * mp.gamma_2
-            / mp.q2
-            * (np.power(mp.rho_0, -mp.q2) - np.power(rho, -mp.q2))
+        gnow = _BGP_PW_Shear_Modulus(
+            rho=rho,
+            G0=mp.G0,
+            rho_0=mp.rho_0,
+            gamma_1=mp.gamma_1,
+            gamma_2=mp.gamma_2,
+            q2=mp.q2,
+            alpha=mp.alpha,
+            temp=temp,
+            tmelt=tmelt,
         )
-        gnow = cold_shear * (1.0 - mp.alpha * (temp / tmelt))
-
-        gnow[np.where(temp >= tmelt)] = 0.0
-        gnow[np.where(gnow < 0)] = 0.0
-
-        # if temp >= tmelt: gnow = 0.0
-        # if gnow < 0.0:    gnow = 0.0
         return gnow
 
 
@@ -537,18 +655,19 @@ def _PTW_corefct(
     small=1.0e-10,
 ):
     """jit-compiled subroutine of the PTW_Yield_Stress class"""
-    argErf = kappa * t_hom * (lgamma + np.log(xiDot / edot))
+    log_xid_ed = np.log(xiDot / edot)
+    argErf = kappa * t_hom * (lgamma + log_xid_ed)
     Erfres = erf(argErf)
 
     saturation1 = s0 - (s0 - sInf) * Erfres
-    saturation2 = s0 * np.exp(beta * (-lgamma + np.log(edot / xiDot)))
+    saturation2 = s0 * np.exp(beta * (-lgamma - log_xid_ed))
     sat_cond = saturation1 > saturation2
     tau_s = np.copy(saturation2)
     tau_s[np.where(sat_cond)] = saturation1[sat_cond]
 
     ayield = y0 - (y0 - yInf) * Erfres
-    byield = y1 * np.exp(-y2 * (lgamma + np.log(xiDot / edot)))
-    cyield = s0 * np.exp(-beta * (lgamma + np.log(xiDot / edot)))
+    byield = y1 * np.exp(-y2 * (lgamma + log_xid_ed))
+    cyield = s0 * np.exp(-beta * (lgamma + log_xid_ed))
 
     y_cond = byield < cyield
     dyield = np.copy(cyield)
