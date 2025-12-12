@@ -55,7 +55,7 @@ class PTWStressError(FloatingPointError):
 ## Model Definitions
 
 
-class BaseModel():
+class BaseModel:
     """
     Base Class for property Models (flow stress, specific heat, melt, density,
     etc.).  Must be instantiated as a child of MaterialModel
@@ -819,20 +819,20 @@ class Stein_Flow_Stress(BaseModel):
 ## Parameters Definition
 
 
-class ModelParameters():
+class ModelParameters:
     params = []
     consts = []
     parent = None
 
     def update_parameters(self, x):
-        if isinstance(x , np.ndarray):
+        if isinstance(x, np.ndarray):
             self.__dict__.update(dict(zip(self.params, x)))
-        elif isinstance(x , dict):
+        elif isinstance(x, dict):
             for key in self.params:
                 self.__dict__[key] = x[key]
-        elif isinstance(x , list):
-            assert len(x) == len(self.params) , "Incorrect number of parameters!"
-            for i,xi in enumerate(self.params):
+        elif isinstance(x, list):
+            assert len(x) == len(self.params), "Incorrect number of parameters!"
+            for i, xi in enumerate(self.params):
                 self.__dict__[self.params[i]] = xi
         else:
             raise ValueError(f"Type {type(x)} is not supported.")
@@ -844,7 +844,7 @@ class ModelParameters():
 ## State Definition
 
 
-class MaterialState():
+class MaterialState:
     T = None
     Tmelt = None
     stress = None
@@ -864,7 +864,7 @@ class MaterialState():
 ## Material Model Definition
 
 
-class MaterialModel():
+class MaterialModel:
     def __init__(
         self,
         parameters=ModelParameters,
@@ -975,7 +975,7 @@ class MaterialModel():
         """
         ## if user assumed one or more parameters constant, they would be in the constants var instead;
         ## check for this first:
-        if not isinstance(self.parameters.params,list):
+        if not isinstance(self.parameters.params, list):
             self.parameters.params = list(self.parameters.params)
         if not isinstance(self.parameters.consts, set):
             self.parameters.consts = set(self.parameters.consts)
@@ -984,9 +984,16 @@ class MaterialModel():
             self.parameters.consts |= {usercnst}
         try:
             self.parameters.__dict__.update(
-                {key: parameters[key] for key in set(self.parameters.params).difference(user_constants)},
+                {
+                    key: parameters[key]
+                    for key in set(self.parameters.params).difference(
+                        user_constants
+                    )
+                },
             )
-            self.parameters.__dict__ |= {key: constants[key] for key in user_constants}
+            self.parameters.__dict__ |= {
+                key: constants[key] for key in user_constants
+            }
         except KeyError:
             print(
                 "{} missing from list of supplied parameters".format(
