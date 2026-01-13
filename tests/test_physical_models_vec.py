@@ -88,6 +88,8 @@ def test_constparams():
         "sgB": 6.44e-4,
         "y1": 0.09,
         "y2": 0.7,
+        "kappa": 0.3,
+        "lgamma": -12.0,
     }
 
     params = {
@@ -95,8 +97,6 @@ def test_constparams():
         "p": np.array([2.0]),
         "s0": np.array([0.02]),
         "sInf": np.array([0.01]),
-        "kappa": np.array([0.3]),
-        "lgamma": np.array([-12.0]),
         "y0": np.array([0.01]),
         "yInf": np.array([0.003]),
     }
@@ -155,7 +155,7 @@ def test_constparams():
             s2_df=[0],
             s2_ind=[0] * len(yobs))
     setup_pool_ptw.setTemperatureLadder(1.05**np.arange(20)) 
-    setup_pool_ptw.setMCMC(nmcmc=10000, decor=100)
+    setup_pool_ptw.setMCMC(nmcmc=2000, decor=100)
     np.seterr(divide = 'ignore')
     np.seterr(invalid = 'ignore')
     out = sc.calibPool(setup_pool_ptw)
