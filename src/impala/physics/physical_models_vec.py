@@ -600,14 +600,16 @@ class Constant_Yield_Stress(BaseModel):
         )
 
 
-def fast_pow(a, b):
-    """
-    Numpy power is slow, this is faster.  Gets a**b for a and b np arrays.
-    """
-    cond = a > 0
-    out = a * 0.0
-    out[cond] = np.exp(b[cond] * np.log(a[cond]))
-    return out
+# def fast_pow(a, b):
+#     """
+#     Numpy power is slow, this is faster.  Gets a**b for a and b np arrays.
+#     """
+#     ## no longer true in numpy 1.24 (=our requirement in toml file) and higher; deprecate / remove?
+#     cond = a > 0
+#     out = a * 0.0
+#     out[cond] = np.exp(b[cond] * np.log(a[cond]))
+#     return out
+fast_pow = np.power ## do we need this?
 
 
 def pos(a):
@@ -628,9 +630,9 @@ class JC_Yield_Stress(BaseModel):
         th = pos((t - mp.Tref) / (tmelt - mp.Tref))
 
         Y = (
-            (mp.A + mp.B * fast_pow(eps, mp.n))
+            (mp.A + mp.B * np.power(eps, mp.n))
             * (1.0 + mp.C * np.log(edot / mp.edot0))
-            * (1.0 - fast_pow(th, mp.m))
+            * (1.0 - np.power(th, mp.m))
         )
         return Y
 
@@ -715,6 +717,7 @@ class PTW_Yield_Stress(BaseModel):
         "theta",
         "p",
         "s0",
+        'beta',
         "sInf",
         "kappa",
         "lgamma",
@@ -723,7 +726,7 @@ class PTW_Yield_Stress(BaseModel):
         "y1",
         "y2",
     ]
-    consts = ["rho0", "beta", "matomic", "chi"]
+    consts = ["rho0", "matomic", "chi"]
 
     # @profile
     def value(self, edot):
@@ -804,7 +807,7 @@ class Stein_Flow_Stress(BaseModel):
         tmelt = self.parent.state.Tmelt
         shear = self.parent.state.G
         eps = self.parent.state.strain
-        fnow = fast_pow((1.0 + mp.beta * (mp.epsi + eps)), mp.n)
+        fnow = np.power((1.0 + mp.beta * (mp.epsi + eps)), mp.n)
 
         cond1 = fnow * mp.y0 > mp.ymax
         fnow[cond1] = (mp.ymax / mp.y0)[cond1]
@@ -908,17 +911,8 @@ class MaterialModel:
             + self.density.consts
         )
 
-        try:
-            assert len(set(params)) == len(params)
-        except AssertionError:
-            print("Some Duplicate Parameters between models")
-            raise
-
-        try:
-            assert len(set(params).intersection(set(consts))) == 0
-        except AssertionError:
-            print("Duplicate item in parameters and constants")
-            raise
+        assert len(set(params)) == len(params) , "Some Duplicate Parameters between models"
+        assert len(set(params).intersection(set(consts))) == 0 , "Duplicate item in parameters and constants"
 
         self.parameters.params = params
         self.parameters.consts = consts
