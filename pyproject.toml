@@ -17,6 +17,11 @@ dependencies = [
 license = "BSD-3-Clause"
 license-files = ["LICENSE"]
 
+[project.optional-dependencies]
+numba = [
+    "numba>=0.62.1",
+]
+
 [build-system]
 requires = ["setuptools>=68.1", "versioningit"]
 build-backend = "setuptools.build_meta"
@@ -29,9 +34,6 @@ default-tag = "0.0.1"
 dev = [
     "pre-commit>=4.4.0",
     "pytest>=9.0.1",
-]
-numba = [
-    "numba>=0.62.1",
 ]
 
 [tool.ruff]
