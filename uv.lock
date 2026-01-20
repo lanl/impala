@@ -324,7 +324,6 @@ dev = [
     { name = "pre-commit", specifier = ">=4.4.0" },
     { name = "pytest", specifier = ">=9.0.1" },
 ]
-numba = []
 
 [[package]]
 name = "iniconfig"
