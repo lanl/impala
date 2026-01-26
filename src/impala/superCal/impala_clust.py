@@ -9,7 +9,9 @@ from numpy.linalg import slogdet
 import scipy
 from scipy.stats import invwishart
 
-from .impala_noProbit_emu import *
+from .impala_noProbit_emu import cov_4d_pcm, chol_sample_1per, initfunc_unif, tran_unif, \
+    chol_sample_1per_constraints, chol_sample_nper_constraints, \
+    mvnorm_logpdf, mvnorm_logpdf_, invwishart_logpdf, gamma_logpdf, invgamma_logpdf
 
 # import pbar
 # np.seterr(under='ignore')
