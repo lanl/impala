@@ -52,12 +52,12 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
         """
         PTW, const. g0, Tm. Rates less than 1e-6/us (~1/s), should be isothermal T=const
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_ptw_cg0Tm.set_history_variables(
             emax=np.array([1.0]), edot=np.array([1e-7]), nhist=1000
         )
         self.model_ptw_cg0Tm.initialize(self.params, self.consts)
         self.model_ptw_cg0Tm.initialize_state(T=np.array([298.0]))
-        results_ptw_cg0Tm = self.model_ptw_cg0Tm.compute_state_history(shist)
+        results_ptw_cg0Tm = self.model_ptw_cg0Tm.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         self.assertEqual(results_ptw_cg0Tm[0][3], results_ptw_cg0Tm[-1][3])
@@ -66,12 +66,12 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
         """
         PTW, const. g0, Tm. Rates greater than 1e-6/us (~1/s), temp. changes adiabatically
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_ptw_cg0Tm.set_history_variables(
             emax=np.array([1.0]), edot=np.array([1e-2]), nhist=1000
         )
         self.model_ptw_cg0Tm.initialize(self.params, self.consts)
         self.model_ptw_cg0Tm.initialize_state(T=np.array([298.0]))
-        results_ptw_cg0Tm = self.model_ptw_cg0Tm.compute_state_history(shist)
+        results_ptw_cg0Tm = self.model_ptw_cg0Tm.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         self.assertNotEqual(results_ptw_cg0Tm[0][3], results_ptw_cg0Tm[-1][3])
@@ -102,12 +102,12 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
         affect of holding the shear modulus constant, thus producing a tight match
         with the Python result, although for likely non-physical reasons.
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_ptw_cg0Tm.set_history_variables(
             emax=np.array([0.244376]), edot=np.array([1e0]), nhist=1000
         )
         self.model_ptw_cg0Tm.initialize(self.params, self.consts)
         self.model_ptw_cg0Tm.initialize_state(T=np.array([298.0]))
-        results_ptw_cg0Tm = self.model_ptw_cg0Tm.compute_state_history(shist)
+        results_ptw_cg0Tm = self.model_ptw_cg0Tm.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         # Assess stress at the emax
@@ -144,12 +144,12 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
         This makes it difficult to directly compare the initial yield stress at
         zero plastic strain.
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_ptw_cg0Tm.set_history_variables(
             emax=np.array([0.382749]), edot=np.array([1e-2]), nhist=1000
         )
         self.model_ptw_cg0Tm.initialize(self.params, self.consts)
         self.model_ptw_cg0Tm.initialize_state(T=np.array([298.0]))
-        results_ptw_cg0Tm = self.model_ptw_cg0Tm.compute_state_history(shist)
+        results_ptw_cg0Tm = self.model_ptw_cg0Tm.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         # Assess stress at the emax
@@ -186,12 +186,12 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
         This makes it difficult to directly compare the initial yield stress at
         zero plastic strain.
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_ptw_cg0Tm.set_history_variables(
             emax=np.array([0.388339]), edot=np.array([1e-4]), nhist=1000
         )
         self.model_ptw_cg0Tm.initialize(self.params, self.consts)
         self.model_ptw_cg0Tm.initialize_state(T=np.array([298.0]))
-        results_ptw_cg0Tm = self.model_ptw_cg0Tm.compute_state_history(shist)
+        results_ptw_cg0Tm = self.model_ptw_cg0Tm.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         # Assess stress at the emax
@@ -228,12 +228,12 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
         This makes it difficult to directly compare the initial yield stress at
         zero plastic strain.
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_ptw_cg0Tm.set_history_variables(
             emax=np.array([0.371143]), edot=np.array([1e-6]), nhist=1000
         )
         self.model_ptw_cg0Tm.initialize(self.params, self.consts)
         self.model_ptw_cg0Tm.initialize_state(T=np.asarray([298.0]))
-        results_ptw_cg0Tm = self.model_ptw_cg0Tm.compute_state_history(shist)
+        results_ptw_cg0Tm = self.model_ptw_cg0Tm.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         # Assess stress at the emax
@@ -296,12 +296,12 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
         """
         PTW, const. Tm, PW shear. Rates less than 1e-6/us (~1/s), should be isothermal T=const
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_ptw_ss_cTm.set_history_variables(
             emax=np.array([1.0]), edot=np.array([1e-7]), nhist=1000
         )
         self.model_ptw_ss_cTm.initialize(self.params, self.consts)
         self.model_ptw_ss_cTm.initialize_state(T=np.array([298.0]))
-        results_ptw_ss_cTm = self.model_ptw_ss_cTm.compute_state_history(shist)
+        results_ptw_ss_cTm = self.model_ptw_ss_cTm.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         self.assertEqual(results_ptw_ss_cTm[0][3], results_ptw_ss_cTm[-1][3])
@@ -310,12 +310,12 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
         """
         PTW, const. Tm, PW shear. Rates greater than 1e-6/us (~1/s), temp. changes adiabatically
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_ptw_ss_cTm.set_history_variables(
             emax=np.array([1.0]), edot=np.array([1e-2]), nhist=1000
         )
         self.model_ptw_ss_cTm.initialize(self.params, self.consts)
         self.model_ptw_ss_cTm.initialize_state(T=np.array([298.0]))
-        results_ptw_ss_cTm = self.model_ptw_ss_cTm.compute_state_history(shist)
+        results_ptw_ss_cTm = self.model_ptw_ss_cTm.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         self.assertNotEqual(results_ptw_ss_cTm[0][3], results_ptw_ss_cTm[-1][3])
@@ -342,12 +342,12 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
         by FLAG at maximum strain. This could get the python result closer to
         the FLAG result
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_ptw_ss_cTm.set_history_variables(
             emax=np.array([0.244463]), edot=np.array([1e0]), nhist=1000
         )
         self.model_ptw_ss_cTm.initialize(self.params, self.consts)
         self.model_ptw_ss_cTm.initialize_state(T=np.array([620.0]))
-        results_ptw_ss_cTm = self.model_ptw_ss_cTm.compute_state_history(shist)
+        results_ptw_ss_cTm = self.model_ptw_ss_cTm.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         # Assess stress at the emax
@@ -380,12 +380,12 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
         See note above from the high rate test. Temperature effects may still
         create significant differences in computed stress.
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_ptw_ss_cTm.set_history_variables(
             emax=np.array([0.383542]), edot=np.array([1e-2]), nhist=1000
         )
         self.model_ptw_ss_cTm.initialize(self.params, self.consts)
         self.model_ptw_ss_cTm.initialize_state(T=np.array([298.0]))
-        results_ptw_ss_cTm = self.model_ptw_ss_cTm.compute_state_history(shist)
+        results_ptw_ss_cTm = self.model_ptw_ss_cTm.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         # Assess stress at the emax
@@ -422,12 +422,12 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
         This makes it difficult to directly compare the initial yield stress at
         zero plastic strain.
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_ptw_ss_cTm.set_history_variables(
             emax=np.array([0.388302]), edot=1e-4, nhist=1000
         )
         self.model_ptw_ss_cTm.initialize(self.params, self.consts)
         self.model_ptw_ss_cTm.initialize_state(T=np.array([298.0]))
-        results_ptw_ss_cTm = self.model_ptw_ss_cTm.compute_state_history(shist)
+        results_ptw_ss_cTm = self.model_ptw_ss_cTm.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         # Assess stress at the emax
@@ -464,12 +464,12 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
         This makes it difficult to directly compare the initial yield stress at
         zero plastic strain.
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_ptw_ss_cTm.set_history_variables(
             emax=np.array([0.385416]), edot=np.array([1e-6]), nhist=1000
         )
         self.model_ptw_ss_cTm.initialize(self.params, self.consts)
         self.model_ptw_ss_cTm.initialize_state(T=np.array([298.0]))
-        results_ptw_ss_cTm = self.model_ptw_ss_cTm.compute_state_history(shist)
+        results_ptw_ss_cTm = self.model_ptw_ss_cTm.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         # Assess stress at the emax
@@ -532,12 +532,12 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
         """
         PTW, const. Tm, SG shear. Rates less than 1e-6/us (~1/s), should be isothermal T=const
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_ptw_sg_cTm.set_history_variables(
             emax=np.array([1.0]), edot=np.array([1e-7]), nhist=1000
         )
         self.model_ptw_sg_cTm.initialize(self.params, self.consts)
         self.model_ptw_sg_cTm.initialize_state(T=np.array([298.0]))
-        results_ptw_sg_cTm = self.model_ptw_sg_cTm.compute_state_history(shist)
+        results_ptw_sg_cTm = self.model_ptw_sg_cTm.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         self.assertEqual(results_ptw_sg_cTm[0][3], results_ptw_sg_cTm[-1][3])
@@ -546,12 +546,12 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
         """
         PTW, const. Tm, SG shear. Rates greater than 1e-6/us (~1/s), temp. changes adiabatically
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_ptw_sg_cTm.set_history_variables(
             emax=np.array([1.0]), edot=np.array([1e-2]), nhist=1000
         )
         self.model_ptw_sg_cTm.initialize(self.params, self.consts)
         self.model_ptw_sg_cTm.initialize_state(T=np.array([298.0]))
-        results_ptw_sg_cTm = self.model_ptw_sg_cTm.compute_state_history(shist)
+        results_ptw_sg_cTm = self.model_ptw_sg_cTm.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         self.assertNotEqual(results_ptw_sg_cTm[0][3], results_ptw_sg_cTm[-1][3])
@@ -578,12 +578,12 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
         by FLAG at maximum strain. This could get the python result closer to
         the FLAG result
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_ptw_sg_cTm.set_history_variables(
             emax=np.array([0.244632]), edot=np.array([1e0]), nhist=1000
         )
         self.model_ptw_sg_cTm.initialize(self.params, self.consts)
         self.model_ptw_sg_cTm.initialize_state(T=np.array([617.0]))
-        results_ptw_sg_cTm = self.model_ptw_sg_cTm.compute_state_history(shist)
+        results_ptw_sg_cTm = self.model_ptw_sg_cTm.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         # Assess stress at the emax
@@ -616,12 +616,12 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
         See note above from the high rate test. Temperature effects may still
         create significant differences in computed stress.
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_ptw_sg_cTm.set_history_variables(
             emax=np.array([0.384834]), edot=np.array([1e-2]), nhist=1000
         )
         self.model_ptw_sg_cTm.initialize(self.params, self.consts)
         self.model_ptw_sg_cTm.initialize_state(T=np.array([298.0]))
-        results_ptw_sg_cTm = self.model_ptw_sg_cTm.compute_state_history(shist)
+        results_ptw_sg_cTm = self.model_ptw_sg_cTm.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         # Assess stress at the emax
@@ -658,12 +658,12 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
         This makes it difficult to directly compare the initial yield stress at
         zero plastic strain.
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_ptw_sg_cTm.set_history_variables(
             emax=np.array([0.388306]), edot=np.array([1e-4]), nhist=1000
         )
         self.model_ptw_sg_cTm.initialize(self.params, self.consts)
         self.model_ptw_sg_cTm.initialize_state(T=np.array([298.0]))
-        results_ptw_sg_cTm = self.model_ptw_sg_cTm.compute_state_history(shist)
+        results_ptw_sg_cTm = self.model_ptw_sg_cTm.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         # Assess stress at the emax
@@ -700,12 +700,12 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
         This makes it difficult to directly compare the initial yield stress at
         zero plastic strain.
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_ptw_sg_cTm.set_history_variables(
             emax=np.array([0.388966]), edot=np.array([1e-6]), nhist=1000
         )
         self.model_ptw_sg_cTm.initialize(self.params, self.consts)
         self.model_ptw_sg_cTm.initialize_state(T=np.array([298.0]))
-        results_ptw_sg_cTm = self.model_ptw_sg_cTm.compute_state_history(shist)
+        results_ptw_sg_cTm = self.model_ptw_sg_cTm.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         # Assess stress at the emax
