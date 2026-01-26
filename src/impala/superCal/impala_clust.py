@@ -4,12 +4,12 @@ from collections import namedtuple
 from math import sqrt
 
 import numpy as np
-import scipy
+from numpy.random import uniform, beta, choice, gamma
 from numpy.linalg import slogdet
-from numpy.random import beta, choice, gamma, uniform
+import scipy
 from scipy.stats import invwishart
 
-from impala.superCal.impala_noProbit_emu import *
+from .impala_noProbit_emu import *
 
 # import pbar
 # np.seterr(under='ignore')
@@ -137,7 +137,6 @@ def cluster_covariance_update_old(
                 mus[i][temps, j],
                 covs[i][temps, j],
             )
-    return
 
 
 # West 1992, dirichletprocess R package
@@ -316,7 +315,6 @@ class AMcov_clust:
                 )
                 self.mu_clust[self.temps, delta[i].T[j]] = mu_new  # (m1=m)
                 self.n_hc[self.temps, delta[i].T[j]] = n_new.ravel()  # (n1=n)
-        return
 
     def update_tau(
         self, m

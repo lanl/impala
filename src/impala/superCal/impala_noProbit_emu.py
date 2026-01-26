@@ -1,6 +1,6 @@
 ####################################
 ####################################
-### Impala Model Fit Definitions ###
+''' Impala Model Fit Definitions '''
 ####################################
 ####################################
 
@@ -11,6 +11,7 @@
 import time
 from collections import namedtuple
 from math import floor, log, sqrt
+from multiprocessing import Pool
 
 import numpy as np
 import scipy
@@ -196,7 +197,6 @@ class CalibSetup:
             self.s2_prior_kern.append(ldhc_kern)
         else:
             self.s2_prior_kern.append(ldig_kern)
-        return
 
     def setTemperatureLadder(self, temperature_ladder, start_temper=1000):
         """
@@ -210,7 +210,6 @@ class CalibSetup:
         self.ntemps = len(self.tl)
         self.nswap_per = floor(self.ntemps // 2)
         self.start_temper = start_temper
-        return
 
     def setMCMC(
         self,
@@ -251,7 +250,6 @@ class CalibSetup:
         self.start_var_ls2 = start_var_ls2
         self.start_tau_ls2 = start_tau_ls2
         self.start_adapt_iter = start_adapt_iter
-        return
 
     def setHierPriors(
         self,
@@ -275,7 +273,6 @@ class CalibSetup:
         self.theta0_prior_cov = theta0_prior_cov
         self.Sigma0_prior_df = Sigma0_prior_df
         self.Sigma0_prior_scale = Sigma0_prior_scale
-        return
 
     def setClusterPriors(
         self, nclustmax=None, eta_prior_shape=2, eta_prior_rate=0.1
@@ -293,7 +290,6 @@ class CalibSetup:
         self.eta_prior_shape = eta_prior_shape
         self.eta_prior_rate = eta_prior_rate
 
-    pass
 
 
 ########################
@@ -361,7 +357,6 @@ def subset_dict(dd, idx):
 def tran_probit(th, bounds, names):
     return dict(zip(names, unnormalize(invprobit(th), bounds).T))  # If probit
     # return dict(zip(names, unnormalize(th, bounds).T)) # If uniform
-    pass
 
 
 def tran_unif(th, bounds, names):
@@ -2047,10 +2042,9 @@ def calibPool(setup):
 
 
 ##############################################################################################################################################################################
-from multiprocessing import Pool
 
 
-class PoolCalib(object):
+class PoolCalib:
     # adapted from https://stackoverflow.com/questions/1816958/cant-pickle-type-instancemethod-when-using-multiprocessing-pool-map/41959862#41959862 answer by parisjohn
     # somewhat slow collection of results
     def __init__(self, setup_list):
