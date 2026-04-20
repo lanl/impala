@@ -8,9 +8,9 @@
 ### Imports ###
 ###############
 import abc
-from itertools import cycle
-import re
 import inspect
+import re
+from itertools import cycle
 
 import numpy as np
 from scipy.interpolate import interp1d

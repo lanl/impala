@@ -4,14 +4,23 @@ from collections import namedtuple
 from math import sqrt
 
 import numpy as np
-from numpy.random import uniform, beta, choice, gamma
-from numpy.linalg import slogdet
 import scipy
+from numpy.linalg import slogdet
+from numpy.random import beta, choice, gamma, uniform
 from scipy.stats import invwishart
 
-from .impala_noProbit_emu import cov_4d_pcm, chol_sample_1per, initfunc_unif, tran_unif, \
-    chol_sample_1per_constraints, chol_sample_nper_constraints, \
-    mvnorm_logpdf, mvnorm_logpdf_, invwishart_logpdf, gamma_logpdf, invgamma_logpdf
+from .impala_noProbit_emu import (
+    chol_sample_1per,
+    chol_sample_1per_constraints,
+    chol_sample_nper_constraints,
+    cov_4d_pcm,
+    gamma_logpdf,
+    initfunc_unif,
+    invwishart_logpdf,
+    mvnorm_logpdf,  #, invgamma_logpdf
+    mvnorm_logpdf_,
+    tran_unif,
+)
 
 # import pbar
 # np.seterr(under='ignore')
