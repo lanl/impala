@@ -8,7 +8,13 @@ on:
   workflow_dispatch:  # allow manual trigger
 
 jobs:
-  build:
+  test:
+    if: >
+      ${{
+        !(
+          startsWith(github.event.head_commit.message, '[NOTEST]')
+        )
+      }}
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.os == 'windows-latest' }}
     strategy:

@@ -62,7 +62,6 @@ def func_prediction_plot(
         plt.text(0.1, 0.85, text, transform=plt.gca().transAxes)
     if pdf:
         pdf.savefig(fig)
-    return
 
 
 def ptw_prediction_plots_pool(
@@ -136,7 +135,6 @@ def ptw_prediction_plots_pool(
             sigma=sigma[k],
         )
     pdf.close()
-    return
 
 
 def ptw_prediction_plots_hier(
@@ -271,7 +269,6 @@ def ptw_prediction_plots_hier(
             parent_y_ub=pred_thetap_quant_ub[k],
         )
     pdf.close()
-    return
 
 
 def ptw_prediction_plots_cluster(
@@ -291,7 +288,7 @@ def ptw_prediction_plots_cluster(
     ]
 
     thetas = calib_out.theta[mcmc_use, 0]
-    deltas = [calib_out.delta[i][mcmc_use] for i in range(setup.nexp)]
+    [calib_out.delta[i][mcmc_use] for i in range(setup.nexp)]
     nclustmax = max(calib_out.out.delta[i].max() for i in range(setup.nexp)) + 1
     dcounts = np.zeros((mcmc_use.shape[0], nclustmax))
     for it, s in enumerate(mcmc_use):
@@ -417,7 +414,6 @@ def ptw_prediction_plots_cluster(
             parent_y_ub=pred_thetap_quant_ub[k],
         )
     pdf.close()
-    return
 
 
 def kde_contour(x1, x2, percentile):
@@ -553,7 +549,6 @@ def pairwise_theta_plot_hier(
         plt.savefig(path, bbox_inches="tight")
     else:
         plt.show()
-    return
 
 
 def pairwise_theta_plot_pool(setup, calib_out, path, mcmc_use, alpha=0.05):
@@ -607,7 +602,6 @@ def pairwise_theta_plot_pool(setup, calib_out, path, mcmc_use, alpha=0.05):
         plt.savefig(path, bbox_inches="tight")
     else:
         plt.show()
-    return
 
 
 def pairwise_theta_plot_pool_compare(
@@ -668,14 +662,13 @@ def pairwise_theta_plot_pool_compare(
         plt.savefig(path, bbox_inches="tight")
     else:
         plt.show()
-    return
 
 
 def pairwise_theta_plot_cluster(
     setup, calib_out, path, mcmc_use, alpha=0.05, highlight=None
 ):
     thetas = calib_out.theta[mcmc_use, 0]
-    deltas = [calib_out.delta[i][mcmc_use] for i in range(setup.nexp)]
+    [calib_out.delta[i][mcmc_use] for i in range(setup.nexp)]
     nclustmax = max(calib_out.delta[i].max() for i in range(setup.nexp)) + 1
     dcounts = np.zeros((mcmc_use.shape[0], nclustmax))
     for it, s in enumerate(mcmc_use):
@@ -807,15 +800,14 @@ def pairwise_theta_plot_cluster(
         plt.savefig(path, bbox_inches="tight")
     else:
         plt.show()
-    return
 
 
 def cluster_matrix(delta_list, ns2, nclustmax, nburn=20000, nthin=10):
     # subset delta to post burn-in
     delta_relist = [d[nburn::nthin] for d in delta_list]
     # Declare constants
-    nsamp = delta_relist[0].shape[0]
-    nexp = len(delta_relist)
+    delta_relist[0].shape[0]
+    len(delta_relist)
     # create a combined delta array (for all experiments/vectorized experiments)
     # Boolean array, so (True iff member of cluster)
     breaks = np.hstack((0, np.cumsum(ns2)))
@@ -848,7 +840,6 @@ def cluster_matrix_plot(setup, calib_out, path=None, **kwargs):
         plt.savefig(path, bbox_inches="tight")
     else:
         plt.show()
-    return
 
 
 def hide_current_axis(*args, **kwds):
@@ -873,9 +864,7 @@ def pairs(setup, mat_st, col=None, s=None):
         g.axes[i, i].set_xlim(setup.bounds[dat.keys()[i]])
         g.axes[i, i].set_ylim(setup.bounds[dat.keys()[i]])
     g.fig.set_size_inches(10, 10)
-    g
     #    plt.show()
-    return
 
 
 def parameter_trace_plot(sample_parameters, ylim=None):
@@ -899,7 +888,6 @@ def parameter_trace_plot(sample_parameters, ylim=None):
             if ylim is not None:
                 ax.set_ylim(ylim)
     #    plt.show()
-    return
 
 
 def parameter_trace_plot_rollmean(sample_parameters, ylim=None, num_draws=100):
@@ -909,7 +897,8 @@ def parameter_trace_plot_rollmean(sample_parameters, ylim=None, num_draws=100):
         plt.plot(range(n), sample_parameters, marker="", linewidth=1)
         plt.plot(
             range(n),
-            pd.DataFrame(sample_parameters.reshape(-1, 1))
+            pd
+            .DataFrame(sample_parameters.reshape(-1, 1))
             .rolling(num_draws)
             .mean(),
             c="black",
@@ -929,7 +918,8 @@ def parameter_trace_plot_rollmean(sample_parameters, ylim=None, num_draws=100):
             )
             plt.plot(
                 range(n),
-                pd.DataFrame(sample_parameters[:, i].reshape(-1, 1))
+                pd
+                .DataFrame(sample_parameters[:, i].reshape(-1, 1))
                 .rolling(num_draws)
                 .mean(),
                 c="black",
@@ -939,7 +929,6 @@ def parameter_trace_plot_rollmean(sample_parameters, ylim=None, num_draws=100):
             if ylim is not None:
                 ax.set_ylim(ylim)
     #    plt.show()
-    return
 
 
 ### Shows the number of swaps between pairs of temperatures.
@@ -983,7 +972,6 @@ def total_temperature_swaps(out, setup):
             color="white",
             horizontalalignment="right",
         )
-    return
 
 
 def save_parent_strength(setup, ptw_mod, calib_out, mcmc_use, path):
@@ -996,7 +984,7 @@ def save_parent_strength(setup, ptw_mod, calib_out, mcmc_use, path):
         setup.bounds,
         setup.constants,
     )
-    theta_parent_native = sc.unnormalize(theta_parent, setup.bounds_mat)
+    sc.unnormalize(theta_parent, setup.bounds_mat)
 
     # sub_dict = {k: calib_out.theta_parent_native[k][mcmc_use] for k in calib_out.theta_parent_native.keys()}
     # params = pd.DataFrame(sub_dict)
@@ -1012,9 +1000,9 @@ def save_parent_strength(setup, ptw_mod, calib_out, mcmc_use, path):
         setup.models[i].eval(theta_parent_native_dict, pool=True)
         for i in range(setup.nexp)
     ]
-    llik = sum([
+    llik = sum(
         ((pred[i] - setup.ys[i]) ** 2).mean(axis=1) for i in range(setup.nexp)
-    ])
+    )
 
     # params['sse'] = calib_out.llik[mcmc_use]
     params["sse"] = llik
@@ -1029,14 +1017,13 @@ def save_parent_strength(setup, ptw_mod, calib_out, mcmc_use, path):
         fd.write(bounds.to_csv(index=False))
         fd.write("===\n")
         fd.write(params.to_csv(index=False))
-    return
 
 
-def get_bounds(
-    edot, strain, temp, results_csv, write_path, percentiles=[0.05, 0.5, 0.95]
-):
+def get_bounds(edot, strain, temp, results_csv, write_path, percentiles=None):
     # rank parent distribution samples by stress at particular strain, strain rate, temperature, save to file
-    edot_star = edot * 1e-6  # first term is per second
+    if percentiles is None:
+        percentiles = [0.05, 0.5, 0.95]
+    edot * 1e-6  # first term is per second
 
     df = pd.read_csv(results_csv, nrows=1, header=None)
     mods = df.loc[0, :].values.tolist()
@@ -1065,8 +1052,7 @@ def get_bounds(
     rank_sse = np.argsort(theta_parent_native["sse"])
     idx_rank = (np.array(percentiles) * stress_star.shape[0]).astype(int)
     sub_dat = pd.DataFrame({
-        k: theta_parent_native[k][rank][idx_rank]
-        for k in theta_parent_native.keys()
+        k: theta_parent_native[k][rank][idx_rank] for k in theta_parent_native
     })
     sub_dat["perc"] = percentiles
     sub_dat["stress"] = stress_star[rank][idx_rank]
@@ -1085,12 +1071,10 @@ def get_bounds(
     with open(write_path, "w") as fp:
         fp.write(template.format(sub_dat.to_csv(index=False)))
 
-    return
-
 
 def get_samples_rank(edot, strain, temp, results_csv, write_path):
     # rank parent distribution samples by stress at particular strain, strain rate, temperature, save all samples to file, for sky
-    edot_star = edot * 1e-6  # first term is per second
+    edot * 1e-6  # first term is per second
 
     df = pd.read_csv(results_csv, nrows=1, header=None)
     mods = df.loc[0, :].values.tolist()
@@ -1132,25 +1116,18 @@ def get_samples_rank(edot, strain, temp, results_csv, write_path):
     with open(write_path, "w") as fp:
         fp.write(template.format(ranked_post.to_csv(index=False)))
 
-    return
-
 
 def get_best_sse(results_csv, write_path):
     df = pd.read_csv(results_csv, skiprows=7)
     theta_parent_native = dict(zip(df.T.index, df.values.T))
     rank_sse = np.argsort(theta_parent_native["sse"])
     sub_dat = pd.DataFrame(
-        {
-            k: theta_parent_native[k][rank_sse][0]
-            for k in theta_parent_native.keys()
-        },
+        {k: theta_parent_native[k][rank_sse][0] for k in theta_parent_native},
         index=[0],
     )
 
     with open(write_path, "w") as fp:
         fp.write(sub_dat.to_csv(index=False))
-
-    return
 
 
 ### Function for predicting the outcome for a given
@@ -1208,8 +1185,8 @@ def get_outcome_predictions_impala(setup, theta_input, disc_input=None):
                 )
                 + disc_y
             )  # even for hierarchical
-    RESULTS = dict({
+    RESULTS = {
         "outcome_draws": outcome_draws,
         "constraints_satisfied": CONSTRAINTS,
-    })
+    }
     return RESULTS

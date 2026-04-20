@@ -297,9 +297,11 @@ class CalibSetup:
 ########################
 
 
-def constraints_ptw(x, bounds, constants={}):
+def constraints_ptw(x, bounds, constants=None):
     """Checks if the given PTW parameter set is valid. Required input variables: parameters 'x' and their (calibration) bounds 'bounds;
     Any parameter the user chose to keep constant during a calibration goes into the optional variable 'constants' instead of x and bounds."""
+    if constants is None:
+        constants = {}
     y = constants | x
     good = PTW_goodparam(
         s0=y["s0"],
@@ -315,9 +317,11 @@ def constraints_ptw(x, bounds, constants={}):
     return good
 
 
-def cf_bounds(x, bounds, constants={}):
+def cf_bounds(x, bounds, constants=None):
     """default for bounds checking, variable 'constants' is not used here and present only to have a consistent api."""
-    k = list(bounds.keys())[0]
+    if constants is None:
+        constants = {}
+    k = next(iter(bounds.keys()))
     good = x[k] < bounds[k][1]
     for k, v in bounds.items():
         good = good * (x[k] < v[1]) * (x[k] > v[0])
@@ -850,18 +854,18 @@ def calibHier(setup):
     count = [
         np.zeros((setup.ntemps, setup.ntheta[i])) for i in range(setup.nexp)
     ]
-    count_decor = [
-        np.zeros((setup.ntemps, setup.ntheta[i], setup.p))
-        for i in range(setup.nexp)
-    ]
+    # count_decor = [
+    #     np.zeros((setup.ntemps, setup.ntheta[i], setup.p))
+    #     for i in range(setup.nexp)
+    # ]
     count_decor2 = np.zeros((setup.ntemps, setup.p))
     # count_100 = [np.zeros((setup.ntemps, setup.ntheta[i])) for i in range(setup.nexp)]
     count_s2 = np.zeros([setup.nexp, setup.ntemps], dtype=int)
 
-    theta_cand = [
-        np.empty([setup.ntemps, setup.ntheta[i], setup.p])
-        for i in range(setup.nexp)
-    ]
+    # theta_cand = [
+    #     np.empty([setup.ntemps, setup.ntheta[i], setup.p])
+    #     for i in range(setup.nexp)
+    # ]
     theta_cand_mat = [
         np.empty([setup.ntemps * setup.ntheta[i], setup.p])
         for i in range(setup.nexp)
@@ -1031,84 +1035,84 @@ def calibHier(setup):
         #         count_100[i] *= 0
 
         ## Decorrelation Step
-        if False:  # m % setup.decor == 0:
-            for i in range(setup.nexp):
-                for k in range(setup.p):
-                    # Find new candidate values for theta
-                    theta_cand[i][:] = theta[i][m].copy()
-                    theta_eval_mat[i][:] = theta[i][m].reshape(
-                        setup.ntheta[i] * setup.ntemps, setup.p
-                    )
-                    theta_cand[i][:, :, k] = initfunc(
-                        size=(setup.ntemps, setup.ntheta[i])
-                    )
-                    theta_cand_mat[i][:] = theta_cand[i].reshape(
-                        setup.ntheta[i] * setup.ntemps, setup.p
-                    )
-                    # Compute constraint flags
-                    good_values_mat[i][:] = setup.checkConstraints(
-                        tran(
-                            theta_cand_mat[i],
-                            setup.bounds_mat,
-                            setup.bounds.keys(),
-                        )
-                    )
-                    # Generate predictions at "good" candidate values
-                    theta_eval_mat[i][good_values_mat[i]] = theta_cand_mat[i][
-                        good_values_mat[i]
-                    ]
-                    good_values[i][:] = good_values_mat[i].reshape(
-                        setup.ntemps, setup.ntheta[i]
-                    )
-                    pred_cand[i][:] = setup.models[i].eval(
-                        tran(
-                            theta_eval_mat[i],
-                            setup.bounds_mat,
-                            setup.bounds.keys(),
-                        )
-                    )
-                    sse_cand[i][:] = (
-                        ((pred_cand[i] - setup.ys[i]) ** 2 @ s2_ind_mat[i])
-                        / s2[i][m - 1]
-                    )  ## check the [:] here !!!!! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                    # Calculate log-probability of MCMC Accept
-                    alpha[i][:] = -np.inf
-                    alpha[i][good_values[i]] = (
-                        -0.5
-                        * itl_mat[i][good_values[i]]
-                        * (
-                            sse_cand[i][good_values[i]]
-                            - sse_curr[i][good_values[i]]
-                        )
-                        + itl_mat[i][good_values[i]]
-                        * (
-                            +mvnorm_logpdf_(
-                                theta_cand[i],
-                                theta0[m - 1],
-                                Sigma0_inv_curr,
-                                Sigma0_ldet_curr,
-                            )[good_values[i]]
-                            - mvnorm_logpdf_(
-                                theta[i][m],
-                                theta0[m - 1],
-                                Sigma0_inv_curr,
-                                Sigma0_ldet_curr,
-                            )[good_values[i]]
-                        )
-                    )  ## THIS NEEDS SOMETHING FOR THE PROPOSAL~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                    # MCMC Accept
-                    accept[i][:] = (
-                        np.log(uniform(size=alpha[i].shape)) < alpha[i]
-                    )
-                    # Where accept, make changes
-                    theta[i][m][accept[i]] = theta_cand[i][accept[i]].copy()
-                    pred_curr[i][accept[i] @ s2_ind_mat[i].T] = pred_cand[i][
-                        accept[i] @ s2_ind_mat[i].T
-                    ].copy()
-                    sse_curr[i][accept[i]] = sse_cand[i][accept[i]].copy()
-                    count_decor[i][accept[i], k] = (
-                        count_decor[i][accept[i], k] + 1
-                    )
+        # if False:  # m % setup.decor == 0:
+        #     for i in range(setup.nexp):
+        #         for k in range(setup.p):
+        #             # Find new candidate values for theta
+        #             theta_cand[i][:] = theta[i][m].copy()
+        #             theta_eval_mat[i][:] = theta[i][m].reshape(
+        #                 setup.ntheta[i] * setup.ntemps, setup.p
+        #             )
+        #             theta_cand[i][:, :, k] = initfunc(
+        #                 size=(setup.ntemps, setup.ntheta[i])
+        #             )
+        #             theta_cand_mat[i][:] = theta_cand[i].reshape(
+        #                 setup.ntheta[i] * setup.ntemps, setup.p
+        #             )
+        #             # Compute constraint flags
+        #             good_values_mat[i][:] = setup.checkConstraints(
+        #                 tran(
+        #                     theta_cand_mat[i],
+        #                     setup.bounds_mat,
+        #                     setup.bounds.keys(),
+        #                 )
+        #             )
+        #             # Generate predictions at "good" candidate values
+        #             theta_eval_mat[i][good_values_mat[i]] = theta_cand_mat[i][
+        #                 good_values_mat[i]
+        #             ]
+        #             good_values[i][:] = good_values_mat[i].reshape(
+        #                 setup.ntemps, setup.ntheta[i]
+        #             )
+        #             pred_cand[i][:] = setup.models[i].eval(
+        #                 tran(
+        #                     theta_eval_mat[i],
+        #                     setup.bounds_mat,
+        #                     setup.bounds.keys(),
+        #                 )
+        #             )
+        #             sse_cand[i][:] = (
+        #                 ((pred_cand[i] - setup.ys[i]) ** 2 @ s2_ind_mat[i])
+        #                 / s2[i][m - 1]
+        #             )  ## check the [:] here !!!!! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #             # Calculate log-probability of MCMC Accept
+        #             alpha[i][:] = -np.inf
+        #             alpha[i][good_values[i]] = (
+        #                 -0.5
+        #                 * itl_mat[i][good_values[i]]
+        #                 * (
+        #                     sse_cand[i][good_values[i]]
+        #                     - sse_curr[i][good_values[i]]
+        #                 )
+        #                 + itl_mat[i][good_values[i]]
+        #                 * (
+        #                     +mvnorm_logpdf_(
+        #                         theta_cand[i],
+        #                         theta0[m - 1],
+        #                         Sigma0_inv_curr,
+        #                         Sigma0_ldet_curr,
+        #                     )[good_values[i]]
+        #                     - mvnorm_logpdf_(
+        #                         theta[i][m],
+        #                         theta0[m - 1],
+        #                         Sigma0_inv_curr,
+        #                         Sigma0_ldet_curr,
+        #                     )[good_values[i]]
+        #                 )
+        #             )  ## THIS NEEDS SOMETHING FOR THE PROPOSAL~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #             # MCMC Accept
+        #             accept[i][:] = (
+        #                 np.log(uniform(size=alpha[i].shape)) < alpha[i]
+        #             )
+        #             # Where accept, make changes
+        #             theta[i][m][accept[i]] = theta_cand[i][accept[i]].copy()
+        #             pred_curr[i][accept[i] @ s2_ind_mat[i].T] = pred_cand[i][
+        #                 accept[i] @ s2_ind_mat[i].T
+        #             ].copy()
+        #             sse_curr[i][accept[i]] = sse_cand[i][accept[i]].copy()
+        #             count_decor[i][accept[i], k] = (
+        #                 count_decor[i][accept[i], k] + 1
+        #             )
 
         # ------------------------------------------------------------------------------------------
         ## update s2
@@ -1537,7 +1541,7 @@ def calibHier(setup):
         # print('\rCalibration MCMC {:.01%} Complete'.format(m / setup.nmcmc), end='')
 
     t1 = time.time()
-    print("\rCalibration MCMC Complete. Time: {:f} seconds.".format(t1 - t0))
+    print(f"\rCalibration MCMC Complete. Time: {t1 - t0:f} seconds.")
 
     # theta_parent_01 = chol_sample_1per_constraints(
     #    theta0[:,0], Sigma0[:,0], setup.checkConstraints,
@@ -1580,12 +1584,10 @@ def calibHier(setup):
 
 # @profile
 def calibPool(setup):
-    """
-    Pooled calibration
-    """
+    """Perform pooled calibration"""
     t0 = time.time()
     theta = np.empty([setup.nmcmc, setup.ntemps, setup.p])
-    n_s2 = np.sum(setup.ns2)
+    np.sum(setup.ns2)
     log_s2 = [
         np.ones([setup.nmcmc, setup.ntemps, setup.ns2[i]])
         for i in range(setup.nexp)
@@ -2023,7 +2025,7 @@ def calibPool(setup):
     theta_native = tran_unif(theta[:, 0], setup.bounds_mat, setup.bounds.keys())
 
     t1 = time.time()
-    print("\rCalibration MCMC Complete. Time: {:f} seconds.".format(t1 - t0))
+    print(f"\rCalibration MCMC Complete. Time: {t1 - t0:f} seconds.")
     count = count + count.T - np.diag(np.diag(count))
     out = OutCalibPool(
         theta,

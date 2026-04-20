@@ -167,4 +167,4 @@ def test_constparams():
         bestval = np.min(np.abs(v / params[k] - 1))
         # print(k,params[k],bestval)
         assert bestval < 1e-3
-    assert sorted(list(out.theta_native.keys())) == sorted(list(params.keys()))
+    assert sorted(out.theta_native.keys()) == sorted(params.keys())

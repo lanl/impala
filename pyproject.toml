@@ -8,7 +8,7 @@ authors = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "matplotlib>=3.7.3",
+    "matplotlib>=3.9.0",
     "numpy>=1.24.4",
     "scipy>=1.10.1",
     "seaborn>=0.13.2",
@@ -20,6 +20,9 @@ license-files = ["LICENSE"]
 [project.optional-dependencies]
 numba = [
     "numba>=0.62.1",
+]
+map = [
+    "pyswarm>=0.8.0,<0.9.0",
 ]
 
 [build-system]
@@ -34,14 +37,20 @@ default-tag = "0.0.1"
 dev = [
     "pre-commit>=4.4.0",
     "pytest>=9.0.1",
+    "ruff==0.15.6",
 ]
 
 [tool.ruff]
 line-length = 80
 preview = true
 
+# TODO: Unexclude
+exclude = ["examples"]
+
 [tool.ruff.lint]
 extend-select = ["I"]  # W505 (doc-line-too-long); D (pydocstyle)
+# TODO: Gradually unignore these.
+extend-ignore = ["N999", "DTZ005", "SIM115", "RUF012"]
 pydocstyle.convention = "numpy"
 pycodestyle.max-doc-length = 80
 
