@@ -609,7 +609,7 @@ class Constant_Yield_Stress(BaseModel):
 #     out = a * 0.0
 #     out[cond] = np.exp(b[cond] * np.log(a[cond]))
 #     return out
-fast_pow = np.power ## do we need this?
+fast_pow = np.power  ## do we need this?
 
 
 def pos(a):
@@ -717,7 +717,7 @@ class PTW_Yield_Stress(BaseModel):
         "theta",
         "p",
         "s0",
-        'beta',
+        "beta",
         "sInf",
         "kappa",
         "lgamma",
@@ -838,7 +838,7 @@ class ModelParameters:
             for i, xi in enumerate(self.params):
                 self.__dict__[self.params[i]] = xi
         else:
-            raise ValueError(f"Type {type(x)} is not supported.")
+            raise TypeError(f"Type {type(x)} is not supported.")
 
     def __init__(self, parent):
         self.parent = parent
@@ -911,8 +911,12 @@ class MaterialModel:
             + self.density.consts
         )
 
-        assert len(set(params)) == len(params) , "Some Duplicate Parameters between models"
-        assert len(set(params).intersection(set(consts))) == 0 , "Duplicate item in parameters and constants"
+        assert len(set(params)) == len(params), (
+            "Some Duplicate Parameters between models"
+        )
+        assert len(set(params).intersection(set(consts))) == 0, (
+            "Duplicate item in parameters and constants"
+        )
 
         self.parameters.params = params
         self.parameters.consts = consts

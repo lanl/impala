@@ -1,5 +1,3 @@
-
-
 # from models_withLik import interpolate_experiment
 import matplotlib.pyplot as plt
 import numpy as np
@@ -18,27 +16,25 @@ from scipy.stats import gaussian_kde
 # diagnostic plots to include:
 #    - traces of theta, s2, but for hier which ones? All?
 #   - tempering and MCMC counts
-class Diagnostics(object):
+class Diagnostics:
     def __init__(self, setup, out):
-        """ """
+        # TODO: Add doc string
         self.setup = setup
         self.out = out
-        return
 
     def pooled_trace_plots():
         pass
 
 
-class PTW_Plotter(object):
+class PTW_Plotter:
     """PTW Prediction and Pairwise Plots"""
 
     pooled = None
 
     def __init__(self, setup, out):
-        """ """
+        # TODO: Add doc string
         self.setup = setup
         self.out = out
-        return
 
     def ptw_prediction_plot_single(
         self,
@@ -92,10 +88,9 @@ class PTW_Plotter(object):
         plt.scatter(actual_x, actual_y, color="blue", s=0.5, label="y")
         plt.ylim(0.0, 0.025)
         if edot is not None and temp is not None:
-            plt.text(*text_coords, "edot: {:.3E}\n temp: {}".format(edot, temp))
+            plt.text(*text_coords, f"edot: {edot:.3E}\n temp: {temp}")
         if pdf:
             pdf.savefig(fig)
-        return
 
     def ptw_prediction_plots_hier(self, path, uu):
         """PTW Prediction Hierarchical Plots (no input)"""
@@ -259,7 +254,6 @@ class PTW_Plotter(object):
                 else:
                     self.ptw_prediction_plot_single(**plot_params, pdf=pdf)
         pdf.close()
-        return
 
     def ptw_prediction_plots_pool(self, path, uu):
         """PTW Prediction Hierarchical Plots (no input)"""
@@ -353,7 +347,6 @@ class PTW_Plotter(object):
                 else:
                     self.ptw_prediction_plot_single(**plot_params, pdf=pdf)
         pdf.close()
-        return
 
     def ptw_prediction_plots_cluster(self, path):
         sel = np.arange(20000, self.setup.nmcmc, 10)  # need to script this in
@@ -371,7 +364,7 @@ class PTW_Plotter(object):
         ]
 
         thetas = self.out.theta[sel, 0]
-        deltas = [self.out.delta[i][sel] for i in range(self.setup.nexp)]
+        [self.out.delta[i][sel] for i in range(self.setup.nexp)]
         nclustmax = (
             max(self.out.delta[i].max() for i in range(self.setup.nexp)) + 1
         )
@@ -503,7 +496,6 @@ class PTW_Plotter(object):
         for plot_params in plot_param_list:
             self.ptw_prediction_plot_single(**plot_params, pdf=pdf)
         pdf.close()
-        return
 
     def ptw_prediction_plots(self, path):
         """PTW Prediction Plots against model"""
@@ -655,7 +647,6 @@ class PTW_Plotter(object):
             plt.savefig(path, bbox_inches="tight")
         else:
             plt.show()
-        return
 
     def pairwise_theta_plot_pool(self, path, uu):
         sel = uu  # np.arange(20000, self.setup.nmcmc, 10)
@@ -706,12 +697,11 @@ class PTW_Plotter(object):
             plt.savefig(path, bbox_inches="tight")
         else:
             plt.show()
-        return
 
     def pairwise_theta_plot_cluster(self, path=None):
         sel = np.arange(20000, self.setup.nmcmc, 10)
         thetas = self.out.theta[sel, 0]
-        deltas = [self.out.delta[i][sel] for i in range(self.setup.nexp)]
+        [self.out.delta[i][sel] for i in range(self.setup.nexp)]
         nclustmax = (
             max(self.out.delta[i].max() for i in range(self.setup.nexp)) + 1
         )
@@ -836,7 +826,6 @@ class PTW_Plotter(object):
             plt.savefig(path, bbox_inches="tight")
         else:
             plt.show()
-        pass
 
     def pairwise_theta_plot(self, path=None):
         if type(self.out) is impala.OutCalibPool:
@@ -854,8 +843,8 @@ class PTW_Plotter(object):
         # subset delta to post burn-in
         delta_relist = [d[nburn::nthin] for d in delta_list]
         # Declare constants
-        nsamp = delta_relist[0].shape[0]
-        nexp = len(delta_relist)
+        delta_relist[0].shape[0]
+        len(delta_relist)
         # create a combined delta array (for all experiments/vectorized experiments)
         # Boolean array, so (True iff member of cluster)
         breaks = np.hstack((0, np.cumsum(ns2)))
@@ -889,9 +878,6 @@ class PTW_Plotter(object):
             plt.savefig(path, bbox_inches="tight")
         else:
             plt.show()
-        return
-
-    pass
 
 
 # EOF

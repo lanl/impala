@@ -48,7 +48,7 @@ def sample_delta_per_temperature(
                 + log_posts_t.T[s, njs_t + djs > 0]
             )
         )
-        temp[:] -= temp.max()  #
+        temp[:] -= temp.max()
         # temp[:] = np.exp(temp) / np.exp(temp).sum()
         temp[:] = np.cumsum(np.exp(temp))
         temp[:] /= temp[
@@ -137,7 +137,6 @@ def cluster_covariance_update_old(
                 mus[i][temps, j],
                 covs[i][temps, j],
             )
-    return
 
 
 # West 1992, dirichletprocess R package
@@ -316,7 +315,6 @@ class AMcov_clust:
                 )
                 self.mu_clust[self.temps, delta[i].T[j]] = mu_new  # (m1=m)
                 self.n_hc[self.temps, delta[i].T[j]] = n_new.ravel()  # (n1=n)
-        return
 
     def update_tau(
         self, m
@@ -351,9 +349,9 @@ def calibClust(setup, parallel=False):
     t0 = time.time()
 
     if parallel:
-        pool = mp.Pool(processes=mp.cpu_count())
+        mp.Pool(processes=mp.cpu_count())
     else:
-        pool = None
+        pass
 
     ## Constants Declaration
 
@@ -429,7 +427,7 @@ def calibClust(setup, parallel=False):
     djs = np.empty(
         clust_mem_count.shape
     )  # (candidate) cluster weight for ijth experiment
-    cluster_weights = np.empty(clust_mem_count.shape)
+    np.empty(clust_mem_count.shape)
     for i in range(setup.nexp):
         clust_mem_count[:] += bincount2D_vectorized(
             delta[i][0], setup.nclustmax
@@ -503,7 +501,7 @@ def calibClust(setup, parallel=False):
         setup.ntemps,
         setup.nclustmax,
     ))  # above, Summarized by cluster assignment (i.e., llik for each unique theta, summed over experiments that share that theta)
-    llik_curr_theta_ = np.zeros((setup.ntemps, setup.nclustmax))  #
+    llik_curr_theta_ = np.zeros((setup.ntemps, setup.nclustmax))
     marg_lik_cov_curr = (
         [None] * setup.nexp
     )  # does not need to get summed over experiments (should be one for each experiment, regardless of cluster)
@@ -536,7 +534,8 @@ def calibClust(setup, parallel=False):
 
         ### Initialize predictions for clusters
         pred_curr_delta[i] = (
-            setup.models[i]
+            setup
+            .models[i]
             .eval(
                 tran_unif(
                     theta[0].reshape(-1, setup.p),
@@ -604,7 +603,7 @@ def calibClust(setup, parallel=False):
     count_temper = np.zeros([setup.ntemps, setup.ntemps])
     count = np.zeros(setup.ntemps)
     ## Initialize Alphas
-    alpha_long_shape = (setup.ntemps * setup.nclustmax,)
+    (setup.ntemps * setup.nclustmax,)
     alpha_wide_shape = (
         setup.ntemps,
         setup.nclustmax,
@@ -614,9 +613,7 @@ def calibClust(setup, parallel=False):
     sw_alpha = np.zeros(setup.nswap_per)
     good_values = np.zeros(alpha_wide_shape, dtype=bool)
 
-    delta_size = [
-        (setup.ntemps, setup.nclustmax, setup.ns2[i]) for i in range(setup.nexp)
-    ]
+    [(setup.ntemps, setup.nclustmax, setup.ns2[i]) for i in range(setup.nexp)]
     cluster_cum_prob = np.empty((setup.ntemps, setup.nclustmax))
     cluster_sample_unif = [
         np.empty((setup.ntemps, setup.ns2[i])) for i in range(setup.nexp)
@@ -879,7 +876,8 @@ def calibClust(setup, parallel=False):
         ##########################
         for i in range(setup.nexp):
             pred_curr_delta[i][:] = (
-                setup.models[i]
+                setup
+                .models[i]
                 .eval(  # (IN PARTICULAR, THIS CALL!!!!)
                     tran_unif(
                         theta[m]
@@ -1166,13 +1164,13 @@ def calibClust(setup, parallel=False):
                         theta_ext[tt[0]].copy(),
                     )
         print(
-            "\rCalibration MCMC {:.01%} Complete".format(m / setup.nmcmc),
+            f"\rCalibration MCMC {m / setup.nmcmc:.01%} Complete",
             end="",
         )
     # ------------------------------------------------------------------------------------------
     pred_curr = pred_curr_theta
     t1 = time.time()
-    print("\rCalibration MCMC Complete. Time: {:f} seconds.".format(t1 - t0))
+    print(f"\rCalibration MCMC Complete. Time: {t1 - t0:f} seconds.")
     count_temper = (
         count_temper + count_temper.T - np.diag(np.diag(count_temper))
     )

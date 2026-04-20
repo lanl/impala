@@ -43,7 +43,7 @@ def generate_data(n_features: int, gridsize: int):
 
     mu = np.apply_along_axis(friedman, 1, theta).squeeze()
     yobs = np.random.normal(mu, sigma)
-    param_truth = dict(theta=theta, sigma=sigma)
+    param_truth = {"theta": theta, "sigma": sigma}
 
     return yobs, friedman, n_features, param_truth
 

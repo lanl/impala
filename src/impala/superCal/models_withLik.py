@@ -110,13 +110,11 @@ class ModelBassPca_mult(AbstractModel):
         self.s2 = s2
         self.constants = None
         if s2 == "gibbs":
-            raise "Cannot use Gibbs s2 for emulator models."
-        return
+            raise ValueError("Cannot use Gibbs s2 for emulator models.")
 
     def step(self):
         self.ii = np.random.choice(range(self.nmcmc), 1).item()
         self.emu_vars = self.mod_s2[self.ii]
-        return
 
     def eval(self, parmat, pool=None, nugget=False):
         """
@@ -132,7 +130,7 @@ class ModelBassPca_mult(AbstractModel):
         if pool is True:
             return pred
         else:
-            nrep = list(parmat.values())[0].shape[0] // self.nexp
+            nrep = next(iter(parmat.values())).shape[0] // self.nexp
             return np.concatenate(
                 [
                     pred[
@@ -212,13 +210,11 @@ class ModelBpprPca_mult(AbstractModel):
         self.s2 = s2
         self.constants = None
         if s2 == "gibbs":
-            raise "Cannot use Gibbs s2 for emulator models."
-        return
+            raise ValueError("Cannot use Gibbs s2 for emulator models.")
 
     def step(self):
         self.ii = np.random.choice(range(self.nmcmc), 1).item()
         self.emu_vars = self.mod_s2[self.ii]
-        return
 
     def eval(self, parmat, pool=None, nugget=False):
         """
@@ -234,7 +230,7 @@ class ModelBpprPca_mult(AbstractModel):
         if pool is True:
             return pred
         else:
-            nrep = list(parmat.values())[0].shape[0] // self.nexp
+            nrep = next(iter(parmat.values())).shape[0] // self.nexp
             return np.concatenate(
                 [
                     pred[
@@ -324,13 +320,11 @@ class ModelBassPca_func(AbstractModel):
         self.s2 = s2
         self.constants = None
         if s2 == "gibbs":
-            raise "Cannot use Gibbs s2 for emulator models."
-        return
+            raise ValueError("Cannot use Gibbs s2 for emulator models.")
 
     def step(self):
         self.ii = np.random.choice(range(self.nmcmc), 1).item()
         self.emu_vars = self.mod_s2[self.ii]
-        return
 
     # @profile
     def discrep_sample(self, yobs, pred, cov, itemp):
@@ -358,7 +352,7 @@ class ModelBassPca_func(AbstractModel):
         if pool is True:
             return pred
         else:
-            nrep = list(parmat.values())[0].shape[0] // self.nexp
+            nrep = next(iter(parmat.values())).shape[0] // self.nexp
             return np.concatenate(
                 [
                     pred[
@@ -469,13 +463,11 @@ class ModelBpprPca_func(AbstractModel):
         self.s2 = s2
         self.constants = None
         if s2 == "gibbs":
-            raise "Cannot use Gibbs s2 for emulator models."
-        return
+            raise ValueError("Cannot use Gibbs s2 for emulator models.")
 
     def step(self):
         self.ii = np.random.choice(range(self.nmcmc), 1).item()
         self.emu_vars = self.mod_s2[self.ii]
-        return
 
     # @profile
     def discrep_sample(self, yobs, pred, cov, itemp):
@@ -503,7 +495,7 @@ class ModelBpprPca_func(AbstractModel):
         if pool is True:
             return pred
         else:
-            nrep = list(parmat.values())[0].shape[0] // self.nexp
+            nrep = next(iter(parmat.values())).shape[0] // self.nexp
             return np.concatenate(
                 [
                     pred[
@@ -597,7 +589,7 @@ class ModelF(AbstractModel):
         if pool is True:
             return np.apply_along_axis(self.mod, 1, parmat_array)
         else:
-            nrep = list(parmat.values())[0].shape[0] // self.nexp
+            nrep = next(iter(parmat.values())).shape[0] // self.nexp
             out_all = np.apply_along_axis(self.mod, 1, parmat_array)
 
             # out_sub = np.concatenate([out_all[(i*nrep):(i*nrep+nrep), self.exp_ind==i] for i in range(self.nexp)], 1)
@@ -677,7 +669,7 @@ class ModelF_bigdata(AbstractModel):
         if pool is True:
             return np.apply_along_axis(self.mod, 1, parmat_array)
         else:
-            nrep = list(parmat.values())[0].shape[0] // self.nexp
+            nrep = next(iter(parmat.values())).shape[0] // self.nexp
             out_all = np.apply_along_axis(self.mod, 1, parmat_array)
 
             # out_sub = np.concatenate([out_all[(i*nrep):(i*nrep+nrep), self.exp_ind==i] for i in range(self.nexp)], 1)
@@ -770,7 +762,7 @@ class ModelMaterialStrength(AbstractModel):
         self.meas_strain_histories = strain_histories
         self.meas_strain_max = np.array([v.max() for v in strain_histories])
         self.strain_max = self.meas_strain_max.max()
-        self.nhists = sum([len(v) for v in strain_histories])
+        self.nhists = sum(len(v) for v in strain_histories)
         self.model = pm_vec.MaterialModel(
             flow_stress_model=eval("pm_vec." + flow_stress_model),
             shear_modulus_model=eval("pm_vec." + shear_model),
@@ -797,7 +789,6 @@ class ModelMaterialStrength(AbstractModel):
         self.s2 = s2
 
         # self.meas_error_cor = np.diag(self.basis.shape[0])
-        return
 
     def eval(
         self, parmat, pool=None, nugget=False
@@ -805,14 +796,14 @@ class ModelMaterialStrength(AbstractModel):
         """parmat:  dictionary of parameters"""
         if (pool is True) or self.pool:  # Pooled Case
             # nrep = parmat['p'].shape[0]  # number of temper temps
-            nrep = list(parmat.values())[0].shape[0]
+            nrep = next(iter(parmat.values())).shape[0]
             parmat_big = {
                 key: np.kron(parm, np.ones(self.nexp))
                 for key, parm in parmat.items()
             }
         else:  # hierarchical case
             nrep = (
-                list(parmat.values())[0].shape[0] // self.nexp
+                next(iter(parmat.values())).shape[0] // self.nexp
             )  # number of temper temps
             parmat_big = parmat
 
@@ -903,13 +894,13 @@ def getoptions_ModelMaterialStrength():
         filter(re.compile(".*Specific_Heat").match, mod_options)
     )
     density_model = list(filter(re.compile(".*Density").match, mod_options))
-    return dict({
+    return {
         "flow_stress_model": flow_stress_model,
         "melt_model": melt_model,
         "shear_model": shear_model,
         "specific_heat_model": specific_heat_model,
         "density_model": density_model,
-    })
+    }
 
 
 #######
