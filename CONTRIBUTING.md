@@ -13,7 +13,7 @@ editable mode via
 pip install -e .[dev]
 ```
 
-If using `uv`, `pre-commit` will be installed in your default (dev)
+If using `uv`, `pre-commit` will be installed in your default (`dev`)
 environment.
 
 To install the ruff git hook to your local `.git/hooks` folder, run
