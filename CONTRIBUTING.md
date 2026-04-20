@@ -6,7 +6,7 @@ You will need to lint and format your code using [`ruff`][2]. The easiest way
 to automate linting/formatting of code prior to each commit is via the
 [`pre-commit`][1] package, which simplifies management of git hooks.
 
-If using pip, `pre-commit` will be installed when you install `ursa` in
+If using pip, `pre-commit` will be installed when you install `impala-calib` in
 editable mode via
 
 ```bash
