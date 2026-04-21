@@ -29,15 +29,9 @@ sim_inputs = np.genfromtxt(
 )
 input_names = ["A", "B", "C", "n", "m", "v1", "v2", "v3", "G1", "del2", "del3"]
 
-xx104 = np.genfromtxt(
-    datafolder / "flyer_data" / "xsims104.csv", delimiter=","
-)
-xx105 = np.genfromtxt(
-    datafolder / "flyer_data" / "xsims105.csv", delimiter=","
-)
-xx106 = np.genfromtxt(
-    datafolder / "flyer_data" / "xsims106.csv", delimiter=","
-)
+xx104 = np.genfromtxt(datafolder / "flyer_data" / "xsims104.csv", delimiter=",")
+xx105 = np.genfromtxt(datafolder / "flyer_data" / "xsims105.csv", delimiter=",")
+xx106 = np.genfromtxt(datafolder / "flyer_data" / "xsims106.csv", delimiter=",")
 xx_all_list = [xx104, xx105, xx106]
 
 sims104 = np.genfromtxt(
@@ -52,15 +46,9 @@ sims106 = np.genfromtxt(
 sims_all_list = [sims104, sims105, sims106]
 # sims_all = np.hstack(sims_all_list)
 
-obs104 = np.genfromtxt(
-    datafolder / "flyer_data" / "obs104.csv", delimiter=","
-)
-obs105 = np.genfromtxt(
-   datafolder / "flyer_data" / "obs105.csv", delimiter=","
-)
-obs106 = np.genfromtxt(
-    datafolder / "flyer_data" / "obs106.csv", delimiter=","
-)
+obs104 = np.genfromtxt(datafolder / "flyer_data" / "obs104.csv", delimiter=",")
+obs105 = np.genfromtxt(datafolder / "flyer_data" / "obs105.csv", delimiter=",")
+obs106 = np.genfromtxt(datafolder / "flyer_data" / "obs106.csv", delimiter=",")
 obs_all_list = [obs104, obs105, obs106]
 # obs_all = np.hstack(obs_all_list)
 
@@ -260,7 +248,9 @@ bounds_mat = np.array([
 bounds = dict(zip(input_names, bounds_mat))
 
 
-constraint_funcion = sc.cf_bounds # included in superCal, no need to hard code here
+constraint_funcion = (
+    sc.cf_bounds
+)  # included in superCal, no need to hard code here
 
 
 ends = M - 125

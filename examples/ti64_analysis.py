@@ -55,9 +55,7 @@ dat_all = []
 # for i in use_idx:
 for i in range(n_shpb):
     ## get first datset
-    dat_all.append(
-        pd.read_sql(f"select * from data_{i + 1};", con).values
-    )
+    dat_all.append(pd.read_sql(f"select * from data_{i + 1};", con).values)
 stress_stacked = np.hstack([v.T[1] for v in dat_all])
 strain_hist_list = [v.T[0] for v in dat_all]
 
@@ -90,9 +88,7 @@ if emu:
         "vel",
     ]  # actually gamma, not lgamma, but we take log below
     for i in np.where(meta["type"] != "shpb")[0][range(n_tc)]:
-        X = pd.read_sql(
-            f"select * from sims_input_{i + 1};", con
-        ).values.copy()
+        X = pd.read_sql(f"select * from sims_input_{i + 1};", con).values.copy()
         X[:, 9] = np.log(X[:, 9])  # we use log gamma below
         y = pd.read_sql(
             f"select * from sims_output_{i + 1};", con
