@@ -9,7 +9,18 @@ from numpy.linalg import slogdet
 from numpy.random import beta, choice, gamma, uniform
 from scipy.stats import invwishart
 
-from impala.superCal.impala_noProbit_emu import *
+from .impala_noProbit_emu import (
+    chol_sample_1per,
+    chol_sample_1per_constraints,
+    chol_sample_nper_constraints,
+    cov_4d_pcm,
+    gamma_logpdf,
+    initfunc_unif,
+    invwishart_logpdf,
+    mvnorm_logpdf,  # , invgamma_logpdf
+    mvnorm_logpdf_,
+    tran_unif,
+)
 
 # import pbar
 # np.seterr(under='ignore')
@@ -702,49 +713,49 @@ def calibClust(setup, parallel=False):
 
         # ------------------------------------------------------------------------------------------
         ## adaptive Metropolis per Cluster
-        if False:
-            if m > 300:
-                for i in range(setup.nexp):
-                    mu[i] += (theta_hist[i][m - 1] - mu[i]) / m
-                    cov[i][:] = +((m - 1) / m) * cov[i] + (
-                        (m - 1) / (m * m)
-                    ) * np.einsum(
-                        "tej,tel->tejl",
-                        theta_hist[i][m - 1] - mu[i],
-                        theta_hist[i][m - 1] - mu[i],
-                    )
-                cluster_covariance_update(
-                    S,
-                    mS,
-                    nS,
-                    m,
-                    curr_delta,
-                    cov,
-                    mu,
-                    setup.nexp,
-                    setup.nclustmax,
-                    temps,
-                )
-                S = AM_SCALAR * np.einsum("ijkl,i->ijkl", S, np.exp(tau))
-            elif m == 300:
-                for i in range(setup.nexp):
-                    mu[i][:] = theta_hist[i][:m].mean(axis=0)
-                    cov[i][:] = cov_4d_pcm(theta_hist[i][:m], mu[i])
-                cluster_covariance_update(
-                    S,
-                    mS,
-                    nS,
-                    m,
-                    curr_delta,
-                    cov,
-                    mu,
-                    setup.nexp,
-                    setup.nclustmax,
-                    temps,
-                )
-                S = AM_SCALAR * np.einsum("ijkl,i->ijkl", S, np.exp(tau))
-            else:
-                pass
+        # if False:
+        #     if m > 300:
+        #         for i in range(setup.nexp):
+        #             mu[i] += (theta_hist[i][m - 1] - mu[i]) / m
+        #             cov[i][:] = +((m - 1) / m) * cov[i] + (
+        #                 (m - 1) / (m * m)
+        #             ) * np.einsum(
+        #                 "tej,tel->tejl",
+        #                 theta_hist[i][m - 1] - mu[i],
+        #                 theta_hist[i][m - 1] - mu[i],
+        #             )
+        #         cluster_covariance_update(
+        #             S,
+        #             mS,
+        #             nS,
+        #             m,
+        #             curr_delta,
+        #             cov,
+        #             mu,
+        #             setup.nexp,
+        #             setup.nclustmax,
+        #             temps,
+        #         )
+        #         S = AM_SCALAR * np.einsum("ijkl,i->ijkl", S, np.exp(tau))
+        #     elif m == 300:
+        #         for i in range(setup.nexp):
+        #             mu[i][:] = theta_hist[i][:m].mean(axis=0)
+        #             cov[i][:] = cov_4d_pcm(theta_hist[i][:m], mu[i])
+        #         cluster_covariance_update(
+        #             S,
+        #             mS,
+        #             nS,
+        #             m,
+        #             curr_delta,
+        #             cov,
+        #             mu,
+        #             setup.nexp,
+        #             setup.nclustmax,
+        #             temps,
+        #         )
+        #         S = AM_SCALAR * np.einsum("ijkl,i->ijkl", S, np.exp(tau))
+        #     else:
+        #         pass
         # ------------------------------------------------------------------------------------------
 
         ###################
@@ -1063,47 +1074,47 @@ def calibClust(setup, parallel=False):
                         - llik_curr_theta[i][sw.T[1]].sum(axis=1)
                     )
 
-                    if False:
-                        sw_alpha[:] = sw_alpha + (
-                            setup.itl[sw.T[1]] - setup.itl[sw.T[0]]
-                        ) * (
-                            # for t_0
-                            +invgamma_logpdf(
-                                s2[i][m][sw.T[0]], setup.ig_a[i], setup.ig_b[i]
-                            )
-                            + (
-                                mvnorm_logpdf_(
-                                    theta[m, sw.T[0]],
-                                    theta0[m, sw.T[0]],
-                                    Sigma0_inv_curr[sw.T[0]],
-                                    Sigma0_ldet_curr[sw.T[0]],
-                                )
-                                * theta_ext[sw.T[0]]
-                            ).sum(axis=1)
-                            - 0.5
-                            * (setup.ny_s2[i] * np.log(s2[i][m])).sum(axis=1)[
-                                sw.T[0]
-                            ]
-                            - 0.5 * sse_curr[i][sw.T[0]].sum(axis=1)
-                            # for t_1
-                            - invgamma_logpdf(
-                                s2[i][m][sw.T[1]], setup.ig_a[i], setup.ig_b[i]
-                            )
-                            - (
-                                mvnorm_logpdf_(
-                                    theta[m, sw.T[1]],
-                                    theta0[m, sw.T[1]],
-                                    Sigma0_inv_curr[sw.T[1]],
-                                    Sigma0_ldet_curr[sw.T[1]],
-                                )
-                                * theta_ext[sw.T[1]]
-                            ).sum(axis=1)
-                            + 0.5
-                            * (setup.ny_s2[i] * np.log(s2[i][m])).sum(axis=1)[
-                                sw.T[1]
-                            ]
-                            + 0.5 * sse_curr[i][sw.T[1]].sum(axis=1)
-                        )
+                    # if False:
+                    #     sw_alpha[:] = sw_alpha + (
+                    #         setup.itl[sw.T[1]] - setup.itl[sw.T[0]]
+                    #     ) * (
+                    #         # for t_0
+                    #         +invgamma_logpdf(
+                    #             s2[i][m][sw.T[0]], setup.ig_a[i], setup.ig_b[i]
+                    #         )
+                    #         + (
+                    #             mvnorm_logpdf_(
+                    #                 theta[m, sw.T[0]],
+                    #                 theta0[m, sw.T[0]],
+                    #                 Sigma0_inv_curr[sw.T[0]],
+                    #                 Sigma0_ldet_curr[sw.T[0]],
+                    #             )
+                    #             * theta_ext[sw.T[0]]
+                    #         ).sum(axis=1)
+                    #         - 0.5
+                    #         * (setup.ny_s2[i] * np.log(s2[i][m])).sum(axis=1)[
+                    #             sw.T[0]
+                    #         ]
+                    #         - 0.5 * sse_curr[i][sw.T[0]].sum(axis=1)
+                    #         # for t_1
+                    #         - invgamma_logpdf(
+                    #             s2[i][m][sw.T[1]], setup.ig_a[i], setup.ig_b[i]
+                    #         )
+                    #         - (
+                    #             mvnorm_logpdf_(
+                    #                 theta[m, sw.T[1]],
+                    #                 theta0[m, sw.T[1]],
+                    #                 Sigma0_inv_curr[sw.T[1]],
+                    #                 Sigma0_ldet_curr[sw.T[1]],
+                    #             )
+                    #             * theta_ext[sw.T[1]]
+                    #         ).sum(axis=1)
+                    #         + 0.5
+                    #         * (setup.ny_s2[i] * np.log(s2[i][m])).sum(axis=1)[
+                    #             sw.T[1]
+                    #         ]
+                    #         + 0.5 * sse_curr[i][sw.T[1]].sum(axis=1)
+                    #     )
                 for tt in sw[
                     np.where(
                         sw[np.log(uniform(size=setup.nswap_per)) < sw_alpha]

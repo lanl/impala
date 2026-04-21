@@ -1,6 +1,6 @@
 ######################################
 ######################################
-### Impala Model Class Definitions ###
+"""Impala Model Class Definitions"""
 ######################################
 ######################################
 
@@ -8,6 +8,8 @@
 ### Imports ###
 ###############
 import abc
+import inspect
+import re
 from itertools import cycle
 
 import numpy as np
@@ -16,8 +18,7 @@ from scipy.linalg import cho_factor, cholesky
 
 # import pyBASS as pb
 # import pyBayesPPR as pbppr
-# import physical_models_vec as pm_vec
-from impala import physics as pm_vec
+from .. import physics as pm_vec
 
 ########################
 ### Helper Functions ###
@@ -817,16 +818,12 @@ class ModelMaterialStrength(AbstractModel):
             np.ones(nrep), self.meas_strain_max
         )  # 1d vector, nexp * temper_temps
         ntot = edots.shape[0]  # nexp * temper_temps
-        sim_strain_histories = pm_vec.generate_strain_history_new(
-            strain_maxs, edots, self.Nhist
-        )
+        self.model.set_history_variables(strain_maxs, edots, self.Nhist)
         self.model.initialize(parmat_big, self.constants)
         self.model.initialize_state(
             T=temps, stress=np.zeros(ntot), strain=np.zeros(ntot)
         )
-        sim_state_histories = self.model.compute_state_history(
-            sim_strain_histories
-        )
+        sim_state_histories = self.model.compute_state_history()
         sim_strains = sim_state_histories[:, 1].T  # 2d array: ntot, Nhist
         sim_stresses = sim_state_histories[:, 2].T  # 2d array: ntot, Nhist
 
@@ -873,11 +870,7 @@ def interpolate_experiment(args):
 #######
 ### getoptions_ModelMaterialStrength: Provides current options for ModelMaterialStrength physical models
 def getoptions_ModelMaterialStrength():
-    import re
-
-    import impala
-
-    mod_options = dir(impala.physics.physical_models_vec)
+    mod_options = dir(pm_vec)
     flow_stress_model = list(
         filter(re.compile(".*Yield_Stress").match, mod_options)
     )
@@ -909,11 +902,8 @@ def showdef_ModelMaterialStrength(func_name):
     """
     func_name: string listing a function listed in get_ModelMaterialStrength_options(), e.g., showdef_ModelMaterialStrength('Linear_Specific_Heat')
     """
-    import inspect
 
-    import impala
-
-    my_func = getattr(impala.physics, func_name)
+    my_func = getattr(pm_vec, func_name)
     print(inspect.getsource(my_func))
 
 

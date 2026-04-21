@@ -1,6 +1,6 @@
 ####################################
 ####################################
-### Impala Model Fit Definitions ###
+"""Impala Model Fit Definitions"""
 ####################################
 ####################################
 
@@ -11,6 +11,7 @@
 import time
 from collections import namedtuple
 from math import floor, log, sqrt
+from multiprocessing import Pool
 
 import numpy as np
 import scipy
@@ -2042,7 +2043,6 @@ def calibPool(setup):
 
 
 ##############################################################################################################################################################################
-from multiprocessing import Pool
 
 
 class PoolCalib:

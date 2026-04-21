@@ -47,14 +47,12 @@ def test_physics():
     emax = 0.6
     nhist = 100
 
-    sim_strain_histories = physics.generate_strain_history_new(
-        emax=np.array([emax]), edot=np.array([edot]), nhist=nhist
-    )
+    ptw.set_history_variables(emax=emax, edot=np.array([edot]), nhist=nhist)
     ptw.initialize(params, consts)
     ptw.initialize_state(
         T=np.array([temp]), stress=np.zeros(1), strain=np.zeros(1)
     )
-    sim_state_histories = ptw.compute_state_history(sim_strain_histories)
+    sim_state_histories = ptw.compute_state_history()
     sim_strains = sim_state_histories[:, 1]  # 2d array: ntot, Nhist
     sim_stresses = sim_state_histories[:, 2]  # 2d array: ntot, Nhist
 
@@ -117,14 +115,12 @@ def test_constparams():
     emax = 0.6
     nhist = 100
 
-    sim_strain_histories = physics.generate_strain_history_new(
-        np.array([emax]), np.array([edot]), nhist
-    )
+    ptw.set_history_variables(emax, np.array([edot]), nhist)
     ptw.initialize(params, consts)
     ptw.initialize_state(
         T=np.array([temp]), stress=np.zeros(1), strain=np.zeros(1)
     )
-    sim_state_histories = ptw.compute_state_history(sim_strain_histories)
+    sim_state_histories = ptw.compute_state_history()
     sim_strains = sim_state_histories[:, 1]  # 2d array: ntot, Nhist
     sim_stresses = sim_state_histories[:, 2]  # 2d array: ntot, Nhist
 

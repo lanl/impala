@@ -36,12 +36,12 @@ class TestJCYieldStress(unittest.TestCase):
         """
         JC, const. g0, Tm. Rates less than 1e-6/us (~1/s), should be isothermal T=const
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_yjc.set_history_variables(
             emax=np.array([1.0]), edot=np.array([1e-7]), nhist=1000
         )
         self.model_yjc.initialize(self.params, self.consts)
         self.model_yjc.initialize_state(T=np.array([298.0]))
-        results_yjc = self.model_yjc.compute_state_history(shist)
+        results_yjc = self.model_yjc.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         self.assertEqual(results_yjc[0][3], results_yjc[-1][3])
@@ -50,12 +50,12 @@ class TestJCYieldStress(unittest.TestCase):
         """
         JC, const. g0, Tm. Rates greater than 1e-6/us (~1/s), temperature changes adiabatically
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_yjc.set_history_variables(
             emax=np.array([1.0]), edot=np.array([1e-2]), nhist=1000
         )
         self.model_yjc.initialize(self.params, self.consts)
         self.model_yjc.initialize_state(T=np.array([298.0]))
-        results_yjc = self.model_yjc.compute_state_history(shist)
+        results_yjc = self.model_yjc.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         self.assertNotEqual(results_yjc[0][3], results_yjc[-1][3])
@@ -82,12 +82,12 @@ class TestJCYieldStress(unittest.TestCase):
         This makes it difficult to directly compare the initial yield stress at
         zero plastic strain.
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_yjc.set_history_variables(
             emax=np.array([0.28179]), edot=np.array([1e-2]), nhist=1000
         )
         self.model_yjc.initialize(self.params, self.consts)
         self.model_yjc.initialize_state(T=np.array([298.0]))
-        results_yjc = self.model_yjc.compute_state_history(shist)
+        results_yjc = self.model_yjc.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         # Assess stress at the emax
@@ -124,12 +124,12 @@ class TestJCYieldStress(unittest.TestCase):
         This makes it difficult to directly compare the initial yield stress at
         zero plastic strain.
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_yjc.set_history_variables(
             emax=np.array([0.28895]), edot=np.array([1e-4]), nhist=1000
         )
         self.model_yjc.initialize(self.params, self.consts)
         self.model_yjc.initialize_state(T=np.array([298.0]))
-        results_yjc = self.model_yjc.compute_state_history(shist)
+        results_yjc = self.model_yjc.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         # Assess stress at the emax
@@ -166,12 +166,12 @@ class TestJCYieldStress(unittest.TestCase):
         This makes it difficult to directly compare the initial yield stress at
         zero plastic strain.
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_yjc.set_history_variables(
             emax=np.array([0.28928]), edot=np.array([1e-7]), nhist=1000
         )
         self.model_yjc.initialize(self.params, self.consts)
         self.model_yjc.initialize_state(T=np.array([298.0]))
-        results_yjc = self.model_yjc.compute_state_history(shist)
+        results_yjc = self.model_yjc.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         # Assess stress at the emax

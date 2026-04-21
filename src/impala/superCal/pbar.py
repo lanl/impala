@@ -60,10 +60,9 @@ class pbar:
     def parse_extra(self):
         if self.extra is None:
             return ""
-        else:
-            return " | " + " | ".join(
-                f"{name}: {value}" for name, value in self.extra.items()
-            )
+        return " | " + " | ".join(
+            f"{name}: {value}" for name, value in self.extra.items()
+        )
 
     def clean(self, x):
         return str(x).split(".")[0]

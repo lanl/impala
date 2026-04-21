@@ -23,12 +23,12 @@ class TestConstantYieldStress(unittest.TestCase):
         """
         Const. yield, g0, Tm. Rates less than 1e-6/us (~1/s), should be isothermal T=const
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_const_y.set_history_variables(
             emax=np.array([1.0]), edot=np.array([1e-7]), nhist=1000
         )
         self.model_const_y.initialize(self.params, self.consts)
         self.model_const_y.initialize_state(T=np.array([298.0]))
-        results_const_y = self.model_const_y.compute_state_history(shist)
+        results_const_y = self.model_const_y.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         self.assertEqual(results_const_y[0][3], results_const_y[-1][3])
@@ -37,12 +37,12 @@ class TestConstantYieldStress(unittest.TestCase):
         """
         Const. yield, g0, Tm. Rates greater than 1e-6/us (~1/s), temperature changes adiabatically
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_const_y.set_history_variables(
             emax=np.array([1.0]), edot=np.array([1e0]), nhist=1000
         )
         self.model_const_y.initialize(self.params, self.consts)
         self.model_const_y.initialize_state(T=np.array([298.0]))
-        results_const_y = self.model_const_y.compute_state_history(shist)
+        results_const_y = self.model_const_y.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         self.assertNotEqual(results_const_y[0][3], results_const_y[-1][3])
@@ -51,12 +51,12 @@ class TestConstantYieldStress(unittest.TestCase):
         """
         Const. yield, g0, Tm. Yield stress is constant for all strain
         """
-        shist = pmh.generate_strain_history_new(
+        self.model_const_y.set_history_variables(
             emax=np.array([1.0]), edot=np.array([1e0]), nhist=1000
         )
         self.model_const_y.initialize(self.params, self.consts)
         self.model_const_y.initialize_state(T=np.array([298.0]))
-        results_const_y = self.model_const_y.compute_state_history(shist)
+        results_const_y = self.model_const_y.compute_state_history()
         # result format
         # [time, strain, stress, temp, shear_mod, density]
         for time_i in results_const_y:
