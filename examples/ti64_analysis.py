@@ -2,16 +2,17 @@
 ## This script demonstrates how to do pooled impala calibration of PTW
 ## using SHPB/quasistatic data.
 ##########################################################################################
+import os
+import pathlib
+import sqlite3 as sq
 
+import numpy as np
 import matplotlib
 
 ## Force matplotlib to not use any Xwindows backend.
 matplotlib.use("Agg")
-import os
-import sqlite3 as sq
 
 import matplotlib.pyplot as plt
-import numpy as np
 
 # import dill
 import pandas as pd
@@ -34,7 +35,8 @@ os.makedirs(path, exist_ok=True)
 ## Three Ti64 experiments, 1st column is plastic strain 2nd column is stress (units: mbar)
 
 ## get meta data
-con = sq.connect("data/ti-6al-4v/data_Ti64.db")
+datafolder = pathlib.Path(__file__).resolve().parents[1] / "data" / "ti-6al-4v"
+con = sq.connect(datafolder / "data_Ti64.db")
 meta = pd.read_sql("select * from meta;", con)
 n_tot = meta.shape[0]
 n_shpb = np.sum(meta["type"] == "shpb")
@@ -90,11 +92,11 @@ if emu:
     for i in np.where(meta["type"] != "shpb")[0][range(n_tc)]:
         X = pd.read_sql(
             f"select * from sims_input_{i + 1};", con
-        ).values
+        ).values.copy()
         X[:, 9] = np.log(X[:, 9])  # we use log gamma below
         y = pd.read_sql(
             f"select * from sims_output_{i + 1};", con
-        ).values
+        ).values.copy()
         mod = pb.bassPCA(X, y, ncores=15, percVar=99.9)
         emu_list.append(mod)
         yobs = pd.read_sql(f"select * from data_{i + 1};", con).values
@@ -146,17 +148,7 @@ bounds_ptw = {
 
 ##########################################################################################
 # constraints: sInf < s0, yInf < y0, y0 < s0, yInf < sInf, s0 < y1, beta < y2 (but beta is fixed)
-def constraints_ptw(x, bounds):
-    good = (
-        (x["sInf"] < x["s0"])
-        * (x["yInf"] < x["y0"])
-        * (x["y0"] < x["s0"])
-        * (x["yInf"] < x["sInf"])
-        * (x["s0"] < x["y1"])
-    )
-    for k in list(bounds.keys()):
-        good = good * (x[k] < bounds[k][1]) * (x[k] > bounds[k][0])
-    return good
+constraints_ptw = sc.constraints_ptw
 
 
 ##########################################################################################

@@ -853,7 +853,7 @@ def pairs(setup, mat_st, col=None, s=None):
     if col is None:
         col = ["blue"] * mat_st.shape[0]
     if s is None:
-        s = [3] * mat_st.shape[0]
+        s = 3
     dat["col"] = col
     # g = sns.pairplot(dat, plot_kws={"s": s}, corner=True, diag_kind='hist', hue='col')
     g = sns.pairplot(dat, plot_kws={"s": s}, diag_kind="hist", hue="col")
