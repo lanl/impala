@@ -17,7 +17,7 @@ from .impala_noProbit_emu import (
     gamma_logpdf,
     initfunc_unif,
     invwishart_logpdf,
-    mvnorm_logpdf,  #, invgamma_logpdf
+    mvnorm_logpdf,  # , invgamma_logpdf
     mvnorm_logpdf_,
     tran_unif,
 )

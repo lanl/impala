@@ -1,6 +1,6 @@
 ####################################
 ####################################
-''' Impala Model Fit Definitions '''
+"""Impala Model Fit Definitions"""
 ####################################
 ####################################
 
@@ -289,7 +289,6 @@ class CalibSetup:
         self.nclustmax = nclustmax
         self.eta_prior_shape = eta_prior_shape
         self.eta_prior_rate = eta_prior_rate
-
 
 
 ########################

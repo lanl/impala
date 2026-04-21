@@ -1025,13 +1025,13 @@ class MaterialModel:
         self.state.set_state(T, stress, strain)
 
     def set_history_variables(self, emax, edot, nhist):
-        '''initializes attributes emax, edot, and Nhist, then calls
-           generate_strain_history() for those values and stores the
-           results as self.strain_history.'''
+        """initializes attributes emax, edot, and Nhist, then calls
+        generate_strain_history() for those values and stores the
+        results as self.strain_history."""
         self.emax = emax
         self.edot = edot
         self.Nhist = nhist
-        self.strain_history = generate_strain_history(emax,edot,nhist)
+        self.strain_history = generate_strain_history(emax, edot, nhist)
 
     def get_history_variables(self):
         return [self.emax, self.edot, self.Nhist]
@@ -1082,11 +1082,11 @@ class MaterialModel:
 
 
 def generate_strain_history(emax, edot, nhist):
-    '''function to generate strain history to calculate along;
-       it is called by the method set_history_variables() within the MaterialModel class.'''
+    """function to generate strain history to calculate along;
+    it is called by the method set_history_variables() within the MaterialModel class."""
     tmax = emax / edot
     if isinstance(emax, float):
-        emax = [emax]*len(edot)
+        emax = [emax] * len(edot)
     strains = np.linspace(0, emax, nhist)  # nhist * nexp
     times = np.linspace(0, tmax, nhist)  # nhist * nexp
     rates = np.diff(strains, axis=0) / np.diff(
@@ -1094,5 +1094,7 @@ def generate_strain_history(emax, edot, nhist):
     )  # (nhist - 1) * nexp
     return {"times": times.T, "strains": strains.T, "strain_rate": rates.T}
 
-generate_strain_history_new =  generate_strain_history # only for backwards compatibility, TODO: deprecate
 
+generate_strain_history_new = (
+    generate_strain_history  # only for backwards compatibility, TODO: deprecate
+)

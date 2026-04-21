@@ -1,7 +1,7 @@
 ######################################
 ######################################
-''' Impala Model Class Definitions '''
-###################################### 
+"""Impala Model Class Definitions"""
+######################################
 ######################################
 
 ###############
@@ -818,9 +818,7 @@ class ModelMaterialStrength(AbstractModel):
             np.ones(nrep), self.meas_strain_max
         )  # 1d vector, nexp * temper_temps
         ntot = edots.shape[0]  # nexp * temper_temps
-        self.model.set_history_variables(
-            strain_maxs, edots, self.Nhist
-        )
+        self.model.set_history_variables(strain_maxs, edots, self.Nhist)
         self.model.initialize(parmat_big, self.constants)
         self.model.initialize_state(
             T=temps, stress=np.zeros(ntot), strain=np.zeros(ntot)
