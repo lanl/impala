@@ -174,25 +174,8 @@ bounds_jc = {
 
 ##########################################################################################
 # constraints: sInf < s0, yInf < y0, y0 < s0, yInf < sInf, s0 < y1, beta < y2 (but beta is fixed)
-def constraints_ptw(x, bounds):
-    good = (
-        (x["sInf"] < x["s0"])
-        * (x["yInf"] < x["y0"])
-        * (x["y0"] < x["s0"])
-        * (x["yInf"] < x["sInf"])
-        * (x["s0"] < x["y1"])
-    )
-    for k in list(bounds.keys()):
-        good = good * (x[k] < bounds[k][1]) * (x[k] > bounds[k][0])
-    return good
-
-
-def constraints_jc(x, bounds):
-    k = next(iter(bounds.keys()))
-    good = x[k] < bounds[k][1]
-    for k in list(bounds.keys()):
-        good = good * (x[k] < bounds[k][1]) * (x[k] > bounds[k][0])
-    return good
+constraints_ptw = sc.constraints_ptw
+constraints_jc = sc.cf_bounds # both constraint fcts are included in superCal, no need to hard code here
 
 
 ##########################################################################################
@@ -312,7 +295,8 @@ dat = pd.DataFrame(
 dat["col"] = ["blue"] * len(uu) + ["red"] + ["green"]
 g = sns.pairplot(
     dat,
-    plot_kws={"s": [3] * len(uu) + [30] * 2},
+    # plot_kws={"s": [3] * len(uu) + [30] * 2}, ## this line does not work on latest seaborn/matplotlib
+    plot_kws={"s": 5}, # set all marker sizes equal for now
     corner=True,
     diag_kind="hist",
     hue="col",
