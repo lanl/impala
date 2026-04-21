@@ -44,9 +44,6 @@ dev = [
 line-length = 80
 preview = true
 
-# TODO: Unexclude
-exclude = ["examples"]
-
 [tool.ruff.lint]
 extend-select = ["I"]  # W505 (doc-line-too-long); D (pydocstyle)
 # TODO: Gradually unignore these.
