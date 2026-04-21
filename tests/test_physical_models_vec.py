@@ -47,9 +47,7 @@ def test_physics():
     emax = 0.6
     nhist = 100
 
-    ptw.set_history_variables(
-        emax=emax, edot=np.array([edot]), nhist=nhist
-    )
+    ptw.set_history_variables(emax=emax, edot=np.array([edot]), nhist=nhist)
     ptw.initialize(params, consts)
     ptw.initialize_state(
         T=np.array([temp]), stress=np.zeros(1), strain=np.zeros(1)
@@ -117,9 +115,7 @@ def test_constparams():
     emax = 0.6
     nhist = 100
 
-    ptw.set_history_variables(
-        emax, np.array([edot]), nhist
-    )
+    ptw.set_history_variables(emax, np.array([edot]), nhist)
     ptw.initialize(params, consts)
     ptw.initialize_state(
         T=np.array([temp]), stress=np.zeros(1), strain=np.zeros(1)
