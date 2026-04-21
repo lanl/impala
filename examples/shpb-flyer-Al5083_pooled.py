@@ -1,11 +1,12 @@
 import pathlib
+
 import fdasrsf as fs
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import pyBASS as pb
 import seaborn as sns
 
-import pyBASS as pb
 from impala import superCal as sc
 
 np.seterr(under="ignore")
@@ -474,7 +475,6 @@ dat = pd.DataFrame(out.discrep_vars[1][uu, 0, :])
 g = sns.pairplot(
     dat, plot_kws={"s": [3] * len(uu)}, corner=True, diag_kind="hist"
 )
-g
 plt.show()
 
 figure = plt.figure()
@@ -490,7 +490,6 @@ g = sns.pairplot(
 )
 g.set(xlim=(0, 1), ylim=(0, 1))
 g.fig.set_size_inches(10, 10)
-g
 plt.tight_layout()
 plt.savefig(plotfolder / "params.png", dpi=300)
 plt.show()

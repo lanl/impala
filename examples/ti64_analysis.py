@@ -6,8 +6,8 @@ import os
 import pathlib
 import sqlite3 as sq
 
-import numpy as np
 import matplotlib
+import numpy as np
 
 ## Force matplotlib to not use any Xwindows backend.
 matplotlib.use("Agg")

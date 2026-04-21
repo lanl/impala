@@ -307,5 +307,4 @@ for i in range(out_pool.theta.shape[2]):
     g.axes[i, i].set_ylim(setup_pool.bounds[dat.keys()[i]])
 # g.axes[1,1].set_xlim((-20,20))
 g.fig.set_size_inches(10, 10)
-g
 plt.show()
