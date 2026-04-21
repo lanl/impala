@@ -8,10 +8,13 @@ Created on Mon Apr 24 09:30:15 2023
 try:
     import pyswarm
 except ImportError:
-    print("pyswarm is not installed. Install with:")
-    print("pip install 'impala-calib[map]'")
-    print("or")
-    print("pip install pyswarm")
+    try:
+        import pyswarms as pyswarm
+    except ImportError:
+        print("pyswarm is not installed. Install with:")
+        print("pip install 'impala-calib[map]'")
+        print("or")
+        print("pip install pyswarm")
 
 
 import numpy as np
