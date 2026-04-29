@@ -168,8 +168,12 @@ def test_constparams():
         out.theta[uu[mle_idx], 0, :],
         out.theta[uu, 0, :].mean(0),
     ))
-    sc.post_process.pairs(setup=setup_pool_ptw, mat_st=mat, path=str(data_dir / "test_ptw_pairplot.png"))
-    
+    sc.post_process.pairs(
+        setup=setup_pool_ptw,
+        mat_st=mat,
+        path=str(data_dir / "test_ptw_pairplot.png"),
+    )
+
     for k, v in out.theta_native.items():
         bestval = np.min(np.abs(v / params[k] - 1))
         # print(k,params[k],bestval)
