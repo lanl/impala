@@ -83,7 +83,7 @@ class Constant_Specific_Heat(BaseModel):
     Constant Specific Heat Model
     """
 
-    def __init__(self,parent):
+    def __init__(self, parent):
         BaseModel.__init__(self, parent)
         self.consts = ["Cv0"]
 
@@ -227,16 +227,16 @@ class Piecewise_Cubic_Specific_Heat(BaseModel):
     def __init__(self, parent):
         BaseModel.__init__(self, parent)
         self.consts = [
-        "T_t",
-        "c0_0",
-        "c1_0",
-        "c2_0",
-        "c3_0",
-        "c0_1",
-        "c1_1",
-        "c2_1",
-        "c3_1",
-    ]
+            "T_t",
+            "c0_0",
+            "c1_0",
+            "c2_0",
+            "c3_0",
+            "c0_1",
+            "c1_1",
+            "c2_1",
+            "c3_1",
+        ]
 
     def value(self, *args):
         tnow = self.parent.state.T
@@ -643,7 +643,7 @@ class Constant_Yield_Stress(BaseModel):
     Constant Yield Stress Model
     """
 
-    def __init__(self,parent):
+    def __init__(self, parent):
         BaseModel.__init__(self, parent)
         self.consts = ["yield_stress", "chi"]
 
@@ -658,7 +658,7 @@ def pos(a):
 
 
 class JC_Yield_Stress(BaseModel):
-    def __init__(self,parent):
+    def __init__(self, parent):
         BaseModel.__init__(self, parent)
         self.params = ["A", "B", "C", "n", "m"]
         self.consts = ["Tref", "edot0", "chi"]
@@ -756,7 +756,7 @@ def PTW_goodparam(s0, sInf, y0, yInf, y1, y2, beta):
 class PTW_Yield_Stress(BaseModel):
     """This class implements the PTW flow stress model"""
 
-    def __init__(self,parent):
+    def __init__(self, parent):
         BaseModel.__init__(self, parent)
         self.params = [
             "theta",
@@ -843,7 +843,7 @@ class PTW_Yield_Stress(BaseModel):
 
 
 class Stein_Flow_Stress(BaseModel):
-    def __init__(self,parent):
+    def __init__(self, parent):
         BaseModel.__init__(self, parent)
         self.params = ["y0", "a", "b", "beta", "n", "ymax"]
         self.consts = ["G0", "epsi", "chi"]
@@ -870,7 +870,6 @@ class Stein_Flow_Stress(BaseModel):
 
 
 class ModelParameters:
-
     def update_parameters(self, x):
         if isinstance(x, np.ndarray):
             self.__dict__.update(dict(zip(self.params, x)))
@@ -894,7 +893,6 @@ class ModelParameters:
 
 
 class MaterialState:
-
     def set_state(self, T=300.0, strain=0.0, stress=0.0):
         self.T = T
         self.strain = strain
