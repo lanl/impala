@@ -19,6 +19,7 @@ np.seterr(under="ignore")
 ## get data
 datafolder = pathlib.Path(__file__).resolve().parents[1] / "data" / "Al-5083"
 plotfolder = datafolder / "plots"
+plotfolder.mkdir(exist_ok=True)
 print(f"{datafolder=}")
 print(f"{plotfolder=}")
 
