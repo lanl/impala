@@ -61,9 +61,6 @@ class BaseModel:
     etc.).  Must be instantiated as a child of MaterialModel
     """
 
-    params = []
-    consts = []
-
     def value(self, *args):
         pass
 
@@ -71,6 +68,8 @@ class BaseModel:
         self.parent.parameters.update_parameters(x, self.params)
 
     def __init__(self, parent):
+        self.params = []
+        self.consts = []
         self.parent = parent
 
 
@@ -84,7 +83,9 @@ class Constant_Specific_Heat(BaseModel):
     Constant Specific Heat Model
     """
 
-    consts = ["Cv0"]
+    def __init__(self,parent):
+        BaseModel.__init__(self, parent)
+        self.consts = ["Cv0"]
 
     def value(self, *args):
         return self.parent.parameters.Cv0 * np.ones(len(self.parent.state.T))
@@ -110,7 +111,9 @@ class Linear_Specific_Heat(BaseModel):
     Linear Specific Heat Model
     """
 
-    consts = ["c0", "c1"]
+    def __init__(self, parent):
+        BaseModel.__init__(self, parent)
+        self.consts = ["c0", "c1"]
 
     def value(self, *args):
         tnow = self.parent.state.T
@@ -123,7 +126,9 @@ class Quadratic_Specific_Heat(BaseModel):
     Quadratic Specific Heat Model
     """
 
-    consts = ["c0", "c1", "c2"]
+    def __init__(self, parent):
+        BaseModel.__init__(self, parent)
+        self.consts = ["c0", "c1", "c2"]
 
     def value(self, *args):
         tnow = self.parent.state.T
@@ -140,7 +145,9 @@ class Cubic_Specific_Heat(BaseModel):
     Cubic Specific Heat Model
     """
 
-    consts = ["c0", "c1", "c2", "c3"]
+    def __init__(self, parent):
+        BaseModel.__init__(self, parent)
+        self.consts = ["c0", "c1", "c2", "c3"]
 
     def value(self, *args):
         tnow = self.parent.state.T
@@ -160,7 +167,9 @@ class Piecewise_Linear_Specific_Heat(BaseModel):
     Cv (T) = c0_1 + c1_1 * T for T>T_t
     """
 
-    consts = ["T_t", "c0_0", "c1_0", "c0_1", "c1_1"]
+    def __init__(self, parent):
+        BaseModel.__init__(self, parent)
+        self.consts = ["T_t", "c0_0", "c1_0", "c0_1", "c1_1"]
 
     def value(self, *args):
         tnow = self.parent.state.T
@@ -183,7 +192,9 @@ class Piecewise_Quadratic_Specific_Heat(BaseModel):
     Cv (T) = c0_1 + c1_1 * T + c2_1 * T**2 for T>T_t
     """
 
-    consts = ["T_t", "c0_0", "c1_0", "c2_0", "c0_1", "c1_1", "c2_1"]
+    def __init__(self, parent):
+        BaseModel.__init__(self, parent)
+        self.consts = ["T_t", "c0_0", "c1_0", "c2_0", "c0_1", "c1_1", "c2_1"]
 
     def value(self, *args):
         tnow = self.parent.state.T
@@ -213,7 +224,9 @@ class Piecewise_Cubic_Specific_Heat(BaseModel):
     Cv (T) = c0_1 + c1_1 * T + c2_1 * T**2  + c3_1 * T**3 for T>T_t
     """
 
-    consts = [
+    def __init__(self, parent):
+        BaseModel.__init__(self, parent)
+        self.consts = [
         "T_t",
         "c0_0",
         "c1_0",
@@ -264,7 +277,9 @@ class Constant_Density(BaseModel):
     Constant Density Model
     """
 
-    consts = ["rho0"]
+    def __init__(self, parent):
+        BaseModel.__init__(self, parent)
+        self.consts = ["rho0"]
 
     def value(self, *args):
         return self.parent.parameters.rho0 * np.ones(len(self.parent.state.T))
@@ -290,7 +305,9 @@ class Linear_Density(BaseModel):
     Linear Density Model
     """
 
-    consts = ["r0", "r1"]
+    def __init__(self, parent):
+        BaseModel.__init__(self, parent)
+        self.consts = ["r0", "r1"]
 
     def value(self, *args):
         tnow = self.parent.state.T
@@ -303,7 +320,9 @@ class Quadratic_Density(BaseModel):
     Quadratic Density Model
     """
 
-    consts = ["r0", "r1", "r2"]
+    def __init__(self, parent):
+        BaseModel.__init__(self, parent)
+        self.consts = ["r0", "r1", "r2"]
 
     def value(self, *args):
         tnow = self.parent.state.T
@@ -320,7 +339,9 @@ class Cubic_Density(BaseModel):
     Quadratic Density Model
     """
 
-    consts = ["r0", "r1", "r2", "r3"]
+    def __init__(self, parent):
+        BaseModel.__init__(self, parent)
+        self.consts = ["r0", "r1", "r2", "r3"]
 
     def value(self, *args):
         tnow = self.parent.state.T
@@ -343,7 +364,9 @@ class Constant_Melt_Temperature(BaseModel):
     Constant Melt Temperature Model
     """
 
-    consts = ["Tmelt0"]
+    def __init__(self, parent):
+        BaseModel.__init__(self, parent)
+        self.consts = ["Tmelt0"]
 
     def value(self, *args):
         return self.parent.parameters.Tmelt0 * np.ones(len(self.parent.state.T))
@@ -369,7 +392,9 @@ class Linear_Melt_Temperature(BaseModel):
     Linear Melt Temperature Model
     """
 
-    consts = ["tm0", "tm1"]
+    def __init__(self, parent):
+        BaseModel.__init__(self, parent)
+        self.consts = ["tm0", "tm1"]
 
     def value(self, *args):
         rnow = self.parent.state.rho
@@ -385,7 +410,9 @@ class Quadratic_Melt_Temperature(BaseModel):
     Quadratic Melt Temperature Model
     """
 
-    consts = ["tm0", "tm1", "tm2"]
+    def __init__(self, parent):
+        BaseModel.__init__(self, parent)
+        self.consts = ["tm0", "tm1", "tm2"]
 
     def value(self, *args):
         rnow = self.parent.state.rho
@@ -402,7 +429,9 @@ class Cubic_Melt_Temperature(BaseModel):
     Cubic Melt Temperature Model
     """
 
-    consts = ["tm0", "tm1", "tm2", "tm3"]
+    def __init__(self, parent):
+        BaseModel.__init__(self, parent)
+        self.consts = ["tm0", "tm1", "tm2", "tm3"]
 
     def value(self, *args):
         rnow = self.parent.state.rho
@@ -417,7 +446,13 @@ class Cubic_Melt_Temperature(BaseModel):
 
 
 class BGP_Melt_Temperature(BaseModel):
-    consts = ["Tm_0", "rho_m", "gamma_1", "gamma_3", "q3"]
+    """
+    Burakovsky-Greeff-Preston Melt Temperature Model
+    """
+
+    def __init__(self, parent):
+        BaseModel.__init__(self, parent)
+        self.consts = ["Tm_0", "rho_m", "gamma_1", "gamma_3", "q3"]
 
     def value(self, *args):
         mp = self.parent.parameters
@@ -443,7 +478,13 @@ class BGP_Melt_Temperature(BaseModel):
 
 
 class Constant_Shear_Modulus(BaseModel):
-    consts = ["G0"]
+    """
+    Constant Shear Modulus Model
+    """
+
+    def __init__(self, parent):
+        BaseModel.__init__(self, parent)
+        self.consts = ["G0"]
 
     def value(self, *args):
         return self.parent.parameters.G0 * np.ones(len(self.parent.state.T))
@@ -462,7 +503,9 @@ class Constant_Shear_Modulus(BaseModel):
 
 
 class Linear_Cold_PW_Shear_Modulus(BaseModel):
-    consts = ["g0", "g1", "alpha"]
+    def __init__(self, parent):
+        BaseModel.__init__(self, parent)
+        self.consts = ["g0", "g1", "alpha"]
 
     def value(self, *args):
         mp = self.parent.parameters
@@ -479,7 +522,9 @@ class Linear_Cold_PW_Shear_Modulus(BaseModel):
 
 
 class Quadratic_Cold_PW_Shear_Modulus(BaseModel):
-    consts = ["g0", "g1", "g2", "alpha"]
+    def __init__(self, parent):
+        BaseModel.__init__(self, parent)
+        self.consts = ["g0", "g1", "g2", "alpha"]
 
     def value(self, *args):
         mp = self.parent.parameters
@@ -496,7 +541,9 @@ class Quadratic_Cold_PW_Shear_Modulus(BaseModel):
 
 
 class Simple_Shear_Modulus(BaseModel):
-    consts = ["G0", "alpha"]
+    def __init__(self, parent):
+        BaseModel.__init__(self, parent)
+        self.consts = ["G0", "alpha"]
 
     def value(self, *args):
         mp = self.parent.parameters
@@ -540,7 +587,9 @@ class BGP_PW_Shear_Modulus(BaseModel):
     With these two models combined, we get the shear modulus as a function of density and temperature;
     see Burakovsky, Greeff, Preston, Phys. Rev. B67 (2003) 094107, DOI:10.1103/PhysRevB.67.094107"""
 
-    consts = ["G0", "rho_0", "gamma_1", "gamma_2", "q2", "alpha"]
+    def __init__(self, parent):
+        BaseModel.__init__(self, parent)
+        self.consts = ["G0", "rho_0", "gamma_1", "gamma_2", "q2", "alpha"]
 
     def value(self, *args):
         mp = self.parent.parameters
@@ -565,8 +614,10 @@ class Stein_Shear_Modulus(BaseModel):
     # consts = ['G0', 'sgA', 'sgB']
     # assuming constant density and pressure
     # so we only include the temperature dependence
-    consts = ["G0", "sgB"]
-    eta = 1.0
+    def __init__(self, parent):
+        BaseModel.__init__(self, parent)
+        self.consts = ["G0", "sgB"]
+        self.eta = 1.0
 
     def value(self, *args):
         mp = self.parent.parameters
@@ -592,7 +643,9 @@ class Constant_Yield_Stress(BaseModel):
     Constant Yield Stress Model
     """
 
-    consts = ["yield_stress", "chi"]
+    def __init__(self,parent):
+        BaseModel.__init__(self, parent)
+        self.consts = ["yield_stress", "chi"]
 
     def value(self, *args):
         return self.parent.parameters.yield_stress * np.ones(
@@ -600,25 +653,15 @@ class Constant_Yield_Stress(BaseModel):
         )
 
 
-# def fast_pow(a, b):
-#     """
-#     Numpy power is slow, this is faster.  Gets a**b for a and b np arrays.
-#     """
-#     ## no longer true in numpy 1.24 (=our requirement in toml file) and higher; deprecate / remove?
-#     cond = a > 0
-#     out = a * 0.0
-#     out[cond] = np.exp(b[cond] * np.log(a[cond]))
-#     return out
-fast_pow = np.power  ## do we need this?
-
-
 def pos(a):
     return np.maximum(0, a)
 
 
 class JC_Yield_Stress(BaseModel):
-    params = ["A", "B", "C", "n", "m"]
-    consts = ["Tref", "edot0", "chi"]
+    def __init__(self,parent):
+        BaseModel.__init__(self, parent)
+        self.params = ["A", "B", "C", "n", "m"]
+        self.consts = ["Tref", "edot0", "chi"]
 
     def value(self, edot):
         mp = self.parent.parameters
@@ -713,20 +756,22 @@ def PTW_goodparam(s0, sInf, y0, yInf, y1, y2, beta):
 class PTW_Yield_Stress(BaseModel):
     """This class implements the PTW flow stress model"""
 
-    params = [
-        "theta",
-        "p",
-        "s0",
-        "beta",
-        "sInf",
-        "kappa",
-        "lgamma",
-        "y0",
-        "yInf",
-        "y1",
-        "y2",
-    ]
-    consts = ["rho0", "matomic", "chi"]
+    def __init__(self,parent):
+        BaseModel.__init__(self, parent)
+        self.params = [
+            "theta",
+            "p",
+            "s0",
+            "beta",
+            "sInf",
+            "kappa",
+            "lgamma",
+            "y0",
+            "yInf",
+            "y1",
+            "y2",
+        ]
+        self.consts = ["rho0", "matomic", "chi"]
 
     # @profile
     def value(self, edot):
@@ -798,8 +843,10 @@ class PTW_Yield_Stress(BaseModel):
 
 
 class Stein_Flow_Stress(BaseModel):
-    params = ["y0", "a", "b", "beta", "n", "ymax"]
-    consts = ["G0", "epsi", "chi"]
+    def __init__(self,parent):
+        BaseModel.__init__(self, parent)
+        self.params = ["y0", "a", "b", "beta", "n", "ymax"]
+        self.consts = ["G0", "epsi", "chi"]
 
     def value(self, *args):
         mp = self.parent.parameters
@@ -823,9 +870,6 @@ class Stein_Flow_Stress(BaseModel):
 
 
 class ModelParameters:
-    params = []
-    consts = []
-    parent = None
 
     def update_parameters(self, x):
         if isinstance(x, np.ndarray):
@@ -841,6 +885,8 @@ class ModelParameters:
             raise TypeError(f"Type {type(x)} is not supported.")
 
     def __init__(self, parent):
+        self.params = []
+        self.consts = []
         self.parent = parent
 
 
@@ -848,11 +894,6 @@ class ModelParameters:
 
 
 class MaterialState:
-    T = None
-    Tmelt = None
-    stress = None
-    strain = None
-    G = None
 
     def set_state(self, T=300.0, strain=0.0, stress=0.0):
         self.T = T
@@ -860,8 +901,12 @@ class MaterialState:
         self.stress = stress
 
     def __init__(self, parent, T=300.0, strain=0.0, stress=0.0):
+        self.T = T
+        self.Tmelt = None
+        self.stress = stress
+        self.strain = strain
+        self.G = None
         self.parent = parent
-        self.set_state(T, strain, stress)
 
 
 ## Material Model Definition

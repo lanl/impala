@@ -9,7 +9,7 @@ from numpy.linalg import slogdet
 from numpy.random import beta, choice, gamma, uniform
 from scipy.stats import invwishart
 
-from .impala_noProbit_emu import (
+from .impala_noprobit_emu import (
     chol_sample_1per,
     chol_sample_1per_constraints,
     chol_sample_nper_constraints,
