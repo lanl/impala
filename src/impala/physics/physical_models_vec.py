@@ -17,6 +17,7 @@ physical_models_vec.py
 import numpy as np
 
 from . import functions
+
 PTW_goodparam = functions.PTW_goodparam
 
 np.seterr(all="raise")
@@ -99,8 +100,8 @@ class Linear_Specific_Heat(BaseModel):
         return functions.Linear_Specific_Heat(
             c0=self.parent.parameters.c0,
             c1=self.parent.parameters.c1,
-            T=self.parent.state.T
-            )
+            T=self.parent.state.T,
+        )
 
 
 class Quadratic_Specific_Heat(BaseModel):
@@ -117,8 +118,8 @@ class Quadratic_Specific_Heat(BaseModel):
             c0=self.parent.parameters.c0,
             c1=self.parent.parameters.c1,
             c2=self.parent.parameters.c2,
-            T=self.parent.state.T
-            )
+            T=self.parent.state.T,
+        )
 
 
 class Cubic_Specific_Heat(BaseModel):
@@ -136,8 +137,8 @@ class Cubic_Specific_Heat(BaseModel):
             c1=self.parent.parameters.c1,
             c2=self.parent.parameters.c2,
             c3=self.parent.parameters.c3,
-            T=self.parent.state.T
-            )
+            T=self.parent.state.T,
+        )
 
 
 class Piecewise_Linear_Specific_Heat(BaseModel):
@@ -158,8 +159,8 @@ class Piecewise_Linear_Specific_Heat(BaseModel):
             c01=self.parent.parameters.c0_1,
             c10=self.parent.parameters.c1_0,
             c11=self.parent.parameters.c1_1,
-            T=self.parent.state.T
-            )
+            T=self.parent.state.T,
+        )
 
 
 class Piecewise_Quadratic_Specific_Heat(BaseModel):
@@ -182,8 +183,8 @@ class Piecewise_Quadratic_Specific_Heat(BaseModel):
             c11=self.parent.parameters.c1_1,
             c20=self.parent.parameters.c2_0,
             c21=self.parent.parameters.c2_1,
-            T=self.parent.state.T
-            )
+            T=self.parent.state.T,
+        )
 
 
 class Piecewise_Cubic_Specific_Heat(BaseModel):
@@ -219,8 +220,8 @@ class Piecewise_Cubic_Specific_Heat(BaseModel):
             c21=self.parent.parameters.c2_1,
             c30=self.parent.parameters.c3_0,
             c31=self.parent.parameters.c3_1,
-            T=self.parent.state.T
-            )
+            T=self.parent.state.T,
+        )
 
 
 ########################
@@ -269,8 +270,8 @@ class Linear_Density(BaseModel):
         return functions.Linear_Density(
             r0=self.parent.parameters.r0,
             r1=self.parent.parameters.r1,
-            T=self.parent.state.T
-            )
+            T=self.parent.state.T,
+        )
 
 
 class Quadratic_Density(BaseModel):
@@ -287,8 +288,8 @@ class Quadratic_Density(BaseModel):
             r0=self.parent.parameters.r0,
             r1=self.parent.parameters.r1,
             r2=self.parent.parameters.r2,
-            T=self.parent.state.T
-            )
+            T=self.parent.state.T,
+        )
 
 
 class Cubic_Density(BaseModel):
@@ -306,8 +307,8 @@ class Cubic_Density(BaseModel):
             r1=self.parent.parameters.r1,
             r2=self.parent.parameters.r2,
             r3=self.parent.parameters.r3,
-            T=self.parent.state.T
-            )
+            T=self.parent.state.T,
+        )
 
 
 ########################
@@ -356,8 +357,8 @@ class Linear_Melt_Temperature(BaseModel):
         return functions.Linear_Melt_Temperature(
             tm0=self.parent.parameters.tm0,
             tm1=self.parent.parameters.tm1,
-            rho=self.parent.state.rho
-            )
+            rho=self.parent.state.rho,
+        )
 
 
 class Quadratic_Melt_Temperature(BaseModel):
@@ -374,8 +375,8 @@ class Quadratic_Melt_Temperature(BaseModel):
             tm0=self.parent.parameters.tm0,
             tm1=self.parent.parameters.tm1,
             tm2=self.parent.parameters.tm2,
-            rho=self.parent.state.rho
-            )
+            rho=self.parent.state.rho,
+        )
 
 
 class Cubic_Melt_Temperature(BaseModel):
@@ -393,8 +394,8 @@ class Cubic_Melt_Temperature(BaseModel):
             tm1=self.parent.parameters.tm1,
             tm2=self.parent.parameters.tm2,
             tm3=self.parent.parameters.tm3,
-            rho=self.parent.state.rho
-            )
+            rho=self.parent.state.rho,
+        )
 
 
 class BGP_Melt_Temperature(BaseModel):
@@ -414,8 +415,8 @@ class BGP_Melt_Temperature(BaseModel):
             gamma1=mp.gamma_1,
             gamma3=mp.gamma_3,
             q3=mp.q3,
-            rho=self.parent.state.rho
-            )
+            rho=self.parent.state.rho,
+        )
 
 
 # Shear Modulus Models
@@ -459,8 +460,8 @@ class Linear_Cold_PW_Shear_Modulus(BaseModel):
             alpha=mp.alpha,
             rho=self.parent.state.rho,
             T=self.parent.state.T,
-            Tmelt=self.parent.state.Tmelt
-            )
+            Tmelt=self.parent.state.Tmelt,
+        )
 
 
 class Quadratic_Cold_PW_Shear_Modulus(BaseModel):
@@ -477,8 +478,8 @@ class Quadratic_Cold_PW_Shear_Modulus(BaseModel):
             alpha=mp.alpha,
             rho=self.parent.state.rho,
             T=self.parent.state.T,
-            Tmelt=self.parent.state.Tmelt
-            )
+            Tmelt=self.parent.state.Tmelt,
+        )
 
 
 class Simple_Shear_Modulus(BaseModel):
@@ -491,8 +492,8 @@ class Simple_Shear_Modulus(BaseModel):
             G0=self.parent.parameters.G0,
             alpha=self.parent.parameters.alpha,
             T=self.parent.state.T,
-            Tmelt=self.parent.state.Tmelt
-            )
+            Tmelt=self.parent.state.Tmelt,
+        )
 
 
 class BGP_PW_Shear_Modulus(BaseModel):
@@ -536,8 +537,8 @@ class Stein_Shear_Modulus(BaseModel):
             G0=self.parent.parameters.G0,
             sgB=self.parent.parameters.sgB,
             T=self.parent.state.T,
-            Tmelt=self.parent.state.Tmelt
-            )
+            Tmelt=self.parent.state.Tmelt,
+        )
 
 
 # Yield Stress Models
@@ -562,7 +563,11 @@ class JC_Yield_Stress(BaseModel):
     def __init__(self, parent):
         BaseModel.__init__(self, parent)
         self.params = ["A", "B", "C", "n", "m"]
-        self.consts = ["Tref", "edot0", "chi"] ## nothing here depends on chi, why is it here?
+        self.consts = [
+            "Tref",
+            "edot0",
+            "chi",
+        ]  ## nothing here depends on chi, why is it here?
 
     def value(self, edot):
         mp = self.parent.parameters
@@ -577,8 +582,8 @@ class JC_Yield_Stress(BaseModel):
             edot0=mp.edot0,
             eps=self.parent.state.strain,
             T=self.parent.state.T,
-            Tmelt=self.parent.state.Tmelt
-            )
+            Tmelt=self.parent.state.Tmelt,
+        )
 
 
 class PTW_Yield_Stress(BaseModel):
@@ -639,7 +644,7 @@ class PTW_Yield_Stress(BaseModel):
             T=self.parent.state.T,
             Tmelt=self.parent.state.Tmelt,
             small=1.0e-10,
-            )
+        )
         out[np.where(np.logical_not(good))] = -999.0
         return out
 
@@ -653,17 +658,17 @@ class Stein_Flow_Stress(BaseModel):
     def value(self, *args):
         mp = self.parent.parameters
         return functions.Stein_Flow_Stress(
-                y0=mp.y0,
-                beta=mp.beta,
-                n=mp.n,
-                ymax=mp.ymax,
-                G0=mp.G0,
-                epsi=mp.epsi,
-                shear=self.parent.state.G,
-                eps=self.parent.state.strain,
-                T=self.parent.state.T,
-                Tmelt=self.parent.state.Tmelt
-                )
+            y0=mp.y0,
+            beta=mp.beta,
+            n=mp.n,
+            ymax=mp.ymax,
+            G0=mp.G0,
+            epsi=mp.epsi,
+            shear=self.parent.state.G,
+            eps=self.parent.state.strain,
+            T=self.parent.state.T,
+            Tmelt=self.parent.state.Tmelt,
+        )
 
 
 ## Parameters Definition

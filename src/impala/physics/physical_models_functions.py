@@ -22,7 +22,6 @@ from math import pi
 
 import numpy as np
 
-
 try:
     from numba import jit
 
@@ -43,6 +42,7 @@ except ImportError:
         """Dummy decorator if numba is unavailable at runtime."""
         return func or partial(jit, forceobj=forceobj, nopython=nopython)
 
+
 ## constants
 Avogadro = 6.022e23
 cbrtAvogadro = pow(Avogadro, 1.0 / 3.0)
@@ -52,7 +52,7 @@ cbrtAvogadro = pow(Avogadro, 1.0 / 3.0)
 ########################
 
 
-def Linear_Specific_Heat(c0,c1,T):
+def Linear_Specific_Heat(c0, c1, T):
     """
     Linear Specific Heat Model
     """
@@ -60,15 +60,15 @@ def Linear_Specific_Heat(c0,c1,T):
 
 
 @jit(nopython=True)
-def Quadratic_Specific_Heat(c0,c1,c2,T):
+def Quadratic_Specific_Heat(c0, c1, c2, T):
     """
     Quadratic Specific Heat Model
     """
-    return c0 + c1 * T + c2*T**2
+    return c0 + c1 * T + c2 * T**2
 
 
 @jit(nopython=True)
-def Cubic_Specific_Heat(c0,c1,c2,c3,T):
+def Cubic_Specific_Heat(c0, c1, c2, c3, T):
     """
     Cubic Specific Heat Model
     """
@@ -76,7 +76,7 @@ def Cubic_Specific_Heat(c0,c1,c2,c3,T):
 
 
 @jit(nopython=True)
-def Piecewise_Linear_Specific_Heat(Tt,c00,c01,c10,c11,T):
+def Piecewise_Linear_Specific_Heat(Tt, c00, c01, c10, c11, T):
     """
     Piecewise Linear Specific Heat Model
     Cv (T) = c00 + c10 * T for T<=Tt
@@ -90,7 +90,7 @@ def Piecewise_Linear_Specific_Heat(Tt,c00,c01,c10,c11,T):
 
 
 @jit(nopython=True)
-def Piecewise_Quadratic_Specific_Heat(Tt,c00,c01,c10,c11,c20,c21,T):
+def Piecewise_Quadratic_Specific_Heat(Tt, c00, c01, c10, c11, c20, c21, T):
     """
     Piecewise Quadratic Specific Heat Model
     Cv (T) = c00 + c10 * T + c20 * T**2 for T<=Tt
@@ -108,7 +108,9 @@ def Piecewise_Quadratic_Specific_Heat(Tt,c00,c01,c10,c11,c20,c21,T):
 
 
 @jit(nopython=True)
-def Piecewise_Cubic_Specific_Heat(Tt,c00,c01,c10,c11,c20,c21,c30,c31,T):
+def Piecewise_Cubic_Specific_Heat(
+    Tt, c00, c01, c10, c11, c20, c21, c30, c31, T
+):
     """
     Cubic Specific Heat Model
     Piecewise Quadratic Specific Heat Model
@@ -134,7 +136,7 @@ def Piecewise_Cubic_Specific_Heat(Tt,c00,c01,c10,c11,c20,c21,c30,c31,T):
 ########################
 
 
-def Linear_Density(r0,r1,T):
+def Linear_Density(r0, r1, T):
     """
     Linear Density Model
     """
@@ -142,7 +144,7 @@ def Linear_Density(r0,r1,T):
 
 
 @jit(nopython=True)
-def Quadratic_Density(r0,r1,r2,T):
+def Quadratic_Density(r0, r1, r2, T):
     """
     Quadratic Density Model
     """
@@ -150,7 +152,7 @@ def Quadratic_Density(r0,r1,r2,T):
 
 
 @jit(nopython=True)
-def Cubic_Density(r0,r1,r2,r3,T):
+def Cubic_Density(r0, r1, r2, r3, T):
     """
     Quadratic Density Model
     """
@@ -161,7 +163,8 @@ def Cubic_Density(r0,r1,r2,r3,T):
 # Melt Temperature Models
 ########################
 
-def Linear_Melt_Temperature(tm0,tm1,rho):
+
+def Linear_Melt_Temperature(tm0, tm1, rho):
     """
     Linear Melt Temperature Model
     """
@@ -169,7 +172,7 @@ def Linear_Melt_Temperature(tm0,tm1,rho):
 
 
 @jit(nopython=True)
-def Quadratic_Melt_Temperature(tm0,tm1,tm2,rho):
+def Quadratic_Melt_Temperature(tm0, tm1, tm2, rho):
     """
     Quadratic Melt Temperature Model
     """
@@ -177,7 +180,7 @@ def Quadratic_Melt_Temperature(tm0,tm1,tm2,rho):
 
 
 @jit(nopython=True)
-def Cubic_Melt_Temperature(tm0,tm1,tm2,tm3,rho):
+def Cubic_Melt_Temperature(tm0, tm1, tm2, tm3, rho):
     """
     Cubic Melt Temperature Model
     """
@@ -185,23 +188,26 @@ def Cubic_Melt_Temperature(tm0,tm1,tm2,tm3,rho):
 
 
 @jit(nopython=True)
-def BGP_Melt_Temperature(Tm0,rhom,gamma1,gamma3,q3,rho):
+def BGP_Melt_Temperature(Tm0, rhom, gamma1, gamma3, q3, rho):
     """
     Burakovsky-Greeff-Preston Melt Temperature Model
     """
-    melt_temp = ( Tm0 * np.cbrt(rho / rhom) * np.exp( 6 * gamma1
-                * (1/np.cbrt(rhom) - 1/np.cbrt(rho))
-                + 2.0 * gamma3 / q3
-                * (np.power(rhom, -q3) - np.power(rho, -q3))
-                    )
-                )
+    melt_temp = (
+        Tm0
+        * np.cbrt(rho / rhom)
+        * np.exp(
+            6 * gamma1 * (1 / np.cbrt(rhom) - 1 / np.cbrt(rho))
+            + 2.0 * gamma3 / q3 * (np.power(rhom, -q3) - np.power(rho, -q3))
+        )
+    )
     return melt_temp
 
 
 # Shear Modulus Models
 
+
 @jit(nopython=True)
-def Linear_Cold_PW_Shear_Modulus(g0,g1,alpha,rho,T,Tmelt):
+def Linear_Cold_PW_Shear_Modulus(g0, g1, alpha, rho, T, Tmelt):
     """
     Linear Cold PW Shear Modulus
     """
@@ -215,7 +221,7 @@ def Linear_Cold_PW_Shear_Modulus(g0,g1,alpha,rho,T,Tmelt):
 
 
 @jit(nopython=True)
-def Quadratic_Cold_PW_Shear_Modulus(g0,g1,g2,alpha,rho,T,Tmelt):
+def Quadratic_Cold_PW_Shear_Modulus(g0, g1, g2, alpha, rho, T, Tmelt):
     """
     Quadratic Cold PW Shear Modulus
     """
@@ -229,7 +235,7 @@ def Quadratic_Cold_PW_Shear_Modulus(g0,g1,g2,alpha,rho,T,Tmelt):
 
 
 @jit(nopython=True)
-def Simple_Shear_Modulus(G0,alpha,T,Tmelt):
+def Simple_Shear_Modulus(G0, alpha, T, Tmelt):
     """
     Simple Shear Modulus
     """
@@ -237,9 +243,7 @@ def Simple_Shear_Modulus(G0,alpha,T,Tmelt):
 
 
 @jit(nopython=True)
-def BGP_PW_Shear_Modulus(
-    G0, rho_0, gamma_1, gamma_2, q2, alpha, rho, T, Tmelt
-):
+def BGP_PW_Shear_Modulus(G0, rho_0, gamma_1, gamma_2, q2, alpha, rho, T, Tmelt):
     """BPG model provides cold shear, i.e. shear modulus at zero temperature as a function of density.
     PW describes the (linear) temperature dependence of the shear modulus. (Same dependency as
     in Simple_Shear_modulus.)
@@ -261,7 +265,7 @@ def BGP_PW_Shear_Modulus(
 
 
 @jit(nopython=True)
-def Stein_Shear_Modulus(G0,sgB,T,Tmelt):
+def Stein_Shear_Modulus(G0, sgB, T, Tmelt):
     """
     Stein Shear Modulus assuming constant density and pressure,
     so we only include the temperature dependence;
@@ -286,7 +290,7 @@ def pos(a):
 
 
 @jit(nopython=True)
-def JC_Yield_Stress(edot,A,B,C,n,m,Tref,edot0,eps,T,Tmelt):
+def JC_Yield_Stress(edot, A, B, C, n, m, Tref, edot0, eps, T, Tmelt):
     """
     JC Yield Stress
     """
@@ -335,7 +339,7 @@ def PTW_Yield_Stress(
     T,
     Tmelt,
     small=1.0e-10,
-    ):
+):
     """This function implements the PTW flow stress model"""
 
     t_hom = T / Tmelt
@@ -352,7 +356,7 @@ def PTW_Yield_Stress(
     # transverse wave velocity up to units
     xfact = np.sqrt(shear / rho0)
     # PTW characteristic strain rate [ 1/s ]
-    xiDot = 0.5 * ainv * xfact * cbrtAvogadro 
+    xiDot = 0.5 * ainv * xfact * cbrtAvogadro
     # Note: previous version had xiDot *1e6 as well as edot*1e6
     # since everything below depends only on the ratio, we can drop those factors
 
@@ -409,7 +413,7 @@ def Stein_Flow_Stress(
     eps,
     T,
     Tmelt,
-    ):
+):
     """this function implements the Stein flow tress model"""
     fnow = np.power((1.0 + beta * (epsi + eps)), n)
 
