@@ -14,32 +14,12 @@ physical_models_vec.py
         Daniel N Blaschke, dblaschke@lanl.gov
 """
 
-import math
-from math import pi
-
 import numpy as np
 
+from . import functions
+PTW_goodparam = functions.PTW_goodparam
+
 np.seterr(all="raise")
-
-try:
-    from numba import jit
-
-    @jit(nopython=True)
-    def erf(x):
-        """numba.jit-compatible erf."""
-        out = np.empty(x.shape)
-        for i, xi in enumerate(x):
-            out[i] = math.erf(xi)
-        return out
-
-except ImportError:
-    from functools import partial
-
-    from scipy.special import erf
-
-    def jit(func=None, forceobj=True, nopython=False):
-        """Dummy decorator if numba is unavailable at runtime."""
-        return func or partial(jit, forceobj=forceobj, nopython=nopython)
 
 ## Error Definitions
 
@@ -116,9 +96,11 @@ class Linear_Specific_Heat(BaseModel):
         self.consts = ["c0", "c1"]
 
     def value(self, *args):
-        tnow = self.parent.state.T
-        cnow = self.parent.parameters.c0 + self.parent.parameters.c1 * tnow
-        return cnow
+        return functions.Linear_Specific_Heat(
+            c0=self.parent.parameters.c0,
+            c1=self.parent.parameters.c1,
+            T=self.parent.state.T
+            )
 
 
 class Quadratic_Specific_Heat(BaseModel):
@@ -131,13 +113,12 @@ class Quadratic_Specific_Heat(BaseModel):
         self.consts = ["c0", "c1", "c2"]
 
     def value(self, *args):
-        tnow = self.parent.state.T
-        cnow = (
-            self.parent.parameters.c0
-            + self.parent.parameters.c1 * tnow
-            + self.parent.parameters.c2 * tnow**2
-        )
-        return cnow
+        return functions.Quadratic_Specific_Heat(
+            c0=self.parent.parameters.c0,
+            c1=self.parent.parameters.c1,
+            c2=self.parent.parameters.c2,
+            T=self.parent.state.T
+            )
 
 
 class Cubic_Specific_Heat(BaseModel):
@@ -150,14 +131,13 @@ class Cubic_Specific_Heat(BaseModel):
         self.consts = ["c0", "c1", "c2", "c3"]
 
     def value(self, *args):
-        tnow = self.parent.state.T
-        cnow = (
-            self.parent.parameters.c0
-            + self.parent.parameters.c1 * tnow
-            + self.parent.parameters.c2 * tnow**2
-            + self.parent.parameters.c3 * tnow**3
-        )
-        return cnow
+        return functions.Cubic_Specific_Heat(
+            c0=self.parent.parameters.c0,
+            c1=self.parent.parameters.c1,
+            c2=self.parent.parameters.c2,
+            c3=self.parent.parameters.c3,
+            T=self.parent.state.T
+            )
 
 
 class Piecewise_Linear_Specific_Heat(BaseModel):
@@ -172,17 +152,14 @@ class Piecewise_Linear_Specific_Heat(BaseModel):
         self.consts = ["T_t", "c0_0", "c1_0", "c0_1", "c1_1"]
 
     def value(self, *args):
-        tnow = self.parent.state.T
-        intercept = np.repeat(self.parent.parameters.c0_0, len(tnow))
-        slope = np.repeat(self.parent.parameters.c1_0, len(tnow))
-        intercept[np.where(tnow > self.parent.parameters.T_t)] = (
-            self.parent.parameters.c0_1
-        )
-        slope[np.where(tnow > self.parent.parameters.T_t)] = (
-            self.parent.parameters.c1_1
-        )
-        cnow = intercept + slope * tnow
-        return cnow
+        return functions.Piecewise_Linear_Specific_Heat(
+            Tt=self.parent.parameters.T_t,
+            c00=self.parent.parameters.c0_0,
+            c01=self.parent.parameters.c0_1,
+            c10=self.parent.parameters.c1_0,
+            c11=self.parent.parameters.c1_1,
+            T=self.parent.state.T
+            )
 
 
 class Piecewise_Quadratic_Specific_Heat(BaseModel):
@@ -197,23 +174,16 @@ class Piecewise_Quadratic_Specific_Heat(BaseModel):
         self.consts = ["T_t", "c0_0", "c1_0", "c2_0", "c0_1", "c1_1", "c2_1"]
 
     def value(self, *args):
-        tnow = self.parent.state.T
-        pow_0_coeff = np.repeat(self.parent.parameters.c0_0, len(tnow))
-        pow_1_coeff = np.repeat(self.parent.parameters.c1_0, len(tnow))
-        pow_2_coeff = np.repeat(self.parent.parameters.c2_0, len(tnow))
-
-        pow_0_coeff[np.where(tnow > self.parent.parameters.T_t)] = (
-            self.parent.parameters.c0_1
-        )
-        pow_1_coeff[np.where(tnow > self.parent.parameters.T_t)] = (
-            self.parent.parameters.c1_1
-        )
-        pow_2_coeff[np.where(tnow > self.parent.parameters.T_t)] = (
-            self.parent.parameters.c2_1
-        )
-
-        cnow = pow_0_coeff + pow_1_coeff * tnow + pow_2_coeff * tnow * tnow
-        return cnow
+        return functions.Piecewise_Quadratic_Specific_Heat(
+            Tt=self.parent.parameters.T_t,
+            c00=self.parent.parameters.c0_0,
+            c01=self.parent.parameters.c0_1,
+            c10=self.parent.parameters.c1_0,
+            c11=self.parent.parameters.c1_1,
+            c20=self.parent.parameters.c2_0,
+            c21=self.parent.parameters.c2_1,
+            T=self.parent.state.T
+            )
 
 
 class Piecewise_Cubic_Specific_Heat(BaseModel):
@@ -239,32 +209,18 @@ class Piecewise_Cubic_Specific_Heat(BaseModel):
         ]
 
     def value(self, *args):
-        tnow = self.parent.state.T
-        pow_0_coeff = np.repeat(self.parent.parameters.c0_0, len(tnow))
-        pow_1_coeff = np.repeat(self.parent.parameters.c1_0, len(tnow))
-        pow_2_coeff = np.repeat(self.parent.parameters.c2_0, len(tnow))
-        pow_3_coeff = np.repeat(self.parent.parameters.c3_0, len(tnow))
-
-        pow_0_coeff[np.where(tnow > self.parent.parameters.T_t)] = (
-            self.parent.parameters.c0_1
-        )
-        pow_1_coeff[np.where(tnow > self.parent.parameters.T_t)] = (
-            self.parent.parameters.c1_1
-        )
-        pow_2_coeff[np.where(tnow > self.parent.parameters.T_t)] = (
-            self.parent.parameters.c2_1
-        )
-        pow_3_coeff[np.where(tnow > self.parent.parameters.T_t)] = (
-            self.parent.parameters.c3_1
-        )
-
-        cnow = (
-            pow_0_coeff
-            + pow_1_coeff * tnow
-            + pow_2_coeff * tnow * tnow
-            + pow_3_coeff * tnow * tnow * tnow
-        )
-        return cnow
+        return functions.Piecewise_Cubic_Specific_Heat(
+            Tt=self.parent.parameters.T_t,
+            c00=self.parent.parameters.c0_0,
+            c01=self.parent.parameters.c0_1,
+            c10=self.parent.parameters.c1_0,
+            c11=self.parent.parameters.c1_1,
+            c20=self.parent.parameters.c2_0,
+            c21=self.parent.parameters.c2_1,
+            c30=self.parent.parameters.c3_0,
+            c31=self.parent.parameters.c3_1,
+            T=self.parent.state.T
+            )
 
 
 ########################
@@ -310,9 +266,11 @@ class Linear_Density(BaseModel):
         self.consts = ["r0", "r1"]
 
     def value(self, *args):
-        tnow = self.parent.state.T
-        rnow = self.parent.parameters.r0 + self.parent.parameters.r1 * tnow
-        return rnow
+        return functions.Linear_Density(
+            r0=self.parent.parameters.r0,
+            r1=self.parent.parameters.r1,
+            T=self.parent.state.T
+            )
 
 
 class Quadratic_Density(BaseModel):
@@ -325,13 +283,12 @@ class Quadratic_Density(BaseModel):
         self.consts = ["r0", "r1", "r2"]
 
     def value(self, *args):
-        tnow = self.parent.state.T
-        rnow = (
-            self.parent.parameters.r0
-            + self.parent.parameters.r1 * tnow
-            + self.parent.parameters.r2 * tnow**2
-        )
-        return rnow
+        return functions.Quadratic_Density(
+            r0=self.parent.parameters.r0,
+            r1=self.parent.parameters.r1,
+            r2=self.parent.parameters.r2,
+            T=self.parent.state.T
+            )
 
 
 class Cubic_Density(BaseModel):
@@ -344,14 +301,13 @@ class Cubic_Density(BaseModel):
         self.consts = ["r0", "r1", "r2", "r3"]
 
     def value(self, *args):
-        tnow = self.parent.state.T
-        rnow = (
-            self.parent.parameters.r0
-            + self.parent.parameters.r1 * tnow
-            + self.parent.parameters.r2 * tnow**2
-            + self.parent.parameters.r3 * tnow**3
-        )
-        return rnow
+        return functions.Cubic_Density(
+            r0=self.parent.parameters.r0,
+            r1=self.parent.parameters.r1,
+            r2=self.parent.parameters.r2,
+            r3=self.parent.parameters.r3,
+            T=self.parent.state.T
+            )
 
 
 ########################
@@ -397,12 +353,11 @@ class Linear_Melt_Temperature(BaseModel):
         self.consts = ["tm0", "tm1"]
 
     def value(self, *args):
-        rnow = self.parent.state.rho
-
-        tmeltnow = (
-            self.parent.parameters.tm0 + self.parent.parameters.tm1 * rnow
-        )
-        return tmeltnow
+        return functions.Linear_Melt_Temperature(
+            tm0=self.parent.parameters.tm0,
+            tm1=self.parent.parameters.tm1,
+            rho=self.parent.state.rho
+            )
 
 
 class Quadratic_Melt_Temperature(BaseModel):
@@ -415,13 +370,12 @@ class Quadratic_Melt_Temperature(BaseModel):
         self.consts = ["tm0", "tm1", "tm2"]
 
     def value(self, *args):
-        rnow = self.parent.state.rho
-        tmeltnow = (
-            self.parent.parameters.tm0
-            + self.parent.parameters.tm1 * rnow
-            + self.parent.parameters.tm2 * rnow**2
-        )
-        return tmeltnow
+        return functions.Quadratic_Melt_Temperature(
+            tm0=self.parent.parameters.tm0,
+            tm1=self.parent.parameters.tm1,
+            tm2=self.parent.parameters.tm2,
+            rho=self.parent.state.rho
+            )
 
 
 class Cubic_Melt_Temperature(BaseModel):
@@ -434,15 +388,13 @@ class Cubic_Melt_Temperature(BaseModel):
         self.consts = ["tm0", "tm1", "tm2", "tm3"]
 
     def value(self, *args):
-        rnow = self.parent.state.rho
-        tmeltnow = (
-            self.parent.parameters.tm0
-            + self.parent.parameters.tm1 * rnow
-            + self.parent.parameters.tm2 * rnow**2
-            + self.parent.parameters.tm3 * rnow**3
-        )
-        # print(tmeltnow)
-        return tmeltnow
+        return functions.Cubic_Melt_Temperature(
+            tm0=self.parent.parameters.tm0,
+            tm1=self.parent.parameters.tm1,
+            tm2=self.parent.parameters.tm2,
+            tm3=self.parent.parameters.tm3,
+            rho=self.parent.state.rho
+            )
 
 
 class BGP_Melt_Temperature(BaseModel):
@@ -456,22 +408,14 @@ class BGP_Melt_Temperature(BaseModel):
 
     def value(self, *args):
         mp = self.parent.parameters
-        rho = self.parent.state.rho
-
-        melt_temp = (
-            mp.Tm_0
-            * np.power(rho / mp.rho_m, 1.0 / 3.0)
-            * np.exp(
-                6
-                * mp.gamma_1
-                * (np.power(mp.rho_m, -1.0 / 3.0) - np.power(rho, -1.0 / 3.0))
-                + 2.0
-                * mp.gamma_3
-                / mp.q3
-                * (np.power(mp.rho_m, -mp.q3) - np.power(rho, -mp.q3))
+        return functions.BGP_Melt_Temperature(
+            Tm0=mp.Tm_0,
+            rhom=mp.rho_m,
+            gamma1=mp.gamma_1,
+            gamma3=mp.gamma_3,
+            q3=mp.q3,
+            rho=self.parent.state.rho
             )
-        )
-        return melt_temp
 
 
 # Shear Modulus Models
@@ -509,16 +453,14 @@ class Linear_Cold_PW_Shear_Modulus(BaseModel):
 
     def value(self, *args):
         mp = self.parent.parameters
-        rho = self.parent.state.rho
-        temp = self.parent.state.T
-        tmelt = self.parent.state.Tmelt
-        cold_shear = mp.g0 + mp.g1 * rho
-        gnow = cold_shear * (1.0 - mp.alpha * (temp / tmelt))
-
-        gnow[np.where(temp >= tmelt)] = 0.0
-        gnow[np.where(gnow < 0)] = 0.0
-
-        return gnow
+        return functions.Linear_Cold_PW_Shear_Modulus(
+            g0=mp.g0,
+            g1=mp.g1,
+            alpha=mp.alpha,
+            rho=self.parent.state.rho,
+            T=self.parent.state.T,
+            Tmelt=self.parent.state.Tmelt
+            )
 
 
 class Quadratic_Cold_PW_Shear_Modulus(BaseModel):
@@ -528,16 +470,15 @@ class Quadratic_Cold_PW_Shear_Modulus(BaseModel):
 
     def value(self, *args):
         mp = self.parent.parameters
-        rho = self.parent.state.rho
-        temp = self.parent.state.T
-        tmelt = self.parent.state.Tmelt
-        cold_shear = mp.g0 + mp.g1 * rho + mp.g2 * rho**2
-        gnow = cold_shear * (1.0 - mp.alpha * (temp / tmelt))
-
-        gnow[np.where(temp >= tmelt)] = 0.0
-        gnow[np.where(gnow < 0)] = 0.0
-
-        return gnow
+        return functions.Quadratic_Cold_PW_Shear_Modulus(
+            g0=mp.g0,
+            g1=mp.g1,
+            g2=mp.g2,
+            alpha=mp.alpha,
+            rho=self.parent.state.rho,
+            T=self.parent.state.T,
+            Tmelt=self.parent.state.Tmelt
+            )
 
 
 class Simple_Shear_Modulus(BaseModel):
@@ -546,38 +487,12 @@ class Simple_Shear_Modulus(BaseModel):
         self.consts = ["G0", "alpha"]
 
     def value(self, *args):
-        mp = self.parent.parameters
-        temp = self.parent.state.T
-        tmelt = self.parent.state.Tmelt
-
-        return mp.G0 * (1.0 - mp.alpha * (temp / tmelt))
-
-
-@jit(nopython=True)
-def _BGP_PW_Shear_Modulus(
-    rho, G0, rho_0, gamma_1, gamma_2, q2, alpha, temp, tmelt
-):
-    """BPG model provides cold shear, i.e. shear modulus at zero temperature as a function of density.
-    PW describes the (linear) temperature dependence of the shear modulus. (Same dependency as
-    in Simple_Shear_modulus.)
-    With these two models combined, we get the shear modulus as a function of density and temperature;
-    see Burakovsky, Greeff, Preston, Phys. Rev. B67 (2003) 094107, DOI:10.1103/PhysRevB.67.094107"""
-    cold_shear = (
-        G0
-        * np.power(rho / rho_0, 4.0 / 3.0)
-        * np.exp(
-            6.0 * gamma_1 * (1 / np.cbrt(rho_0) - 1 / np.cbrt(rho))
-            + 2 * gamma_2 / q2 * (np.power(rho_0, -q2) - np.power(rho, -q2))
-        )
-    )
-    gnow = cold_shear * (1.0 - alpha * (temp / tmelt))
-
-    gnow[np.where(temp >= tmelt)] = 0.0
-    gnow[np.where(gnow < 0)] = 0.0
-
-    # if temp >= tmelt: gnow = 0.0
-    # if gnow < 0.0:    gnow = 0.0
-    return gnow
+        return functions.Simple_Shear_Modulus(
+            G0=self.parent.parameters.G0,
+            alpha=self.parent.parameters.alpha,
+            T=self.parent.state.T,
+            Tmelt=self.parent.state.Tmelt
+            )
 
 
 class BGP_PW_Shear_Modulus(BaseModel):
@@ -593,19 +508,16 @@ class BGP_PW_Shear_Modulus(BaseModel):
 
     def value(self, *args):
         mp = self.parent.parameters
-        rho = self.parent.state.rho
-        temp = self.parent.state.T
-        tmelt = self.parent.state.Tmelt
-        gnow = _BGP_PW_Shear_Modulus(
-            rho=rho,
+        gnow = functions.BGP_PW_Shear_Modulus(
             G0=mp.G0,
             rho_0=mp.rho_0,
             gamma_1=mp.gamma_1,
             gamma_2=mp.gamma_2,
             q2=mp.q2,
             alpha=mp.alpha,
-            temp=temp,
-            tmelt=tmelt,
+            rho=self.parent.state.rho,
+            T=self.parent.state.T,
+            Tmelt=self.parent.state.Tmelt,
         )
         return gnow
 
@@ -620,19 +532,12 @@ class Stein_Shear_Modulus(BaseModel):
         self.eta = 1.0
 
     def value(self, *args):
-        mp = self.parent.parameters
-        temp = self.parent.state.T
-        tmelt = self.parent.state.Tmelt
-        # just putting this here for completeness
-        # aterm = a/eta**(1.0/3.0)*pressure
-        aterm = 0.0
-        bterm = mp.sgB * (temp - 300.0)
-        gnow = mp.G0 * (1.0 + aterm - bterm)
-        # if temp >= tmelt: gnow = 0.0
-        # if gnow < 0.0:    gnow = 0.0
-        gnow[np.where(temp >= tmelt)] = 0.0
-        gnow[np.where(gnow < 0)] = 0.0
-        return gnow
+        return functions.Stein_Shear_Modulus(
+            G0=self.parent.parameters.G0,
+            sgB=self.parent.parameters.sgB,
+            T=self.parent.state.T,
+            Tmelt=self.parent.state.Tmelt
+            )
 
 
 # Yield Stress Models
@@ -653,104 +558,27 @@ class Constant_Yield_Stress(BaseModel):
         )
 
 
-def pos(a):
-    return np.maximum(0, a)
-
-
 class JC_Yield_Stress(BaseModel):
     def __init__(self, parent):
         BaseModel.__init__(self, parent)
         self.params = ["A", "B", "C", "n", "m"]
-        self.consts = ["Tref", "edot0", "chi"]
+        self.consts = ["Tref", "edot0", "chi"] ## nothing here depends on chi, why is it here?
 
     def value(self, edot):
         mp = self.parent.parameters
-        eps = self.parent.state.strain
-        t = self.parent.state.T
-        tmelt = self.parent.state.Tmelt
-
-        # th = np.max([(t - mp.Tref) / (tmelt - mp.Tref), 0.])
-        th = pos((t - mp.Tref) / (tmelt - mp.Tref))
-
-        Y = (
-            (mp.A + mp.B * np.power(eps, mp.n))
-            * (1.0 + mp.C * np.log(edot / mp.edot0))
-            * (1.0 - np.power(th, mp.m))
-        )
-        return Y
-
-
-@jit(nopython=True)
-def _PTW_corefct(
-    p,
-    kappa,
-    s0,
-    sInf,
-    y0,
-    yInf,
-    y1,
-    y2,
-    beta,
-    theta,
-    lgamma,
-    xiDot,
-    edot,
-    t_hom,
-    eps,
-    small=1.0e-10,
-):
-    """jit-compiled subroutine of the PTW_Yield_Stress class"""
-    log_xid_ed = np.log(xiDot / edot)
-    argErf = kappa * t_hom * (lgamma + log_xid_ed)
-    Erfres = erf(argErf)
-
-    saturation1 = s0 - (s0 - sInf) * Erfres
-    saturation2 = s0 * np.exp(beta * (-lgamma - log_xid_ed))
-    sat_cond = saturation1 > saturation2
-    tau_s = np.copy(saturation2)
-    tau_s[np.where(sat_cond)] = saturation1[sat_cond]
-
-    ayield = y0 - (y0 - yInf) * Erfres
-    byield = y1 * np.exp(-y2 * (lgamma + log_xid_ed))
-    cyield = s0 * np.exp(-beta * (lgamma + log_xid_ed))
-
-    y_cond = byield < cyield
-    dyield = np.copy(cyield)
-    dyield[np.where(y_cond)] = byield[y_cond]
-
-    y_cond2 = ayield > dyield
-    tau_y = np.copy(dyield)
-    tau_y[np.where(y_cond2)] = ayield[y_cond2]
-    scaled_stress = tau_s
-    ind = np.where((p > small) * (np.abs(tau_s - tau_y) > small))
-    eArg1 = (p * (tau_s - tau_y) / (s0 - tau_y))[ind]
-    eArg2 = (
-        (eps * p * theta)[ind] / (s0 - tau_y)[ind] / (np.exp(eArg1) - 1.0)
-    )  # eArg1 already subsetted by ind
-    if np.any((1.0 - (1.0 - np.exp(-eArg1)) * np.exp(-eArg2)) <= 0) or np.any(
-        np.isinf(1.0 - (1.0 - np.exp(-eArg1)) * np.exp(-eArg2))
-    ):
-        print("bad")
-    theLog = np.log(1.0 - (1.0 - np.exp(-eArg1)) * np.exp(-eArg2))
-    scaled_stress[ind] = tau_s[ind] + (s0[ind] - tau_y[ind]) * theLog / p[ind]
-    ind2 = np.where((p <= small) * (tau_s > tau_y))
-    scaled_stress[ind2] = +tau_s[ind2] - (tau_s - tau_y)[ind2] * np.exp(
-        -eps[ind2] * theta[ind2] / (tau_s - tau_y)[ind2]
-    )
-    return scaled_stress
-
-
-@jit(nopython=True)
-def PTW_goodparam(s0, sInf, y0, yInf, y1, y2, beta):
-    """checks if the given PTW parameter set is valid"""
-    return (
-        (sInf < s0)
-        * (yInf < y0)
-        * (y0 < s0)
-        * (yInf < sInf)
-        * (y1 > s0)
-        * (y2 > beta)
-    )
+        return functions.JC_Yield_Stress(
+            edot=edot,
+            A=mp.A,
+            B=mp.B,
+            C=mp.C,
+            n=mp.n,
+            m=mp.m,
+            Tref=mp.Tref,
+            edot0=mp.edot0,
+            eps=self.parent.state.strain,
+            T=self.parent.state.T,
+            Tmelt=self.parent.state.Tmelt
+            )
 
 
 class PTW_Yield_Stress(BaseModel):
@@ -784,11 +612,6 @@ class PTW_Yield_Stress(BaseModel):
         and specified strain rate
         """
         mp = self.parent.parameters
-        eps = self.parent.state.strain
-        temp = self.parent.state.T
-        tmelt = self.parent.state.Tmelt
-        shear = self.parent.state.G
-
         good = PTW_goodparam(
             mp.s0, mp.sInf, mp.y0, mp.yInf, mp.y1, mp.y2, mp.beta
         )
@@ -796,48 +619,27 @@ class PTW_Yield_Stress(BaseModel):
             # return np.array([-999.]*len(good))
             raise ConstraintError("PTW bad val")
 
-        # convert to 1/s strain rate since PTW rate is in that unit
-        edot = edot * 1.0e6
-
-        t_hom = temp / tmelt
-        # this one is commented because it is assumed that
-        # the material state computes the temperature dependence of
-        # the shear modulus
-        # shear = shear * (1.0 - mp.alpha * t_hom)
-        # print("ptw shear is "+str(shear))
-
-        afact = (4.0 / 3.0) * pi * mp.rho0 / mp.matomic
-        # ainv is 1/a where 4/3 pi a^3 is the atomic volume
-        ainv = afact ** (1.0 / 3.0)
-
-        # transverse wave velocity up to units
-        xfact = np.sqrt(shear / mp.rho0)
-        # PTW characteristic strain rate [ 1/s ]
-        xiDot = 0.5 * ainv * xfact * pow(6.022e29, 1.0 / 3.0) * 1.0e4
-
-        # should be flow stress in units of Mbar
-        out = (
-            _PTW_corefct(
-                mp.p,
-                mp.kappa,
-                mp.s0,
-                mp.sInf,
-                mp.y0,
-                mp.yInf,
-                mp.y1,
-                mp.y2,
-                mp.beta,
-                mp.theta,
-                mp.lgamma,
-                xiDot,
-                edot,
-                t_hom,
-                eps,
-                small=1.0e-10,
+        out = functions.PTW_Yield_Stress(
+            p=mp.p,
+            kappa=mp.kappa,
+            s0=mp.s0,
+            sInf=mp.sInf,
+            y0=mp.y0,
+            yInf=mp.yInf,
+            y1=mp.y1,
+            y2=mp.y2,
+            beta=mp.beta,
+            theta=mp.theta,
+            lgamma=mp.lgamma,
+            edot=edot,
+            rho0=mp.rho0,
+            matomic=mp.matomic,
+            shear=self.parent.state.G,
+            eps=self.parent.state.strain,
+            T=self.parent.state.T,
+            Tmelt=self.parent.state.Tmelt,
+            small=1.0e-10,
             )
-            * shear
-            * 2.0
-        )
         out[np.where(np.logical_not(good))] = -999.0
         return out
 
@@ -850,20 +652,18 @@ class Stein_Flow_Stress(BaseModel):
 
     def value(self, *args):
         mp = self.parent.parameters
-        temp = self.parent.state.T
-        tmelt = self.parent.state.Tmelt
-        shear = self.parent.state.G
-        eps = self.parent.state.strain
-        fnow = np.power((1.0 + mp.beta * (mp.epsi + eps)), mp.n)
-
-        cond1 = fnow * mp.y0 > mp.ymax
-        fnow[cond1] = (mp.ymax / mp.y0)[cond1]
-        cond2 = temp > tmelt
-        fnow[cond2] = 0.0
-
-        # if fnow*mp.y0 > mp.ymax: fnow = mp.ymax/mp.y0
-        # if temp > tmelt: fnow = 0.0
-        return mp.y0 * fnow * shear / mp.G0
+        return functions.Stein_Flow_Stress(
+                y0=mp.y0,
+                beta=mp.beta,
+                n=mp.n,
+                ymax=mp.ymax,
+                G0=mp.G0,
+                epsi=mp.epsi,
+                shear=self.parent.state.G,
+                eps=self.parent.state.strain,
+                T=self.parent.state.T,
+                Tmelt=self.parent.state.Tmelt
+                )
 
 
 ## Parameters Definition
