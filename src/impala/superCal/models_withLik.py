@@ -72,6 +72,125 @@ class AbstractModel:
         return
 
 
+class ModelmvBayes(AbstractModel):
+    """
+    ModelmvBayes: mvBayes Emulator for Functional Outputs (can use different
+                  BASS/BPPR type emulators)
+
+    ModelmvBayes Handles larger-dimensional functional responses (e.g., on
+    large spatial fields) using
+    various inversion tricks. We require any other covariance e.g., from
+    discrepancy, measurement error, and basis truncation error)
+    to be diagnonal. Smaller-dimensional functional responses could be
+    specified with non-diagonal covariances using ModelBpprPca_mult.
+    """
+
+    def __init__(self, bmod, input_names, exp_ind=None, s2="MH", psi=False):
+        """
+        bmod        : bassPCA fit
+        input_names : list of the names of the inputs to bmod
+        s2          : method for handling experiment-specific noise s2;
+                      options are 'MH' (Metropolis-Hastings Sampling),
+                      'fix' (fixed at s2_est from addVecExperiments call)
+        psi         : option to compute metric on sphere
+        """
+        self.mod = bmod
+        self.psi = psi
+        self.stochastic = True
+        self.nmcmc = self.mod.nSamples
+        self.input_names = input_names
+        npc = self.mod.basisInfo.nBasis
+        self.basis = self.mod.basisInfo.basis.T
+        self.meas_error_cor = np.eye(self.basis.shape[0])
+        self.discrep_cov = np.eye(self.basis.shape[0]) * 1e-12
+        self.ii = 0
+        self.trunc_error_cov = np.cov(self.mod.basisInfo.truncError.T)
+        self.mod_s2 = np.empty([self.nmcmc, npc])
+        for i in range(npc):
+            self.mod_s2[:, i] = self.mod.bmList[i].samples.residSD ** 2
+        self.emu_vars = self.mod_s2[self.ii]
+        self.yobs = None
+        self.marg_lik_cov = None
+        self.discrep_vars = None
+        self.nd = 0
+        self.discrep_tau = 1.0
+        self.D = None
+        self.discrep = 0.0
+        if exp_ind is None:
+            exp_ind = np.array(0)
+        self.nexp = exp_ind.max() + 1
+        self.exp_ind = exp_ind
+        self.s2 = s2
+        self.constants = None
+        if s2 == "gibbs":
+            raise ValueError("Cannot use Gibbs s2 for emulator models.")
+
+    def step(self):
+        self.ii = np.random.choice(range(self.nmcmc), 1).item()
+        self.emu_vars = self.mod_s2[self.ii]
+
+    def discrep_sample(self, yobs, pred, cov, itemp):
+        S = np.linalg.inv(
+            np.eye(self.nd) / self.discrep_tau + self.D.T @ cov["inv"] @ self.D
+        )
+        m = self.D.T @ cov["inv"] @ (yobs - pred)
+        discrep_vars = chol_sample(S @ m, S / itemp)
+        return discrep_vars
+
+    def eval(self, parmat, pool=None, nugget=False):
+        """
+        parmat : ~
+        """
+        parmat_array = np.vstack([
+            parmat[v] for v in self.input_names
+        ]).T  # get correct subset/ordering of inputs
+        pred = self.mod.predict(parmat_array, idxSamples=np.array([self.ii]))[
+            0, :, :
+        ]
+
+        if pool is True:
+            return pred
+        else:
+            nrep = next(iter(parmat.values())).shape[0] // self.nexp
+            return np.concatenate(
+                [
+                    pred[
+                        np.ix_(
+                            np.arange(i, nrep * self.nexp, self.nexp),
+                            np.where(self.exp_ind == i)[0],
+                        )
+                    ]
+                    for i in range(self.nexp)
+                ],
+                1,
+            )
+            # this is evaluating all experiments for all thetas, which is overkill
+
+    def llik(self, yobs, pred, cov):
+        vec = yobs - pred
+        out = -0.5 * (cov["ldet"] + vec.T @ cov["inv"] @ vec)
+        return out
+
+    def lik_cov_inv(self, s2vec):
+        n = len(s2vec)
+        Sigma = cor2cov(
+            self.meas_error_cor[:n, :n], np.sqrt(s2vec)
+        )  # :n is a hack for when ntheta>1 in heir...fix this sometime
+        mat = (
+            Sigma
+            + self.trunc_error_cov
+            + self.discrep_cov
+            + self.basis @ np.diag(self.emu_vars) @ self.basis.T
+        )
+        # this doesnt work for vectorized experiments...maybe dont allow those for BASS
+        chol = cholesky(mat)
+        ldet = 2 * np.sum(np.log(np.diag(chol)))
+        # la.dpotri(chol, overwrite_c=True) # overwrites chol with original matrix inverse
+        inv = np.linalg.inv(mat)
+        out = {"inv": inv, "ldet": ldet}
+        return out
+
+
 #######
 ### ModelBassPca_mult: Model with BASS Emulator from pyBASS with Multivariate Output
 class ModelBassPca_mult(AbstractModel):
