@@ -652,7 +652,9 @@ class PTW_Yield_Stress(BaseModel):
 class Stein_Flow_Stress(BaseModel):
     def __init__(self, parent):
         BaseModel.__init__(self, parent)
-        self.params = ["y0", "a", "b", "beta", "n", "ymax"]
+        # self.params = ["y0", "a", "b", "beta", "n", "ymax"]
+        ## params a, b are never used, so drop them:
+        self.params = ["y0", "beta", "n", "ymax"]
         self.consts = ["G0", "epsi", "chi"]
 
     def value(self, *args):
