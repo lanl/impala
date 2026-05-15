@@ -57,8 +57,9 @@ def test_physics():
     sim_stresses = sim_state_histories[:, 2]  # 2d array: ntot, Nhist
 
     strainstress_new = np.column_stack([sim_strains, sim_stresses])
+    # pd.DataFrame(strainstress_new).to_csv(data_dir / "physics_strainstress_baseline.csv", index=False)
     strainstress_old = pd.read_csv(
-        data_dir / "physics_strainstress_baseline.csv", index_col=0
+        data_dir / "physics_strainstress_baseline.csv"
     ).values
 
     # Test that the current model output matches the baseline.
@@ -126,7 +127,7 @@ def test_constparams():
 
     strainstress_new = np.column_stack([sim_strains, sim_stresses])
     strainstress_old = pd.read_csv(
-        data_dir / "physics_strainstress_baseline.csv", index_col=0
+        data_dir / "physics_strainstress_baseline.csv"
     ).values
 
     # Test that the current model output matches the baseline, this time using more constants

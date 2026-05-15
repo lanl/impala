@@ -87,9 +87,9 @@ def test_modelinit_1():
     sim_stresses = sim_state_histories[:, 2]  # 2d array: ntot, Nhist
 
     strainstress_new = np.column_stack([sim_strains, sim_stresses])
-    # pd.DataFrame(strainstress_new).to_csv(data_dir / "physics_strainstress_baseline_1.csv")
+    # pd.DataFrame(strainstress_new).to_csv(data_dir / "physics_strainstress_baseline_1.csv", index=False)
     strainstress_old = pd.read_csv(
-        data_dir / "physics_strainstress_baseline_1.csv", index_col=0
+        data_dir / "physics_strainstress_baseline_1.csv"
     ).values
 
     # Test that the current model output matches the baseline.
@@ -198,9 +198,9 @@ def test_modelinit_2():
     sim_stresses = sim_state_histories[:, 2]  # 2d array: ntot, Nhist
 
     strainstress_new = np.column_stack([sim_strains, sim_stresses])
-    # pd.DataFrame(strainstress_new).to_csv(data_dir / "physics_strainstress_baseline_2.csv")
+    # pd.DataFrame(strainstress_new).to_csv(data_dir / "physics_strainstress_baseline_2.csv", index=False)
     strainstress_old = pd.read_csv(
-        data_dir / "physics_strainstress_baseline_2.csv", index_col=0
+        data_dir / "physics_strainstress_baseline_2.csv"
     ).values
 
     # Test that the current model output matches the baseline.
@@ -313,9 +313,9 @@ def test_modelinit_3():
     sim_stresses = sim_state_histories[:, 2]  # 2d array: ntot, Nhist
 
     strainstress_new = np.column_stack([sim_strains, sim_stresses])
-    # pd.DataFrame(strainstress_new).to_csv(data_dir / "physics_strainstress_baseline_3.csv")
+    # pd.DataFrame(strainstress_new).to_csv(data_dir / "physics_strainstress_baseline_3.csv",index=False)
     strainstress_old = pd.read_csv(
-        data_dir / "physics_strainstress_baseline_3.csv", index_col=0
+        data_dir / "physics_strainstress_baseline_3.csv"
     ).values
 
     # Test that the current model output matches the baseline.
@@ -443,9 +443,9 @@ def test_modelinit_4():
     sim_stresses = sim_state_histories[:, 2]  # 2d array: ntot, Nhist
 
     strainstress_new = np.column_stack([sim_strains, sim_stresses])
-    # pd.DataFrame(strainstress_new).to_csv(data_dir / "physics_strainstress_baseline_4.csv")
+    # pd.DataFrame(strainstress_new).to_csv(data_dir / "physics_strainstress_baseline_4.csv",index=False)
     strainstress_old = pd.read_csv(
-        data_dir / "physics_strainstress_baseline_4.csv", index_col=0
+        data_dir / "physics_strainstress_baseline_4.csv"
     ).values
 
     # Test that the current model output matches the baseline.
