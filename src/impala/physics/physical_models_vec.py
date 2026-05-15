@@ -189,8 +189,7 @@ class Piecewise_Quadratic_Specific_Heat(BaseModel):
 
 class Piecewise_Cubic_Specific_Heat(BaseModel):
     """
-    Cubic Specific Heat Model
-    Piecewise Quadratic Specific Heat Model
+    Piecewise Cubic Specific Heat Model
     Cv (T) = c0_0 + c1_0 * T + c2_0 * T**2  + c3_0 * T**3 for T<=T_t
     Cv (T) = c0_1 + c1_1 * T + c2_1 * T**2  + c3_1 * T**3 for T>T_t
     """
@@ -294,7 +293,7 @@ class Quadratic_Density(BaseModel):
 
 class Cubic_Density(BaseModel):
     """
-    Quadratic Density Model
+    Cubic Density Model
     """
 
     def __init__(self, parent):

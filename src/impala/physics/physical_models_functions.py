@@ -55,6 +55,9 @@ cbrtAvogadro = pow(Avogadro, 1.0 / 3.0)
 def Linear_Specific_Heat(c0: float, c1: float, T: float) -> float:
     """
     Linear Specific Heat Model
+
+    T: temperature
+    c0, c1: model parameters
     """
     return c0 + c1 * T
 
@@ -63,6 +66,9 @@ def Linear_Specific_Heat(c0: float, c1: float, T: float) -> float:
 def Quadratic_Specific_Heat(c0: float, c1: float, c2: float, T: float) -> float:
     """
     Quadratic Specific Heat Model
+
+    T: temperature
+    c0, c1, c2: model parameters
     """
     return c0 + c1 * T + c2 * T**2
 
@@ -73,6 +79,9 @@ def Cubic_Specific_Heat(
 ) -> float:
     """
     Cubic Specific Heat Model
+
+    T: temperature
+    c0, c1, c2, c3: model parameters
     """
     return c0 + c1 * T + c2 * T**2 + c3 * T**3
 
@@ -83,6 +92,12 @@ def Piecewise_Linear_Specific_Heat(
 ) -> float:
     """
     Piecewise Linear Specific Heat Model
+
+    T: current temperature
+    Tt: temperature separating the two linear models
+    c00, c10: model parameters used up to temperature Tt
+    c01, c11: model parameters used above Tt
+
     Cv (T) = c00 + c10 * T for T<=Tt
     Cv (T) = c01 + c11 * T for T>Tt
     """
@@ -106,6 +121,12 @@ def Piecewise_Quadratic_Specific_Heat(
 ) -> float:
     """
     Piecewise Quadratic Specific Heat Model
+
+    T: current temperature
+    Tt: temperature separating the two quadratic models
+    c00, c10, c20: model parameters used up to temperature Tt
+    c01, c11, c21: model parameters used above Tt
+
     Cv (T) = c00 + c10 * T + c20 * T**2 for T<=Tt
     Cv (T) = c01 + c11 * T + c21 * T**2 for T>Tt
     """
@@ -134,8 +155,13 @@ def Piecewise_Cubic_Specific_Heat(
     T: float,
 ) -> float:
     """
-    Cubic Specific Heat Model
-    Piecewise Quadratic Specific Heat Model
+    Piecewise Cubic Specific Heat Model
+
+    T: current temperature
+    Tt: temperature separating the two linear models
+    c00, c10, c20, c30: model parameters used up to temperature Tt
+    c01, c11, c21, c31: model parameters used above Tt
+
     Cv (T) = c0_0 + c1_0 * T + c2_0 * T**2  + c3_0 * T**3 for T<=T_t
     Cv (T) = c0_1 + c1_1 * T + c2_1 * T**2  + c3_1 * T**3 for T>T_t
     """
@@ -161,6 +187,9 @@ def Piecewise_Cubic_Specific_Heat(
 def Linear_Density(r0: float, r1: float, T: float) -> float:
     """
     Linear Density Model
+
+    T: temperature
+    r0, r1: model parameters
     """
     return r0 + r1 * T
 
@@ -169,6 +198,9 @@ def Linear_Density(r0: float, r1: float, T: float) -> float:
 def Quadratic_Density(r0: float, r1: float, r2: float, T: float) -> float:
     """
     Quadratic Density Model
+
+    T: temperature
+    r0, r1, r2: model parameters
     """
     return r0 + r1 * T + r2 * T**2
 
@@ -178,7 +210,10 @@ def Cubic_Density(
     r0: float, r1: float, r2: float, r3: float, T: float
 ) -> float:
     """
-    Quadratic Density Model
+    Cubic Density Model
+
+    T: temperature
+    r0, r1, r2, r3: model parameters
     """
     return r0 + r1 * T + r2 * T**2 + r3 * T**3
 
@@ -191,6 +226,9 @@ def Cubic_Density(
 def Linear_Melt_Temperature(tm0: float, tm1: float, rho: float) -> float:
     """
     Linear Melt Temperature Model
+
+    rho: material density
+    tm0, tm1: model parameters
     """
     return tm0 + tm1 * rho
 
@@ -201,6 +239,9 @@ def Quadratic_Melt_Temperature(
 ) -> float:
     """
     Quadratic Melt Temperature Model
+
+    rho: material density
+    tm0, tm1, tm2: model parameters
     """
     return tm0 + tm1 * rho + tm2 * rho**2
 
@@ -211,6 +252,9 @@ def Cubic_Melt_Temperature(
 ) -> float:
     """
     Cubic Melt Temperature Model
+
+    rho: material density
+    tm0, tm1, tm2, tm3: model parameters
     """
     return tm0 + tm1 * rho + tm2 * rho**2 + tm3 * rho**3
 
@@ -221,6 +265,12 @@ def BGP_Melt_Temperature(
 ) -> float:
     """
     Burakovsky-Greeff-Preston Melt Temperature Model
+    see doi.org/10.1103/PhysRevB.67.094107
+
+    rho: current material density
+    rhom: reference density
+    Tm0: melt temperature at reference density rhom
+    gamma1, gamma2, q3: model parameters
     """
     melt_temp = (
         Tm0
@@ -233,7 +283,9 @@ def BGP_Melt_Temperature(
     return melt_temp
 
 
+########################
 # Shear Modulus Models
+########################
 
 
 @jit(nopython=True)
@@ -242,6 +294,11 @@ def Linear_Cold_PW_Shear_Modulus(
 ) -> float:
     """
     Linear Cold PW Shear Modulus
+
+    rho: current material density
+    T: temperature
+    Tmelt: melting temperature
+    g0, g1, alpha: model parameters
     """
     cold_shear = g0 + g1 * rho
     gnow = cold_shear * (1.0 - alpha * (T / Tmelt))
@@ -264,6 +321,11 @@ def Quadratic_Cold_PW_Shear_Modulus(
 ) -> float:
     """
     Quadratic Cold PW Shear Modulus
+
+    rho: current material density
+    T: temperature
+    Tmelt: melting temperature
+    g0, g1, g2, alpha: model parameters
     """
     cold_shear = g0 + g1 * rho + g2 * rho**2
     gnow = cold_shear * (1.0 - alpha * (T / Tmelt))
@@ -280,6 +342,10 @@ def Simple_Shear_Modulus(
 ) -> float:
     """
     Simple Shear Modulus
+
+    T: temperature
+    Tmelt: melting temperature
+    G0, alpha: model parameters
     """
     return G0 * (1.0 - alpha * (T / Tmelt))
 
@@ -296,11 +362,20 @@ def BGP_PW_Shear_Modulus(
     T: float,
     Tmelt: float,
 ) -> float:
-    """BPG model provides cold shear, i.e. shear modulus at zero temperature as a function of density.
+    """
+    BPG model provides cold shear, i.e. shear modulus at zero temperature as a function of density.
     PW describes the (linear) temperature dependence of the shear modulus. (Same dependency as
     in Simple_Shear_modulus.)
     With these two models combined, we get the shear modulus as a function of density and temperature;
-    see Burakovsky, Greeff, Preston, Phys. Rev. B67 (2003) 094107, DOI:10.1103/PhysRevB.67.094107"""
+    see Burakovsky, Greeff, Preston, Phys. Rev. B67 (2003) 094107, DOI:10.1103/PhysRevB.67.094107
+
+    rho: current material density
+    T: temperature
+    Tmelt: melting temperature
+    rho_0: reference density
+    G0: shear modulues at reference density rho_0
+    gamma1, gamma2, q2, alpha: model parameters
+    """
     cold_shear = (
         G0
         * np.power(rho / rho_0, 4.0 / 3.0)
@@ -323,6 +398,10 @@ def Stein_Shear_Modulus(G0: float, sgB: float, T: float, Tmelt: float) -> float:
     so we only include the temperature dependence;
     including aterm = a/eta**(1.0/3.0)*pressure here just for completeness
     and setting aterm = 0
+
+    T: temperature
+    Tmelt: melting temperature
+    G0, sgB: model parameters
     """
     aterm = 0.0
     bterm = sgB * (T - 300.0)
@@ -332,7 +411,9 @@ def Stein_Shear_Modulus(G0: float, sgB: float, T: float, Tmelt: float) -> float:
     return gnow
 
 
+########################
 # Yield Stress Models
+########################
 
 
 @jit(nopython=True)
@@ -357,8 +438,13 @@ def JC_Yield_Stress(
 ) -> float:
     """
     JC Yield Stress
+
+    eps: current strain
+    T: temperature
+    Tmelt: melting temperature
+    edot0, Tref: reference strain rate and temperature
+    A, B, C, n, m: model parameters
     """
-    # th = np.max([(t - mp.Tref) / (tmelt - mp.Tref), 0.])
     th = pos((T - Tref) / (Tmelt - Tref))
 
     Y = (
@@ -412,7 +498,20 @@ def PTW_Yield_Stress(
     Tmelt: float,
     small: float = 1.0e-10,
 ) -> float:
-    """This function implements the PTW flow stress model"""
+    """
+    This function implements the PTW flow stress model.
+    It returns the flow stress at the current material state
+    and specified strain rate;
+    see Preston, Tonks, Wallace, J. Appl. Phys. 93 (2003) 211,
+    doi.org/10.1063/1.1524706
+
+    edot: current strain rate
+    eps: current strain
+    T: temperature
+    Tmelt: melting temperature
+    shear: shear modulus
+    p, kappa, s0, sInf, y0, yInf, y1, y2, beta, theta, lgamma: model parameters
+    """
 
     t_hom = T / Tmelt
     # this one is commented because it is assumed that
