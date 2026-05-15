@@ -68,7 +68,9 @@ def Quadratic_Specific_Heat(c0: float, c1: float, c2: float, T: float) -> float:
 
 
 @jit(nopython=True)
-def Cubic_Specific_Heat(c0: float, c1: float, c2: float, c3: float, T: float) -> float:
+def Cubic_Specific_Heat(
+    c0: float, c1: float, c2: float, c3: float, T: float
+) -> float:
     """
     Cubic Specific Heat Model
     """
@@ -76,7 +78,9 @@ def Cubic_Specific_Heat(c0: float, c1: float, c2: float, c3: float, T: float) ->
 
 
 @jit(nopython=True)
-def Piecewise_Linear_Specific_Heat(Tt: float, c00: float, c01: float, c10: float, c11: float, T: float) -> float:
+def Piecewise_Linear_Specific_Heat(
+    Tt: float, c00: float, c01: float, c10: float, c11: float, T: float
+) -> float:
     """
     Piecewise Linear Specific Heat Model
     Cv (T) = c00 + c10 * T for T<=Tt
@@ -90,7 +94,16 @@ def Piecewise_Linear_Specific_Heat(Tt: float, c00: float, c01: float, c10: float
 
 
 @jit(nopython=True)
-def Piecewise_Quadratic_Specific_Heat(Tt: float, c00: float, c01: float, c10: float, c11: float, c20: float, c21: float, T: float) -> float:
+def Piecewise_Quadratic_Specific_Heat(
+    Tt: float,
+    c00: float,
+    c01: float,
+    c10: float,
+    c11: float,
+    c20: float,
+    c21: float,
+    T: float,
+) -> float:
     """
     Piecewise Quadratic Specific Heat Model
     Cv (T) = c00 + c10 * T + c20 * T**2 for T<=Tt
@@ -109,7 +122,16 @@ def Piecewise_Quadratic_Specific_Heat(Tt: float, c00: float, c01: float, c10: fl
 
 @jit(nopython=True)
 def Piecewise_Cubic_Specific_Heat(
-    Tt: float, c00: float, c01: float, c10: float, c11: float, c20: float, c21: float, c30: float, c31: float, T: float
+    Tt: float,
+    c00: float,
+    c01: float,
+    c10: float,
+    c11: float,
+    c20: float,
+    c21: float,
+    c30: float,
+    c31: float,
+    T: float,
 ) -> float:
     """
     Cubic Specific Heat Model
@@ -152,7 +174,9 @@ def Quadratic_Density(r0: float, r1: float, r2: float, T: float) -> float:
 
 
 @jit(nopython=True)
-def Cubic_Density(r0: float, r1: float, r2: float, r3: float, T: float) -> float:
+def Cubic_Density(
+    r0: float, r1: float, r2: float, r3: float, T: float
+) -> float:
     """
     Quadratic Density Model
     """
@@ -172,7 +196,9 @@ def Linear_Melt_Temperature(tm0: float, tm1: float, rho: float) -> float:
 
 
 @jit(nopython=True)
-def Quadratic_Melt_Temperature(tm0: float, tm1: float, tm2: float, rho: float) -> float:
+def Quadratic_Melt_Temperature(
+    tm0: float, tm1: float, tm2: float, rho: float
+) -> float:
     """
     Quadratic Melt Temperature Model
     """
@@ -180,7 +206,9 @@ def Quadratic_Melt_Temperature(tm0: float, tm1: float, tm2: float, rho: float) -
 
 
 @jit(nopython=True)
-def Cubic_Melt_Temperature(tm0: float, tm1: float, tm2: float, tm3: float, rho: float) -> float:
+def Cubic_Melt_Temperature(
+    tm0: float, tm1: float, tm2: float, tm3: float, rho: float
+) -> float:
     """
     Cubic Melt Temperature Model
     """
@@ -188,7 +216,9 @@ def Cubic_Melt_Temperature(tm0: float, tm1: float, tm2: float, tm3: float, rho: 
 
 
 @jit(nopython=True)
-def BGP_Melt_Temperature(Tm0: float, rhom: float, gamma1: float, gamma3: float, q3: float, rho: float) -> float:
+def BGP_Melt_Temperature(
+    Tm0: float, rhom: float, gamma1: float, gamma3: float, q3: float, rho: float
+) -> float:
     """
     Burakovsky-Greeff-Preston Melt Temperature Model
     """
@@ -207,7 +237,9 @@ def BGP_Melt_Temperature(Tm0: float, rhom: float, gamma1: float, gamma3: float, 
 
 
 @jit(nopython=True)
-def Linear_Cold_PW_Shear_Modulus(g0: float, g1: float, alpha: float, rho: float, T: float, Tmelt: float) -> float:
+def Linear_Cold_PW_Shear_Modulus(
+    g0: float, g1: float, alpha: float, rho: float, T: float, Tmelt: float
+) -> float:
     """
     Linear Cold PW Shear Modulus
     """
@@ -221,7 +253,15 @@ def Linear_Cold_PW_Shear_Modulus(g0: float, g1: float, alpha: float, rho: float,
 
 
 @jit(nopython=True)
-def Quadratic_Cold_PW_Shear_Modulus(g0: float, g1: float, g2: float, alpha: float, rho: float, T: float, Tmelt: float) -> float:
+def Quadratic_Cold_PW_Shear_Modulus(
+    g0: float,
+    g1: float,
+    g2: float,
+    alpha: float,
+    rho: float,
+    T: float,
+    Tmelt: float,
+) -> float:
     """
     Quadratic Cold PW Shear Modulus
     """
@@ -235,7 +275,9 @@ def Quadratic_Cold_PW_Shear_Modulus(g0: float, g1: float, g2: float, alpha: floa
 
 
 @jit(nopython=True)
-def Simple_Shear_Modulus(G0: float, alpha: float, T: float, Tmelt: float) -> float:
+def Simple_Shear_Modulus(
+    G0: float, alpha: float, T: float, Tmelt: float
+) -> float:
     """
     Simple Shear Modulus
     """
@@ -243,7 +285,17 @@ def Simple_Shear_Modulus(G0: float, alpha: float, T: float, Tmelt: float) -> flo
 
 
 @jit(nopython=True)
-def BGP_PW_Shear_Modulus(G0: float, rho_0: float, gamma_1: float, gamma_2: float, q2: float, alpha: float, rho: float, T: float, Tmelt: float) -> float:
+def BGP_PW_Shear_Modulus(
+    G0: float,
+    rho_0: float,
+    gamma_1: float,
+    gamma_2: float,
+    q2: float,
+    alpha: float,
+    rho: float,
+    T: float,
+    Tmelt: float,
+) -> float:
     """BPG model provides cold shear, i.e. shear modulus at zero temperature as a function of density.
     PW describes the (linear) temperature dependence of the shear modulus. (Same dependency as
     in Simple_Shear_modulus.)
@@ -290,7 +342,19 @@ def pos(a):
 
 
 @jit(nopython=True)
-def JC_Yield_Stress(edot: float, A: float, B: float, C: float, n: float, m: float, Tref: float, edot0: float, eps: float, T: float, Tmelt: float) -> float:
+def JC_Yield_Stress(
+    edot: float,
+    A: float,
+    B: float,
+    C: float,
+    n: float,
+    m: float,
+    Tref: float,
+    edot0: float,
+    eps: float,
+    T: float,
+    Tmelt: float,
+) -> float:
     """
     JC Yield Stress
     """
@@ -306,7 +370,15 @@ def JC_Yield_Stress(edot: float, A: float, B: float, C: float, n: float, m: floa
 
 
 @jit(nopython=True)
-def PTW_goodparam(s0: float, sInf: float, y0: float, yInf: float, y1: float, y2: float, beta: float) -> float:
+def PTW_goodparam(
+    s0: float,
+    sInf: float,
+    y0: float,
+    yInf: float,
+    y1: float,
+    y2: float,
+    beta: float,
+) -> float:
     """checks if the given PTW parameter set is valid"""
     return (
         (sInf < s0)
@@ -338,7 +410,7 @@ def PTW_Yield_Stress(
     eps: float,
     T: float,
     Tmelt: float,
-    small: float=1.0e-10,
+    small: float = 1.0e-10,
 ) -> float:
     """This function implements the PTW flow stress model"""
 
