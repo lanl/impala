@@ -52,27 +52,6 @@ cbrtAvogadro = pow(Avogadro, 1.0 / 3.0)
 ########################
 
 
-def Linear_Specific_Heat(c0: float, c1: float, T: float) -> float:
-    """
-    Linear Specific Heat Model
-
-    T: temperature
-    c0, c1: model parameters
-    """
-    return c0 + c1 * T
-
-
-@jit(nopython=True)
-def Quadratic_Specific_Heat(c0: float, c1: float, c2: float, T: float) -> float:
-    """
-    Quadratic Specific Heat Model
-
-    T: temperature
-    c0, c1, c2: model parameters
-    """
-    return c0 + c1 * T + c2 * T**2
-
-
 @jit(nopython=True)
 def Cubic_Specific_Heat(
     c0: float, c1: float, c2: float, c3: float, T: float
@@ -84,61 +63,6 @@ def Cubic_Specific_Heat(
     c0, c1, c2, c3: model parameters
     """
     return c0 + c1 * T + c2 * T**2 + c3 * T**3
-
-
-@jit(nopython=True)
-def Piecewise_Linear_Specific_Heat(
-    Tt: float, c00: float, c01: float, c10: float, c11: float, T: float
-) -> float:
-    """
-    Piecewise Linear Specific Heat Model
-
-    T: current temperature
-    Tt: temperature separating the two linear models
-    c00, c10: model parameters used up to temperature Tt
-    c01, c11: model parameters used above Tt
-
-    Cv (T) = c00 + c10 * T for T<=Tt
-    Cv (T) = c01 + c11 * T for T>Tt
-    """
-    intercept = np.repeat(c00, len(T))
-    slope = np.repeat(c10, len(T))
-    intercept[np.where(T > Tt)] = c01
-    slope[np.where(T > Tt)] = c11
-    return intercept + slope * T
-
-
-@jit(nopython=True)
-def Piecewise_Quadratic_Specific_Heat(
-    Tt: float,
-    c00: float,
-    c01: float,
-    c10: float,
-    c11: float,
-    c20: float,
-    c21: float,
-    T: float,
-) -> float:
-    """
-    Piecewise Quadratic Specific Heat Model
-
-    T: current temperature
-    Tt: temperature separating the two quadratic models
-    c00, c10, c20: model parameters used up to temperature Tt
-    c01, c11, c21: model parameters used above Tt
-
-    Cv (T) = c00 + c10 * T + c20 * T**2 for T<=Tt
-    Cv (T) = c01 + c11 * T + c21 * T**2 for T>Tt
-    """
-    pow_0_coeff = np.repeat(c00, len(T))
-    pow_1_coeff = np.repeat(c10, len(T))
-    pow_2_coeff = np.repeat(c20, len(T))
-
-    pow_0_coeff[np.where(T > Tt)] = c01
-    pow_1_coeff[np.where(T > Tt)] = c11
-    pow_2_coeff[np.where(T > Tt)] = c21
-
-    return pow_0_coeff + pow_1_coeff * T + pow_2_coeff * T * T
 
 
 @jit(nopython=True)
@@ -184,27 +108,6 @@ def Piecewise_Cubic_Specific_Heat(
 ########################
 
 
-def Linear_Density(r0: float, r1: float, T: float) -> float:
-    """
-    Linear Density Model
-
-    T: temperature
-    r0, r1: model parameters
-    """
-    return r0 + r1 * T
-
-
-@jit(nopython=True)
-def Quadratic_Density(r0: float, r1: float, r2: float, T: float) -> float:
-    """
-    Quadratic Density Model
-
-    T: temperature
-    r0, r1, r2: model parameters
-    """
-    return r0 + r1 * T + r2 * T**2
-
-
 @jit(nopython=True)
 def Cubic_Density(
     r0: float, r1: float, r2: float, r3: float, T: float
@@ -221,29 +124,6 @@ def Cubic_Density(
 ########################
 # Melt Temperature Models
 ########################
-
-
-def Linear_Melt_Temperature(tm0: float, tm1: float, rho: float) -> float:
-    """
-    Linear Melt Temperature Model
-
-    rho: material density
-    tm0, tm1: model parameters
-    """
-    return tm0 + tm1 * rho
-
-
-@jit(nopython=True)
-def Quadratic_Melt_Temperature(
-    tm0: float, tm1: float, tm2: float, rho: float
-) -> float:
-    """
-    Quadratic Melt Temperature Model
-
-    rho: material density
-    tm0, tm1, tm2: model parameters
-    """
-    return tm0 + tm1 * rho + tm2 * rho**2
 
 
 @jit(nopython=True)
@@ -286,27 +166,6 @@ def BGP_Melt_Temperature(
 ########################
 # Shear Modulus Models
 ########################
-
-
-@jit(nopython=True)
-def Linear_Cold_PW_Shear_Modulus(
-    g0: float, g1: float, alpha: float, rho: float, T: float, Tmelt: float
-) -> float:
-    """
-    Linear Cold PW Shear Modulus
-
-    rho: current material density
-    T: temperature
-    Tmelt: melting temperature
-    g0, g1, alpha: model parameters
-    """
-    cold_shear = g0 + g1 * rho
-    gnow = cold_shear * (1.0 - alpha * (T / Tmelt))
-
-    gnow[np.where(T >= Tmelt)] = 0.0
-    gnow[np.where(gnow < 0)] = 0.0
-
-    return gnow
 
 
 @jit(nopython=True)

@@ -97,9 +97,11 @@ class Linear_Specific_Heat(BaseModel):
         self.consts = ["c0", "c1"]
 
     def value(self, *args):
-        return functions.Linear_Specific_Heat(
+        return functions.Cubic_Specific_Heat(
             c0=self.parent.parameters.c0,
             c1=self.parent.parameters.c1,
+            c2=0,
+            c3=0,
             T=self.parent.state.T,
         )
 
@@ -114,10 +116,11 @@ class Quadratic_Specific_Heat(BaseModel):
         self.consts = ["c0", "c1", "c2"]
 
     def value(self, *args):
-        return functions.Quadratic_Specific_Heat(
+        return functions.Cubic_Specific_Heat(
             c0=self.parent.parameters.c0,
             c1=self.parent.parameters.c1,
             c2=self.parent.parameters.c2,
+            c3=0,
             T=self.parent.state.T,
         )
 
@@ -153,12 +156,16 @@ class Piecewise_Linear_Specific_Heat(BaseModel):
         self.consts = ["T_t", "c0_0", "c1_0", "c0_1", "c1_1"]
 
     def value(self, *args):
-        return functions.Piecewise_Linear_Specific_Heat(
+        return functions.Piecewise_Cubic_Specific_Heat(
             Tt=self.parent.parameters.T_t,
             c00=self.parent.parameters.c0_0,
             c01=self.parent.parameters.c0_1,
             c10=self.parent.parameters.c1_0,
             c11=self.parent.parameters.c1_1,
+            c20=0,
+            c21=0,
+            c30=0,
+            c31=0,
             T=self.parent.state.T,
         )
 
@@ -175,7 +182,7 @@ class Piecewise_Quadratic_Specific_Heat(BaseModel):
         self.consts = ["T_t", "c0_0", "c1_0", "c2_0", "c0_1", "c1_1", "c2_1"]
 
     def value(self, *args):
-        return functions.Piecewise_Quadratic_Specific_Heat(
+        return functions.Piecewise_Cubic_Specific_Heat(
             Tt=self.parent.parameters.T_t,
             c00=self.parent.parameters.c0_0,
             c01=self.parent.parameters.c0_1,
@@ -183,6 +190,8 @@ class Piecewise_Quadratic_Specific_Heat(BaseModel):
             c11=self.parent.parameters.c1_1,
             c20=self.parent.parameters.c2_0,
             c21=self.parent.parameters.c2_1,
+            c30=0,
+            c31=0,
             T=self.parent.state.T,
         )
 
@@ -266,9 +275,11 @@ class Linear_Density(BaseModel):
         self.consts = ["r0", "r1"]
 
     def value(self, *args):
-        return functions.Linear_Density(
+        return functions.Cubic_Density(
             r0=self.parent.parameters.r0,
             r1=self.parent.parameters.r1,
+            r2=0,
+            r3=0,
             T=self.parent.state.T,
         )
 
@@ -283,10 +294,11 @@ class Quadratic_Density(BaseModel):
         self.consts = ["r0", "r1", "r2"]
 
     def value(self, *args):
-        return functions.Quadratic_Density(
+        return functions.Cubic_Density(
             r0=self.parent.parameters.r0,
             r1=self.parent.parameters.r1,
             r2=self.parent.parameters.r2,
+            r3=0,
             T=self.parent.state.T,
         )
 
@@ -353,9 +365,11 @@ class Linear_Melt_Temperature(BaseModel):
         self.consts = ["tm0", "tm1"]
 
     def value(self, *args):
-        return functions.Linear_Melt_Temperature(
+        return functions.Cubic_Melt_Temperature(
             tm0=self.parent.parameters.tm0,
             tm1=self.parent.parameters.tm1,
+            tm2=0,
+            tm3=0,
             rho=self.parent.state.rho,
         )
 
@@ -370,10 +384,11 @@ class Quadratic_Melt_Temperature(BaseModel):
         self.consts = ["tm0", "tm1", "tm2"]
 
     def value(self, *args):
-        return functions.Quadratic_Melt_Temperature(
+        return functions.Cubic_Melt_Temperature(
             tm0=self.parent.parameters.tm0,
             tm1=self.parent.parameters.tm1,
             tm2=self.parent.parameters.tm2,
+            tm3=0,
             rho=self.parent.state.rho,
         )
 
@@ -453,9 +468,10 @@ class Linear_Cold_PW_Shear_Modulus(BaseModel):
 
     def value(self, *args):
         mp = self.parent.parameters
-        return functions.Linear_Cold_PW_Shear_Modulus(
+        return functions.Quadratic_Cold_PW_Shear_Modulus(
             g0=mp.g0,
             g1=mp.g1,
+            g2=0,
             alpha=mp.alpha,
             rho=self.parent.state.rho,
             T=self.parent.state.T,
