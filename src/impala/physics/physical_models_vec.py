@@ -90,6 +90,7 @@ class Constant_Specific_Heat(BaseModel):
 class Linear_Specific_Heat(BaseModel):
     """
     Linear Specific Heat Model
+    calls Cubic Specific Heat Model with c2=0=c3 under the hood
     """
 
     def __init__(self, parent):
@@ -109,6 +110,7 @@ class Linear_Specific_Heat(BaseModel):
 class Quadratic_Specific_Heat(BaseModel):
     """
     Quadratic Specific Heat Model
+    calls Cubic Specific Heat Model with c3=0 under the hood
     """
 
     def __init__(self, parent):
@@ -147,8 +149,7 @@ class Cubic_Specific_Heat(BaseModel):
 class Piecewise_Linear_Specific_Heat(BaseModel):
     """
     Piecewise Linear Specific Heat Model
-    Cv (T) = c0_0 + c1_0 * T for T<=T_t
-    Cv (T) = c0_1 + c1_1 * T for T>T_t
+    calls Piecewise_Cubic_Specific_Heat Model with c20=0=c21 and c30=0=c31 under the hood
     """
 
     def __init__(self, parent):
@@ -173,8 +174,7 @@ class Piecewise_Linear_Specific_Heat(BaseModel):
 class Piecewise_Quadratic_Specific_Heat(BaseModel):
     """
     Piecewise Quadratic Specific Heat Model
-    Cv (T) = c0_0 + c1_0 * T + c2_0 * T**2 for T<=T_t
-    Cv (T) = c0_1 + c1_1 * T + c2_1 * T**2 for T>T_t
+    calls Piecewise_Cubic_Specific_Heat Model with c30=0=c31 under the hood
     """
 
     def __init__(self, parent):
@@ -268,6 +268,7 @@ class Constant_Density(BaseModel):
 class Linear_Density(BaseModel):
     """
     Linear Density Model
+    calls Cubic_Density Model with r2=0=r3 under the hood
     """
 
     def __init__(self, parent):
@@ -287,6 +288,7 @@ class Linear_Density(BaseModel):
 class Quadratic_Density(BaseModel):
     """
     Quadratic Density Model
+    calls Cubic_Density Model with r3=0 under the hood
     """
 
     def __init__(self, parent):
@@ -358,6 +360,7 @@ class Constant_Melt_Temperature(BaseModel):
 class Linear_Melt_Temperature(BaseModel):
     """
     Linear Melt Temperature Model
+    calls Cubic_Melt_Temperature Model with tm2=0=tm3 under the hood
     """
 
     def __init__(self, parent):
@@ -377,6 +380,7 @@ class Linear_Melt_Temperature(BaseModel):
 class Quadratic_Melt_Temperature(BaseModel):
     """
     Quadratic Melt Temperature Model
+    calls Cubic_Melt_Temperature Model with tm3=0 under the hood
     """
 
     def __init__(self, parent):
@@ -462,6 +466,10 @@ class Constant_Shear_Modulus(BaseModel):
 
 
 class Linear_Cold_PW_Shear_Modulus(BaseModel):
+    """
+    Pinear Cold PW Shear Modulus
+    calls Quadratic_Cold_PW_Shear_Modulus with g2=0 under the hood
+    """
     def __init__(self, parent):
         BaseModel.__init__(self, parent)
         self.consts = ["g0", "g1", "alpha"]
@@ -480,6 +488,9 @@ class Linear_Cold_PW_Shear_Modulus(BaseModel):
 
 
 class Quadratic_Cold_PW_Shear_Modulus(BaseModel):
+    """
+    Quadratic Cold PW Shear Modulus
+    """
     def __init__(self, parent):
         BaseModel.__init__(self, parent)
         self.consts = ["g0", "g1", "g2", "alpha"]
@@ -498,6 +509,9 @@ class Quadratic_Cold_PW_Shear_Modulus(BaseModel):
 
 
 class Simple_Shear_Modulus(BaseModel):
+    """
+    Simple Shear Modulus
+    """
     def __init__(self, parent):
         BaseModel.__init__(self, parent)
         self.consts = ["G0", "alpha"]
@@ -539,6 +553,9 @@ class BGP_PW_Shear_Modulus(BaseModel):
 
 
 class Stein_Shear_Modulus(BaseModel):
+    """
+    Steinberg-Guinan Shear Modulus assuming constant density and pressure
+    """
     # consts = ['G0', 'sgA', 'sgB']
     # assuming constant density and pressure
     # so we only include the temperature dependence
@@ -575,6 +592,9 @@ class Constant_Yield_Stress(BaseModel):
 
 
 class JC_Yield_Stress(BaseModel):
+    """
+    Johnson-Cook Yield Stress Model
+    """
     def __init__(self, parent):
         BaseModel.__init__(self, parent)
         self.params = ["A", "B", "C", "n", "m"]
@@ -665,6 +685,9 @@ class PTW_Yield_Stress(BaseModel):
 
 
 class Stein_Flow_Stress(BaseModel):
+    """
+    This class implements the Steinberg-Guinan flow stress model
+    """
     def __init__(self, parent):
         BaseModel.__init__(self, parent)
         # self.params = ["y0", "a", "b", "beta", "n", "ymax"] # TODO: general to Steinberg-Guinan  (and Lund) model where params a,b are perhaps? for strain-rate dependence

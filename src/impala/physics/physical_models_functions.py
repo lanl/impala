@@ -253,7 +253,7 @@ def BGP_PW_Shear_Modulus(
 @jit(nopython=True)
 def Stein_Shear_Modulus(G0: float, sgB: float, T: float, Tmelt: float) -> float:
     """
-    Stein Shear Modulus assuming constant density and pressure,
+    Steinberg-Guinan Shear Modulus assuming constant density and pressure,
     so we only include the temperature dependence;
     including aterm = a/eta**(1.0/3.0)*pressure here just for completeness
     and setting aterm = 0;
@@ -297,7 +297,7 @@ def JC_Yield_Stress(
     Tmelt: float,
 ) -> float:
     """
-    Johnson-Cook Yield Stress;
+    Johnson-Cook Yield Stress Model;
     see Johnson, Cook, Engineering Fracture Mechanics, 21(1):31–48, 1985
     https://doi.org/10.1016/0013-7944(85)90052-9
 
