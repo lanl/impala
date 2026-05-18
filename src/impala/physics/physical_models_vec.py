@@ -470,6 +470,7 @@ class Linear_Cold_PW_Shear_Modulus(BaseModel):
     Pinear Cold PW Shear Modulus
     calls Quadratic_Cold_PW_Shear_Modulus with g2=0 under the hood
     """
+
     def __init__(self, parent):
         BaseModel.__init__(self, parent)
         self.consts = ["g0", "g1", "alpha"]
@@ -491,6 +492,7 @@ class Quadratic_Cold_PW_Shear_Modulus(BaseModel):
     """
     Quadratic Cold PW Shear Modulus
     """
+
     def __init__(self, parent):
         BaseModel.__init__(self, parent)
         self.consts = ["g0", "g1", "g2", "alpha"]
@@ -512,6 +514,7 @@ class Simple_Shear_Modulus(BaseModel):
     """
     Simple Shear Modulus
     """
+
     def __init__(self, parent):
         BaseModel.__init__(self, parent)
         self.consts = ["G0", "alpha"]
@@ -556,6 +559,7 @@ class Stein_Shear_Modulus(BaseModel):
     """
     Steinberg-Guinan Shear Modulus assuming constant density and pressure
     """
+
     # consts = ['G0', 'sgA', 'sgB']
     # assuming constant density and pressure
     # so we only include the temperature dependence
@@ -595,6 +599,7 @@ class JC_Yield_Stress(BaseModel):
     """
     Johnson-Cook Yield Stress Model
     """
+
     def __init__(self, parent):
         BaseModel.__init__(self, parent)
         self.params = ["A", "B", "C", "n", "m"]
@@ -688,6 +693,7 @@ class Stein_Flow_Stress(BaseModel):
     """
     This class implements the Steinberg-Guinan flow stress model
     """
+
     def __init__(self, parent):
         BaseModel.__init__(self, parent)
         # self.params = ["y0", "a", "b", "beta", "n", "ymax"] # TODO: general to Steinberg-Guinan  (and Lund) model where params a,b are perhaps? for strain-rate dependence
