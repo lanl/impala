@@ -397,7 +397,14 @@ def Stein_Shear_Modulus(G0: float, sgB: float, T: float, Tmelt: float) -> float:
     Stein Shear Modulus assuming constant density and pressure,
     so we only include the temperature dependence;
     including aterm = a/eta**(1.0/3.0)*pressure here just for completeness
-    and setting aterm = 0
+    and setting aterm = 0;
+    see 
+    see Steinberg, Cochran, and Guinan, J. Appl. Phys. 51 (1980) 1498
+    https://doi.org/10.1063/1.327799
+    and Steinberg, Int. J. Impact Eng. 5 (1987) 603
+    https://doi.org/10.1016/0734-743X(87)90075-3
+    and Steinberg, J. Appl. Phys. 74 (1993) 3827
+    https://doi.org/10.1063/1.355316
 
     T: temperature
     Tmelt: melting temperature
@@ -417,12 +424,6 @@ def Stein_Shear_Modulus(G0: float, sgB: float, T: float, Tmelt: float) -> float:
 
 
 @jit(nopython=True)
-def pos(a):
-    """returns array a with all negative values set to 0"""
-    return np.maximum(0, a)
-
-
-@jit(nopython=True)
 def JC_Yield_Stress(
     edot: float,
     A: float,
@@ -437,7 +438,9 @@ def JC_Yield_Stress(
     Tmelt: float,
 ) -> float:
     """
-    JC Yield Stress
+    Johnson-Cook Yield Stress;
+    see Johnson, Cook, Engineering Fracture Mechanics, 21(1):31–48, 1985
+    https://doi.org/10.1016/0013-7944(85)90052-9
 
     eps: current strain
     T: temperature
@@ -445,7 +448,7 @@ def JC_Yield_Stress(
     edot0, Tref: reference strain rate and temperature
     A, B, C, n, m: model parameters
     """
-    th = pos((T - Tref) / (Tmelt - Tref))
+    th = np.maximum(0, (T - Tref) / (Tmelt - Tref))
 
     Y = (
         (A + B * np.power(eps, n))
@@ -585,7 +588,26 @@ def Stein_Flow_Stress(
     T: float,
     Tmelt: float,
 ) -> float:
-    """this function implements the Stein flow tress model"""
+    """
+    This function implements the Steinberg-Guinan flow stress model
+    (without the thermally activated part of the yield strength).
+    see Steinberg, Cochran, and Guinan, J. Appl. Phys. 51 (1980) 1498
+    https://doi.org/10.1063/1.327799
+    and Steinberg, Int. J. Impact Eng. 5 (1987) 603
+    https://doi.org/10.1016/0734-743X(87)90075-3
+    and Steinberg, Lund, J. Appl. Phys. 65 (1989) 1528
+    https://doi.org/10.1063/1.342968
+    
+    eps: current strain
+    T: temperature
+    Tmelt: melting temperature
+    shear: current shear modulus
+    beta, n: empirical work hardenning model parameters
+    epsi: initial equivalent plastic strain (model parameter)
+    y0: initial flow stress (model parameter)
+    ymax: upper limit of the hardening term (model parameter)
+    G0: reference shear nmodulus at ambient conditions (model parameter)
+    """
     fnow = np.power((1.0 + beta * (epsi + eps)), n)
 
     cond1 = fnow * y0 > ymax
