@@ -33,16 +33,19 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.stats import qmc
 import pandas as pd
 import seaborn as sns  # noqa: F401
 import yaml
+from scipy.stats import qmc
 
 import impala
 import impala.superCal.post_process as pp  # noqa: F401
 from impala import superCal as sc
-from impala.superCal.post_process import total_temperature_swaps
-from impala.superCal.post_process import get_outcome_predictions_impala
+from impala.superCal.post_process import (
+    get_outcome_predictions_impala,
+    total_temperature_swaps,
+)
+
 
 def find_repo_root(start: Path) -> Path:
     """
@@ -1074,10 +1077,10 @@ def make_all_plots(
         s2_inds = setup.s2_ind[0]
         n_exp_main = len(np.unique(s2_inds))
 
-        pred_median_main = np.hstack([
+        pred_median_main = np.hstack(
             pred_median[0][0, np.where(s2_inds == i)[0]]
             for i in range(n_exp_main)
-        ]).reshape(-1)
+        ).reshape(-1)
 
         parent_sse = sum([
             (
@@ -1100,7 +1103,7 @@ def make_all_plots(
         pred_median_main = pred_median_main[:n]
         pred_minsse_main = pred_minsse_main[:n]
 
-        fig, ax = plt.subplots(1, 1, figsize=(16, 6))
+        _fig, ax = plt.subplots(1, 1, figsize=(16, 6))
         ax.plot(
             np.arange(n),
             pred_median_main,
@@ -1276,21 +1279,21 @@ def main():
                 )
         print("using hierarchical mode")
 
-    dat_all, temps, edots, main_files = load_main_stress_strain(
+    dat_all, temps, edots, _main_files = load_main_stress_strain(
         cfg,
         include_qs_shpb=include_qs,
         include_s200f=include_s200f,
     )
 
-    dat_z, temps_z, edots_z, z_files = ([], [], [], [])
+    dat_z, temps_z, edots_z, _z_files = ([], [], [], [])
     if include_z_requested:
-        dat_z, temps_z, edots_z, z_files = load_z(cfg)
+        dat_z, temps_z, edots_z, _z_files = load_z(cfg)
 
     use_z = bool(include_z_requested and len(dat_z) > 0)
 
-    dat_rmi, temps_rmi, edots_rmi, rmi_files = ([], [], [], [])
+    dat_rmi, temps_rmi, edots_rmi, _rmi_files = ([], [], [], [])
     if include_rmi_requested:
-        dat_rmi, temps_rmi, edots_rmi, rmi_files = load_rmi(cfg)
+        dat_rmi, temps_rmi, edots_rmi, _rmi_files = load_rmi(cfg)
 
     use_rmi = bool(include_rmi_requested and len(dat_rmi) > 0)
 
