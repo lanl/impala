@@ -29,6 +29,7 @@ import random
 import sys
 from copy import deepcopy
 from datetime import datetime
+from math import log
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -36,6 +37,9 @@ import numpy as np
 import pandas as pd
 import seaborn as sns  # noqa: F401
 import yaml
+from numpy import interp
+from scipy.interpolate import interp1d
+from scipy.optimize import fmin
 from scipy.stats import qmc
 
 import impala
@@ -44,6 +48,19 @@ from impala import superCal as sc
 from impala.superCal.post_process import (
     get_outcome_predictions_impala,
     total_temperature_swaps,
+)
+
+PLOT_ERRORS = (
+    OSError,
+    ValueError,
+    RuntimeError,
+    KeyError,
+    IndexError,
+    TypeError,
+    AttributeError,
+    pd.errors.EmptyDataError,
+    pd.errors.ParserError,
+    pickle.PickleError,
 )
 
 
@@ -171,12 +188,24 @@ def log_to_gamma(values, base="exp"):
 
 def convert_lgamma_to_gamma_df(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
     out = df.copy()
+
     if "lgamma" in out.columns:
         base = cfg.get("settings", {}).get("gamma_log_base", "exp")
-        out["gamma"] = log_to_gamma(out["lgamma"].to_numpy(), base=base)
-        out = out.drop(columns=["lgamma"])
-    return out
+        gamma_values = log_to_gamma(out["lgamma"].to_numpy(), base=base)
 
+        out = out.drop(columns=["lgamma"])
+
+        if "gamma" in out.columns:
+            out = out.drop(columns=["gamma"])
+
+        if "kappa" in out.columns:
+            gamma_loc = out.columns.get_loc("kappa") + 1
+        else:
+            gamma_loc = len(out.columns)
+
+        out.insert(gamma_loc, "gamma", gamma_values)
+
+    return out
 
 # ----------------------------------------------------------------------
 # Model selection and registration
@@ -250,6 +279,171 @@ def validate_model_constants_and_bounds(cfg, model_cfg):
 # Data loading
 # ----------------------------------------------------------------------
 
+def use_cu_flyer(cfg):
+    return bool(cfg.get("cu_flyer", {}).get("enabled", False))
+
+
+def load_cu_flyer_block(cfg):
+    """
+    Load Cu flyer observation and ONNX emulator, matching the old Cu hierarchical script.
+
+    Returns:
+      model_emu: sc.ModelF_bigdata
+      yobs_flyer: observed flyer velocity values on selected time grid
+      sub_time_grid: selected time points
+    """
+    flyer_cfg = cfg.get("cu_flyer", {})
+    if not flyer_cfg.get("enabled", False):
+        return None, None, None
+
+    data_root = expand_home(cfg["paths"]["path_to_data"])
+
+    obs_file = data_root / flyer_cfg["obs_file"]
+    emulator_file = expand_home(flyer_cfg["emulator_file"])
+
+    if not obs_file.exists():
+        raise FileNotFoundError(f"Missing Cu flyer obs file: {obs_file}")
+    if not emulator_file.exists():
+        raise FileNotFoundError(f"Missing Cu flyer emulator file: {emulator_file}")
+
+    flyer_obs = pd.read_csv(
+        obs_file,
+        sep=r"\s+",
+        engine="python",
+        skiprows=int(flyer_cfg.get("obs_skiprows", 5)),
+        header=None,
+    )
+    flyer_obs = pd.DataFrame(np.asarray(flyer_obs), columns=["Time", "velocity"])
+    flyer_obs = flyer_obs[flyer_obs["Time"] > float(flyer_cfg.get("obs_time_min", 0.83))]
+
+    time_start = float(flyer_cfg.get("time_start", 0.5))
+    time_end = float(flyer_cfg.get("time_end", 1.4))
+    time_step = float(flyer_cfg.get("time_step", (1.4 - 0.7) / 500))
+
+    time_grid = np.arange(time_start, time_end, time_step)
+
+    flyer_obs_interp = pd.DataFrame(
+        np.append(
+            time_grid.reshape(-1, 1),
+            np.exp(
+                interp1d(
+                    flyer_obs["Time"],
+                    np.log(flyer_obs["velocity"] + 1e-9),
+                    kind="linear",
+                    fill_value="extrapolate",
+                )(time_grid)
+            ).reshape(-1, 1),
+            axis=1,
+        ),
+        columns=["Time", "velocity"],
+    )
+    flyer_obs_interp[flyer_obs_interp < 0] = 0
+
+    sub_stride = int(flyer_cfg.get("subsample_stride", 10))
+    sub_tmin = float(flyer_cfg.get("sub_time_min", 0.8))
+    sub_tmax = float(flyer_cfg.get("sub_time_max", 1.1))
+
+    sub_inds0 = np.arange(0, len(time_grid), sub_stride)
+    sub_inds = sub_inds0[(time_grid[sub_inds0] > sub_tmin) & (time_grid[sub_inds0] < sub_tmax)]
+    time_grid2 = time_grid[sub_inds]
+
+    input_names = list(flyer_cfg.get(
+        "input_names",
+        ["theta", "p", "s0", "sInf", "kappa", "lgamma", "y0", "yInf", "y1", "y2"],
+    ))
+
+    try:
+        import onnxruntime as ort
+    except ImportError as e:
+        raise ImportError(
+            "cu_flyer.enabled is true, but onnxruntime is not installed in this environment."
+        ) from e
+
+    nn_onnx = ort.InferenceSession(str(emulator_file), providers=["CPUExecutionProvider"])
+    input_name = nn_onnx.get_inputs()[0].name
+
+    def nn_emu_pooled(parmat):
+        parmat_array = np.vstack(parmat).T
+        res = [
+            nn_onnx.run(
+                None,
+                {
+                    input_name: np.append(
+                        np.repeat(time_grid2[i], parmat_array.shape[0]).reshape(-1, 1),
+                        parmat_array,
+                        axis=1,
+                    ).astype(np.float32)
+                },
+            )[0].flatten()
+            for i in range(len(time_grid2))
+        ]
+        return np.hstack(res)
+
+    model_emu = sc.ModelF_bigdata(nn_emu_pooled, input_names=input_names)
+    yobs_flyer = np.asarray(flyer_obs_interp)[:, 1].flatten()[sub_inds]
+
+    print(f"loaded Cu flyer block with {len(yobs_flyer)} observations")
+    return model_emu, yobs_flyer, time_grid2
+
+def compute_cu_taylor_point():
+    """
+    Reproduce the old Cu Taylor cylinder pseudo-observation.
+
+    Returns:
+      dat_tc: one-row array [[average true strain, stress in Mbar]]
+      temp_tc: 298.15 K
+      edot_tc: computed average strain rate in 1/s
+    """
+    l0 = 39.35
+    vel0 = 214 * 100.0
+    rho = 8.592
+    rhovsq = rho * (vel0 * 1.0e-6) ** 2
+    lfdata = 27.19
+
+    def eps_eq12(x0, *args):
+        rhovsq_local = args[0]
+        sig = args[1]
+        epsguess = x0[0]
+        epsguess = max(epsguess, 0.0)
+        epsguess = min(epsguess, 0.99)
+        lhs = rhovsq_local / 2.0 / sig
+        rhs = -log(1.0 - epsguess) - epsguess
+        return abs(lhs - rhs)
+
+    sigma = 0.001
+    sigs = []
+    lf = []
+    hf = []
+    xf = []
+
+    while sigma <= 0.015:
+        xout = fmin(eps_eq12, [0.5], xtol=1.0e-8, args=(rhovsq, sigma), disp=False)
+        testeps = xout[0]
+
+        x = l0 * (1.0 - testeps)
+        h = -l0 * (1.0 - testeps) * log(1.0 - testeps)
+        ltot = l0 * (1.0 - testeps) * (1.0 - log(1.0 - testeps))
+
+        hf.append(h)
+        xf.append(x)
+        sigs.append(1.0e5 * sigma)
+        lf.append(ltot)
+
+        sigma += 0.0005
+
+    hawkstress = interp(lfdata, lf, sigs)
+    hawkhf = interp(hawkstress, sigs, hf)
+    hawkxf = interp(hawkstress, sigs, xf)
+
+    tdeformation = (2.0 * (l0 - lfdata)) / (10.0 * vel0)
+    avtruestrain = -log(hawkhf / (l0 - hawkxf))
+    hawkstress_mbar = hawkstress / 1e5
+    hawkedot = avtruestrain / tdeformation
+    hawktemp = 298.15
+
+    dat_tc = np.asarray([[avtruestrain, hawkstress_mbar]], dtype=float)
+    return dat_tc, hawktemp, hawkedot
+
 def has_data_group(cfg, group_name):
     files = cfg.get("data_files", {}).get(group_name, [])
     return files is not None and len(files) > 0
@@ -262,14 +456,119 @@ def warn_unsupported_groups(cfg):
         print(f"WARNING: Unsupported data_files group '{g}' found in config. It will be ignored.")
     return unsupported
 
+def get_loading_options(cfg, group_name):
+    """
+    Get per-group data loading options from YAML.
+
+    Defaults preserve existing Be/U6Nb behavior:
+      - whitespace numeric files
+      - no stress conversion
+      - no row dropping
+    """
+    loading_cfg = cfg.get("data_loading", {})
+    default_cfg = loading_cfg.get("default", {})
+    group_cfg = loading_cfg.get(group_name, {})
+
+    opts = {
+        "delimiter": default_cfg.get("delimiter", "whitespace"),
+        "comment": default_cfg.get("comment", "#"),
+        "stress_divisor": default_cfg.get("stress_divisor", 1.0),
+        "drop_first_data_row_files": default_cfg.get("drop_first_data_row_files", []),
+    }
+    opts.update(group_cfg)
+
+    return opts
+
+def read_xy_file(path: Path, delimiter="whitespace", comment="#"):
+    """
+    Read a two-column stress-strain file.
+
+    Handles:
+      - whitespace numeric files
+      - comma-separated numeric files
+      - optional text header rows like "True Strain, True Stress"
+      - comment rows starting with "#"
+    """
+    def clean_numeric_df(df):
+        df = df.iloc[:, :2].copy()
+        df = df.apply(pd.to_numeric, errors="coerce")
+        df = df.dropna(how="any")
+
+        if df.shape[0] == 0:
+            raise ValueError(f"{path} has no numeric two-column data after cleaning")
+
+        return df.to_numpy(dtype=np.float64)
+
+    if delimiter == "whitespace":
+        df = pd.read_csv(
+            path,
+            sep=r"\s+",
+            comment=comment,
+            header=None,
+            engine="python",
+        )
+        arr = clean_numeric_df(df)
+
+    elif delimiter == "comma":
+        df = pd.read_csv(
+            path,
+            sep=",",
+            comment=comment,
+            header=None,
+            engine="python",
+        )
+        arr = clean_numeric_df(df)
+
+    elif delimiter == "auto":
+        try:
+            df = pd.read_csv(
+                path,
+                sep=r"\s+",
+                comment=comment,
+                header=None,
+                engine="python",
+            )
+            arr = clean_numeric_df(df)
+        except (ValueError, pd.errors.EmptyDataError, pd.errors.ParserError):
+            df = pd.read_csv(
+                path,
+                sep=",",
+                comment=comment,
+                header=None,
+                engine="python",
+            )
+            arr = clean_numeric_df(df)
+
+    else:
+        raise ValueError(
+            f"Unsupported delimiter={delimiter}. "
+            "Allowed values are: whitespace, comma, auto"
+        )
+
+    if arr.ndim == 1:
+        arr = arr.reshape(1, -1)
+
+    if arr.shape[1] < 2:
+        raise ValueError(f"{path} must have at least two columns, got shape {arr.shape}")
+
+    return arr[:, :2]
 
 def load_curve_group(cfg, group_name, temps_key, edots_key, stress_divisor=None):
     """
     Load one stress-strain style group.
 
-    stress_divisor:
-      None -> do not change stress
-      1e5 -> divide stress column by 1e5, matching legacy Z/RMI behavior
+    YAML can control delimiter and stress conversion with:
+
+      data_loading:
+        QS_SHPB:
+          delimiter: auto
+          comment: "#"
+          stress_divisor: 1.0e5
+          drop_first_data_row_files:
+            - "Cu-annealed/Nemat-Nasser/Nemat-Nasser_0.1_296_MPa"
+
+    The function argument stress_divisor still overrides YAML.
+    This preserves the existing hard-coded Z/RMI conversion behavior.
     """
 
     PDATA = expand_home(cfg["paths"]["path_to_data"])
@@ -287,16 +586,32 @@ def load_curve_group(cfg, group_name, temps_key, edots_key, stress_divisor=None)
             f"files={len(files)}, {temps_key}={len(temps)}, {edots_key}={len(edots)}"
         )
 
+    opts = get_loading_options(cfg, group_name)
+
+    delimiter = opts["delimiter"]
+    comment = opts["comment"]
+
+    if stress_divisor is None:
+        divisor = float(opts.get("stress_divisor", 1.0))
+    else:
+        divisor = float(stress_divisor)
+
+    drop_first_files = set(opts.get("drop_first_data_row_files", []))
+
     dat = []
     for f in files:
-        arr = np.loadtxt(PDATA / f, dtype=np.float64)
-        if stress_divisor is not None:
+        arr = read_xy_file(PDATA / f, delimiter=delimiter, comment=comment)
+
+        if f in drop_first_files:
+            arr = arr[1:, :]
+
+        if divisor != 1.0:
             arr = arr.copy()
-            arr[:, 1] /= stress_divisor
+            arr[:, 1] /= divisor
+
         dat.append(arr)
 
     return dat, temps, edots, list(files)
-
 
 def load_main_stress_strain(cfg, include_qs_shpb=True, include_s200f=True):
     dat_all = []
@@ -445,8 +760,18 @@ def build_z_models(cfg, dat_z, temps_z, edots_z, pooled: bool):
 
     return models_z, z_stress
 
-
-def build_setup(cfg, model, dat_all, inds, include_z, models_z, z_stress, pooled: bool):
+def build_setup(
+    cfg,
+    model,
+    dat_all,
+    inds,
+    include_z,
+    models_z,
+    z_stress,
+    pooled: bool,
+    flyer_model=None,
+    flyer_yobs=None,
+):
     bounds = cfg["bounds_ptw"]
     setup = sc.CalibSetup(bounds, sc.constraints_ptw)
 
@@ -500,6 +825,20 @@ def build_setup(cfg, model, dat_all, inds, include_z, models_z, z_stress, pooled
                 s2_ind=np.zeros(n_obs_z, dtype=int),
                 theta_ind=np.zeros(n_obs_z, dtype=int),
             )
+
+    if flyer_model is not None and flyer_yobs is not None:
+        flyer_cfg = cfg.get("cu_flyer", {})
+        yobs_flyer = np.asarray(flyer_yobs, dtype=np.float64)
+        n_obs_flyer = yobs_flyer.shape[0]
+
+        setup.addVecExperiments(
+            yobs=yobs_flyer,
+            model=flyer_model,
+            sd_est=np.array([float(flyer_cfg.get("sd_est", 10.0))], dtype=np.float64),
+            s2_df=np.array([int(flyer_cfg.get("s2_df", 50))], dtype=int),
+            s2_ind=np.zeros(n_obs_flyer, dtype=int),
+            theta_ind=np.zeros(n_obs_flyer, dtype=int),
+        )
 
     temp_cfg = cfg["settings"]["tempering"]
     setup.setTemperatureLadder(
@@ -654,6 +993,17 @@ def save_draws_hier(setup, out, results_dir: Path, cfg: dict, include_z: bool, m
     )
 
     parent = pd.DataFrame(parent_raw, columns=setup.bounds.keys())
+
+    parent_native_all = scale_draws_to_native(
+        parent[list(setup.bounds.keys())].to_numpy(),
+        setup,
+    )
+    parent_preds_all = get_outcome_predictions_impala(
+        setup,
+        theta_input=parent_native_all,
+    )["outcome_draws"]
+    parent["sse"] = sse_by_draw(parent_preds_all, setup)
+
     parent.to_csv(results_dir / "parent_draws.csv", index=False)
 
     nexp_main = setup.ns2[0]
@@ -674,11 +1024,24 @@ def save_draws_hier(setup, out, results_dir: Path, cfg: dict, include_z: bool, m
 
             block_idx += 1
 
+    if cfg.get("cu_flyer", {}).get("enabled", False):
+        flyer_block_idx = 1 + (models_z_cnt if include_z else 0)
+
+        if flyer_block_idx < len(out.theta):
+            theta_exp_flyer = [
+                out.theta[flyer_block_idx][:, 0, j, :]
+                for j in range(out.theta[flyer_block_idx].shape[2])
+            ]
+
+            with open(results_dir / "thetai_draws_flyer.pkl", "wb") as f:
+                pickle.dump(theta_exp_flyer, f, pickle.HIGHEST_PROTOCOL)
+
     n_draws = parent.shape[0]
     start = min(20000, max(0, n_draws // 2))
     uu = np.arange(start, n_draws, 10, dtype=int)
 
-    native_arr = scale_draws_to_native(parent.to_numpy()[uu, :], setup)
+    theta_cols = list(setup.bounds.keys())
+    native_arr = scale_draws_to_native(parent[theta_cols].to_numpy()[uu, :], setup)
     native = pd.DataFrame(native_arr, columns=setup.bounds.keys())
     native = convert_lgamma_to_gamma_df(native, cfg)
     native.to_csv(results_dir / "theta_draws_native.csv", index=False)
@@ -778,7 +1141,7 @@ def make_all_plots(
     include_z: bool,
     include_rmi: bool,
     dat_rmi=None,
-    pooled_overlay_dir: Path = None,
+    pooled_overlay_dir: Path | None = None,
 ):
     ensure_dir(plots_dir)
 
@@ -788,7 +1151,7 @@ def make_all_plots(
     if include_rmi and dat_rmi and len(dat_rmi) > 0:
         try:
             plt.close("all")
-            fig, ax = plt.subplots(1, 1, figsize=(6, 4))
+            _fig, ax = plt.subplots(1, 1, figsize=(6, 4))
 
             for j, arr in enumerate(dat_rmi):
                 ax.plot(
@@ -806,7 +1169,7 @@ def make_all_plots(
             plt.savefig(plots_dir / "observed_data_rmi.png", dpi=200)
             plt.close("all")
 
-        except Exception as e:
+        except PLOT_ERRORS as e:
             print(f"[WARN] Could not create observed_data_rmi.png: {e}")
 
     # -----------------------
@@ -819,7 +1182,7 @@ def make_all_plots(
         plt.savefig(plots_dir / "tempering.png", dpi=200)
         plt.close("all")
 
-    except Exception as e:
+    except PLOT_ERRORS as e:
         print(f"[WARN] Could not create tempering.png: {e}")
 
     # -----------------------
@@ -833,7 +1196,8 @@ def make_all_plots(
             start = min(20000, max(0, n_draws // 2))
             uu = np.arange(start, n_draws, 10, dtype=int)
 
-            parent_native = scale_draws_to_native(df_parent.to_numpy()[uu, :], setup)
+            theta_cols = list(setup.bounds.keys())
+            parent_native = scale_draws_to_native(df_parent[theta_cols].to_numpy()[uu, :], setup)
 
             PARENT_Y = get_outcome_predictions_impala(
                 setup,
@@ -861,7 +1225,7 @@ def make_all_plots(
                     )["outcome_draws"]
                     print(f"loaded pooled overlay from {pooled_overlay_dir}")
 
-                except Exception as e:
+                except PLOT_ERRORS as e:
                     print(f"[WARN] Could not load pooled overlay from {pooled_overlay_dir}: {e}")
 
             with open(results_dir / "thetai_draws.pkl", "rb") as f:
@@ -885,7 +1249,7 @@ def make_all_plots(
 
             for exp_ind in range(n_exp_main):
                 plt.close("all")
-                fig, ax = plt.subplots(1, 1, figsize=(6, 4))
+                _fig, ax = plt.subplots(1, 1, figsize=(6, 4))
 
                 mask = np.where(s2_inds == exp_ind)[0]
                 x = setup.models[0].meas_strain_histories[exp_ind]
@@ -991,7 +1355,7 @@ def make_all_plots(
                     exp_temp_z = setup.models[block].temps[0]
 
                     plt.close("all")
-                    fig, ax = plt.subplots(1, 1, figsize=(6, 4))
+                    _fig, ax = plt.subplots(1, 1, figsize=(6, 4))
 
                     NUDGE = 1e-3
                     xx = np.array([x0 - NUDGE, x0, x0 + NUDGE])
@@ -1035,7 +1399,7 @@ def make_all_plots(
 
                     z_idx += 1
 
-        except Exception as e:
+        except PLOT_ERRORS as e:
             print(f"[WARN] Could not create experiment-level plots: {e}")
 
     # -----------------------
@@ -1062,7 +1426,8 @@ def make_all_plots(
         start = min(start_target, max(0, n_draws // 2))
         uu = np.arange(start, n_draws, 10, dtype=int)
 
-        native = scale_draws_to_native(df_draws.to_numpy()[uu, :], setup)
+        theta_cols = list(setup.bounds.keys())
+        native = scale_draws_to_native(df_draws[theta_cols].to_numpy()[uu, :], setup)
 
         pred_median = get_outcome_predictions_impala(
             setup,
@@ -1077,12 +1442,12 @@ def make_all_plots(
         s2_inds = setup.s2_ind[0]
         n_exp_main = len(np.unique(s2_inds))
 
-        pred_median_main = np.hstack(
+        pred_median_main = np.hstack([
             pred_median[0][0, np.where(s2_inds == i)[0]]
             for i in range(n_exp_main)
-        ).reshape(-1)
+        ]).reshape(-1)
 
-        parent_sse = sum([
+        parent_sse = sum(
             (
                 (
                     THETA_Y[0][:, np.where(s2_inds == i)[0]]
@@ -1090,7 +1455,7 @@ def make_all_plots(
                 ) ** 2
             ).mean(axis=1)
             for i in range(n_exp_main)
-        ])
+        )
 
         best_idx = int(np.argmin(parent_sse))
 
@@ -1135,7 +1500,7 @@ def make_all_plots(
         plt.savefig(plots_dir / "best_all.png", dpi=200)
         plt.close("all")
 
-    except Exception as e:
+    except PLOT_ERRORS as e:
         print(f"[WARN] Could not create best_all.png: {e}")
 
     # -----------------------
@@ -1147,13 +1512,14 @@ def make_all_plots(
         if pooled:
             df_trace = pd.read_csv(results_dir / "theta_draws.csv")
         else:
-            df_trace = pd.read_csv(results_dir / "parent_draws.csv")
+            theta_cols = list(setup.bounds.keys())
+            df_trace = pd.read_csv(results_dir / "parent_draws.csv")[theta_cols]
 
         parameter_trace_plot_labeled(df_trace)
         plt.savefig(plots_dir / "trace.png", dpi=200)
         plt.close("all")
 
-    except Exception as e:
+    except PLOT_ERRORS as e:
         print(f"[WARN] Could not create trace.png: {e}")
 
 # ----------------------------------------------------------------------
@@ -1175,8 +1541,13 @@ def effective_groups_from_flags(cfg, include_qs, include_s200f, include_z, inclu
     if include_rmi:
         groups.append("rmi")
 
-    return groups
+    if cfg.get("cu_taylor_cylinder", {}).get("enabled", False):
+        groups.append("taylor")
 
+    if cfg.get("cu_flyer", {}).get("enabled", False):
+        groups.append("flyer")
+
+    return groups
 
 def build_run_paths(cfg, mode: str, effective_groups):
     root = expand_home(cfg["paths"]["path_to_dir"])
@@ -1245,9 +1616,18 @@ def main():
     seeds(args.seed)
 
     pooled = args.mode == "pooled"
-
+        
     with open(args.config, "r", encoding="utf-8") as fh:
         cfg = yaml.safe_load(fh)
+
+    if pooled:
+        if cfg.get("cu_taylor_cylinder", {}).get("enabled", False):
+            cfg["cu_taylor_cylinder"]["enabled"] = False
+            print("pooled mode: disabled cu_taylor_cylinder")
+
+        if cfg.get("cu_flyer", {}).get("enabled", False):
+            cfg["cu_flyer"]["enabled"] = False
+            print("pooled mode: disabled cu_flyer")
 
     unsupported_groups = warn_unsupported_groups(cfg)
 
@@ -1279,11 +1659,27 @@ def main():
                 )
         print("using hierarchical mode")
 
-    dat_all, temps, edots, _main_files = load_main_stress_strain(
+    dat_all, temps, edots, main_files = load_main_stress_strain(
         cfg,
         include_qs_shpb=include_qs,
         include_s200f=include_s200f,
     )
+
+    print("\nLoaded main stress-strain files:")
+    for i, arr in enumerate(dat_all):
+        fname = main_files[i] if i < len(main_files) else "synthetic/non-file"
+        print(
+            f"{i:02d}",
+            fname,
+            "stress min/max:",
+            f"{np.nanmin(arr[:, 1]):.6g}",
+            f"{np.nanmax(arr[:, 1]):.6g}",
+            "temp:",
+            temps[i],
+            "edot:",
+            edots[i],
+        )
+    print()
 
     dat_z, temps_z, edots_z, _z_files = ([], [], [], [])
     if include_z_requested:
@@ -1309,6 +1705,13 @@ def main():
 
         print(f"appended RMI to main block with replicate={k}")
 
+    if cfg.get("cu_taylor_cylinder", {}).get("enabled", False):
+        dat_tc, temp_tc, edot_tc = compute_cu_taylor_point()
+        dat_all.append(dat_tc)
+        temps.append(temp_tc)
+        edots.append(edot_tc)
+        print(f"appended Cu Taylor cylinder pseudo-experiment: strain={dat_tc[0,0]:.6g}, stress={dat_tc[0,1]:.6g}, edot={edot_tc:.6g}, temp={temp_tc}")
+    print(f"main stress-strain/PTW block has {len(dat_all)} experiments")
     if len(dat_all) == 0:
         raise ValueError(
             "No main-block experiments selected. "
@@ -1324,18 +1727,6 @@ def main():
     )
 
     run_dir, results_dir, plots_dir = build_run_paths(cfg, args.mode, effective_groups)
-    ensure_dir(run_dir)
-    ensure_dir(results_dir)
-    ensure_dir(plots_dir)
-
-    write_run_files(
-        run_dir,
-        cfg,
-        args,
-        model_cfg=model_cfg,
-        included_groups=effective_groups,
-        unsupported_groups=unsupported_groups,
-    )
 
     model_main, inds = build_main_model(
         cfg,
@@ -1350,6 +1741,10 @@ def main():
     if use_z:
         models_z, z_stress = build_z_models(cfg, dat_z, temps_z, edots_z, pooled=pooled)
 
+    flyer_model, flyer_yobs, _flyer_time_grid = (None, None, None)
+    if use_cu_flyer(cfg):
+        flyer_model, flyer_yobs, _flyer_time_grid = load_cu_flyer_block(cfg)
+
     setup = build_setup(
         cfg,
         model_main,
@@ -1359,9 +1754,24 @@ def main():
         models_z=models_z,
         z_stress=z_stress,
         pooled=pooled,
+        flyer_model=flyer_model,
+        flyer_yobs=flyer_yobs,
     )
 
     out = run_calibration(setup, pooled=pooled)
+
+    ensure_dir(run_dir)
+    ensure_dir(results_dir)
+    ensure_dir(plots_dir)
+
+    write_run_files(
+        run_dir,
+        cfg,
+        args,
+        model_cfg=model_cfg,
+        included_groups=effective_groups,
+        unsupported_groups=unsupported_groups,
+    )
 
     if pooled:
         save_draws_pooled(setup, out, results_dir, cfg)
