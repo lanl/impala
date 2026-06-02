@@ -1,6 +1,6 @@
 paths:
-  path_to_dir: /vast/home/amost/impala_runs/Cu
-  path_to_data: /vast/home/amost/impala_runs/Cu/data/Cu
+  path_to_dir: HOME/impala_runs/Cu
+  path_to_data: HOME/impala_runs/Cu/data/Cu
 
 models:
   flow_stress_model: PTW_Yield_Stress

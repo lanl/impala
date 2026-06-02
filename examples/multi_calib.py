@@ -19,6 +19,7 @@ Behavior:
 - If --pooled-overlay-dir is supplied in hierarchical mode, overlays the pooled
   best-SSE curve on each experiment_*.png plot.
 - Use --seed to set random seed for both numpy and random. eg. --seed 42 will set np.random.seed(42) and random.seed(42).
+- Registers Cu_BGP_PW_Shear_Modulus, a legacy Cu BGP/PW shear variant with a 0.001 lower floor.
 """
 
 import argparse
@@ -35,7 +36,6 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns  # noqa: F401
 import yaml
 from numpy import interp
 from scipy.interpolate import interp1d
@@ -43,7 +43,6 @@ from scipy.optimize import fmin
 from scipy.stats import qmc
 
 import impala
-import impala.superCal.post_process as pp  # noqa: F401
 from impala import superCal as sc
 from impala.superCal.post_process import (
     get_outcome_predictions_impala,
@@ -66,7 +65,7 @@ PLOT_ERRORS = (
 
 def find_repo_root(start: Path) -> Path:
     """
-    Walk upward until we find the ptw-bp repo root.
+    Walk upward until we find the repo root.
     Expected repo-root markers:
       - impala/
       - Helper_Functions/
@@ -89,6 +88,54 @@ sys.path.insert(0, str(ROOT))
 PHYS = ROOT / "impala" / "physics"
 sys.path.insert(0, str(PHYS))
 
+
+def register_cu_bgp_shear_floor() -> None:
+    """
+    Register the Cu-specific BGP/PW shear model used by the old Cu scripts.
+
+    Difference from the generic BGP_PW_Shear_Modulus:
+    negative shear values are floored at 0.001 instead of 0.0.
+    """
+
+    class Cu_BGP_PW_Shear_Modulus(impala.physics.BaseModel):
+        """
+        BGP/PW shear modulus variant used by the legacy Cu examples.
+
+        The generic BGP_PW_Shear_Modulus floors negative shear values to 0.0.
+        The legacy Cu scripts used 0.001, which helps keep the Cu calibration
+        from getting stuck when proposed parameter values produce invalid shear values.
+        """
+
+        def __init__(self, parent):
+            impala.physics.BaseModel.__init__(self, parent)
+            self.consts = ["G0", "rho_0", "gamma_1", "gamma_2", "q2", "alpha"]
+
+        def value(self, *args):
+            mp = self.parent.parameters
+            rho = self.parent.state.rho
+            temp = self.parent.state.T
+            tmelt = self.parent.state.Tmelt
+
+            cold_shear = mp.G0 * np.exp(
+                6.0
+                * mp.gamma_1
+                * (np.power(mp.rho_0, -1.0 / 3.0) - np.power(rho, -1.0 / 3.0))
+                + 2.0
+                * mp.gamma_2
+                / mp.q2
+                * (np.power(mp.rho_0, -mp.q2) - np.power(rho, -mp.q2))
+            )
+
+            gnow = cold_shear * (1.0 - mp.alpha * (temp / tmelt))
+            gnow[temp > tmelt] = (cold_shear * (1.0 - mp.alpha))[temp > tmelt]
+            gnow[np.where(gnow < 0)] = 0.001
+
+            return gnow
+
+    impala.physics.Cu_BGP_PW_Shear_Modulus = Cu_BGP_PW_Shear_Modulus
+
+
+register_cu_bgp_shear_floor()
 
 np.seterr(under="ignore", over="ignore", divide="ignore", invalid="ignore")
 
@@ -118,6 +165,7 @@ MODEL_KINDS = {
         "Quadratic_Cold_PW_Shear_Modulus",
         "Simple_Shear_Modulus",
         "BGP_PW_Shear_Modulus",
+        "Cu_BGP_PW_Shear_Modulus",
         "Stein_Shear_Modulus",
     ],
     "specific_heat_model": [
@@ -228,7 +276,7 @@ def get_model_choices(cfg):
 
         if not hasattr(impala.physics, name):
             raise AttributeError(
-                f"{name} is listed for {key}, but it does not exist in physical_models_vec.py"
+                f"{name} is listed for {key}, but it is not registered on impala.physics"
             )
 
     return model_cfg
@@ -815,6 +863,21 @@ def build_z_models(cfg, dat_z, temps_z, edots_z, pooled: bool):
     return models_z, z_stress
 
 
+def constraints_ptw_basic(x, bounds, consts=None, *args):
+    good = (
+        (x["sInf"] < x["s0"])
+        * (x["yInf"] < x["y0"])
+        * (x["y0"] < x["s0"])
+        * (x["yInf"] < x["sInf"])
+        * (x["s0"] < x["y1"])
+    )
+
+    for k in bounds:
+        good = good * (x[k] < bounds[k][1]) * (x[k] > bounds[k][0])
+
+    return good
+
+
 def build_setup(
     cfg,
     model,
@@ -828,7 +891,16 @@ def build_setup(
     flyer_yobs=None,
 ):
     bounds = cfg["bounds_ptw"]
-    setup = sc.CalibSetup(bounds, sc.constraints_ptw)
+    constraint_name = cfg.get("settings", {}).get("constraint_function", "ptw")
+    if constraint_name == "basic":
+        setup = sc.CalibSetup(bounds, constraints_ptw_basic)
+    elif constraint_name == "ptw":
+        setup = sc.CalibSetup(bounds, sc.constraints_ptw)
+    else:
+        raise ValueError(
+            f"Unsupported settings.constraint_function={constraint_name}. "
+            "Allowed values are: basic, ptw"
+        )
 
     yobs_main = np.hstack([
         np.asarray(dat_all[j])[inds[j], 1] for j in range(len(dat_all))
@@ -854,7 +926,8 @@ def build_setup(
             dtype=np.float64,
         )
 
-    s2_df_main = np.array([50] * len(dat_all), dtype=int)
+    s2_df_main_default = int(cfg["settings"]["sd_est"].get("main_s2_df", 50))
+    s2_df_main = np.array([s2_df_main_default] * len(dat_all), dtype=int)
 
     setup.addVecExperiments(
         yobs=yobs_main,
@@ -907,17 +980,21 @@ def build_setup(
     )
 
     mcmc = cfg["settings"]["mcmc"]
-    tau = float(mcmc.get("start_tau_theta", -4.0))
 
-    setup.setMCMC(
-        nmcmc=mcmc["nmcmc"],
-        nburn=mcmc["nburn"],
-        thin=mcmc["thin"],
-        decor=mcmc["decor"],
-        start_tau_theta=tau,
-    )
+    mcmc_kwargs = {
+        "nmcmc": mcmc["nmcmc"],
+        "nburn": mcmc["nburn"],
+        "thin": mcmc["thin"],
+        "decor": mcmc["decor"],
+    }
 
-    if not hasattr(setup, "start_tau_theta"):
+    if "start_tau_theta" in mcmc:
+        tau = float(mcmc["start_tau_theta"])
+        mcmc_kwargs["start_tau_theta"] = tau
+
+    setup.setMCMC(**mcmc_kwargs)
+
+    if "start_tau_theta" in mcmc and not hasattr(setup, "start_tau_theta"):
         setup.start_tau_theta = tau
 
     if not pooled:
@@ -1729,15 +1806,6 @@ def main():
 
     with open(args.config, "r", encoding="utf-8") as fh:
         cfg = yaml.safe_load(fh)
-
-    if pooled:
-        if cfg.get("cu_taylor_cylinder", {}).get("enabled", False):
-            cfg["cu_taylor_cylinder"]["enabled"] = False
-            print("pooled mode: disabled cu_taylor_cylinder")
-
-        if cfg.get("cu_flyer", {}).get("enabled", False):
-            cfg["cu_flyer"]["enabled"] = False
-            print("pooled mode: disabled cu_flyer")
 
     unsupported_groups = warn_unsupported_groups(cfg)
 
