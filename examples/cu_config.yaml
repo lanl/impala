@@ -1,7 +1,15 @@
+# Paths may be absolute, use HOME as a shortcut for the user's home directory,
+# or be relative to the directory where this script is run.
 paths:
+  # Output directory for calibration results, plots, and run metadata.
   path_to_dir: HOME/impala_runs/Cu
+
+  # Directory containing the Cu input data files referenced below.
+  # Replace this with your local data directory before running.
   path_to_data: HOME/impala_runs/Cu/data/Cu
 
+# Material submodels used for the main stress-strain PTW block.
+# These names must match classes registered on impala.physics.
 models:
   flow_stress_model: PTW_Yield_Stress
   melt_model: Linear_Melt_Temperature
@@ -11,11 +19,17 @@ models:
 
 data_loading:
   default:
+    # File parsing defaults:
+    # delimiter: auto lets pandas try whitespace first, then comma-separated data.
+    # comment: "#" ignores header/comment lines that start with #.
+    # stress_divisor: 1.0 leaves stress values unchanged.
     delimiter: auto
     comment: "#"
     stress_divisor: 1.0
 
   QS_SHPB:
+    # Cu QS/SHPB files report stress in different source units.
+    # stress_divisor: 1.0e5 converts stress values to Mbar for the calibration.
     delimiter: auto
     comment: "#"
     stress_divisor: 1.0e5

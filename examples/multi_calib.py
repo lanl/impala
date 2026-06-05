@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-### Author: Alex Most
 """
 Unified PTW calibration script.
+
+Author: Alex Most
 
 Behavior:
 - Select calibration mode with --mode pooled or --mode hier
@@ -83,10 +84,14 @@ def find_repo_root(start: Path) -> Path:
 
 
 ROOT = find_repo_root(Path(__file__).parent)
-sys.path.insert(0, str(ROOT))
-
+SRC = ROOT / "src"
 PHYS = ROOT / "impala" / "physics"
+
+# Prefer the local repo checkout over any installed impala package.
+# SRC is needed because post_process.py lives under src/impala/superCal.
 sys.path.insert(0, str(PHYS))
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(SRC))
 
 
 def register_cu_bgp_shear_floor() -> None:
@@ -262,6 +267,8 @@ def convert_lgamma_to_gamma_df(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
 # ----------------------------------------------------------------------
 
 
+# Validate YAML-selected material submodels before constructing calibration
+# objects so missing parameters or unsupported model names fail early.
 def get_model_choices(cfg):
     model_cfg = dict(DEFAULT_MODELS)
     model_cfg.update(cfg.get("models", {}))
@@ -341,7 +348,11 @@ def use_cu_flyer(cfg):
 
 def load_cu_flyer_block(cfg):
     """
-    Load Cu flyer observation and ONNX emulator, matching the old Cu hierarchical script.
+    Load optional Cu flyer observation data and ONNX emulator.
+
+    This reproduces the old Cu hierarchical-script flyer block and wraps the
+    emulator as another vector experiment. It is only used when
+    cu_flyer.enabled is true in the YAML config.
 
     Returns:
       model_emu: sc.ModelF_bigdata
@@ -448,15 +459,13 @@ def load_cu_flyer_block(cfg):
                 None,
                 {
                     input_name: np.append(
-                        np.repeat(time_grid2[i], parmat_array.shape[0]).reshape(
-                            -1, 1
-                        ),
+                        np.repeat(time_i, parmat_array.shape[0]).reshape(-1, 1),
                         parmat_array,
                         axis=1,
                     ).astype(np.float32)
                 },
             )[0].flatten()
-            for i in range(len(time_grid2))
+            for time_i in time_grid2
         ]
         return np.hstack(res)
 
@@ -650,6 +659,8 @@ def read_xy_file(path: Path, delimiter="whitespace", comment="#"):
     return arr[:, :2]
 
 
+# Shared loader for stress-strain style data groups. Per-group YAML options
+# control delimiter handling, comments, stress scaling, and row dropping.
 def load_curve_group(
     cfg, group_name, temps_key, edots_key, stress_divisor=None
 ):
@@ -782,7 +793,7 @@ def build_main_model(cfg, dat_all, temps, edots, pooled: bool, model_cfg):
         edots=np.array(edots, dtype=float) * 1e-6,
         consts=cfg["consts_ptw"],
         strain_histories=[
-            strain_hist_list[j][inds[j]] for j in range(len(dat_all))
+            strain_hist_list[j][inds[j]] for j, _ in enumerate(dat_all)
         ],
         flow_stress_model=model_cfg["flow_stress_model"],
         melt_model=model_cfg["melt_model"],
@@ -797,6 +808,12 @@ def build_main_model(cfg, dat_all, temps, edots, pooled: bool, model_cfg):
 
 
 def build_z_models(cfg, dat_z, temps_z, edots_z, pooled: bool):
+    """
+    Build separate Z-machine vector experiment models.
+
+    Z shots are modeled separately because they use density-specific constants
+    rather than the main stress-strain constants.
+    """
     if not dat_z:
         return [], []
 
@@ -840,7 +857,7 @@ def build_z_models(cfg, dat_z, temps_z, edots_z, pooled: bool):
             "tm2": c.get("tm2", 0.0),
             "tm3": c.get("tm3", 0.0),
         }
-        for j in range(len(dat_all_z))
+        for j, _ in enumerate(dat_all_z)
     ]
 
     models_z = [
@@ -857,7 +874,7 @@ def build_z_models(cfg, dat_z, temps_z, edots_z, pooled: bool):
             pool=pooled,
             s2="gibbs",
         )
-        for j in range(len(dat_all_z))
+        for j, _ in enumerate(dat_all_z)
     ]
 
     return models_z, z_stress
@@ -890,6 +907,12 @@ def build_setup(
     flyer_model=None,
     flyer_yobs=None,
 ):
+    """
+    Assemble the IMPALA calibration setup.
+
+    Adds the main stress-strain block, optional Z-machine blocks, and optional
+    Cu flyer emulator block.
+    """
     bounds = cfg["bounds_ptw"]
     constraint_name = cfg.get("settings", {}).get("constraint_function", "ptw")
     if constraint_name == "basic":
@@ -903,12 +926,12 @@ def build_setup(
         )
 
     yobs_main = np.hstack([
-        np.asarray(dat_all[j])[inds[j], 1] for j in range(len(dat_all))
+        np.asarray(dat_all_j)[inds[j], 1] for j, dat_all_j in enumerate(dat_all)
     ]).astype(np.float64)
 
     s2_ind_main = np.hstack([
-        [j] * len(np.asarray(dat_all[j])[inds[j], 1])
-        for j in range(len(dat_all))
+        [j] * len(np.asarray(dat_all_j)[inds[j], 1])
+        for j, dat_all_j in enumerate(dat_all)
     ]).astype(int)
 
     theta_ind_main = s2_ind_main
@@ -1065,6 +1088,12 @@ def mape_one_theta(preds, setup):
 
 
 def save_best_from_native_draws(native_draws, setup, cfg, results_dir: Path):
+    """
+    Save representative posterior parameter sets.
+
+    Writes both the posterior median and the draw with the lowest posterior
+    predictive SSE across all experiment blocks.
+    """
     preds = get_outcome_predictions_impala(setup, theta_input=native_draws)[
         "outcome_draws"
     ]
@@ -1364,8 +1393,8 @@ def make_all_plots(
             )["outcome_draws"]
 
             QUANTS_PARENT_Y = [
-                np.quantile(PARENT_Y[j], [0.025, 0.5, 0.975], axis=0)
-                for j in range(len(PARENT_Y))
+                np.quantile(parent_y_j, [0.025, 0.5, 0.975], axis=0)
+                for parent_y_j in PARENT_Y
             ]
 
             # Optional pooled overlay.
@@ -1396,15 +1425,15 @@ def make_all_plots(
                 get_outcome_predictions_impala(
                     setup,
                     theta_input=scale_draws_to_native(
-                        theta_exp_list[j][uu, :], setup
+                        theta_exp_j[uu, :], setup
                     ),
                 )["outcome_draws"]
-                for j in range(len(theta_exp_list))
+                for theta_exp_j in theta_exp_list
             ]
 
             QUANTS_THETAi_Y = [
-                np.quantile(THETAi_Y[j][0], [0.025, 0.5, 0.975], axis=0)
-                for j in range(len(THETAi_Y))
+                np.quantile(theta_y_j[0], [0.025, 0.5, 0.975], axis=0)
+                for theta_y_j in THETAi_Y
             ]
 
             n_exp_main = len(np.unique(setup.s2_ind[0]))
@@ -1518,6 +1547,7 @@ def make_all_plots(
                     x0 = setup.models[block].meas_strain_histories[0][0]
                     y0 = setup.ys[block][0]
 
+                    # Convert internal 1/us strain rate back to YAML/input 1/s for the plot title.
                     exp_edot_z = setup.models[block].edots[0] * 1e6
                     exp_temp_z = setup.models[block].temps[0]
 
