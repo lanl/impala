@@ -257,7 +257,6 @@ def Stein_Shear_Modulus(G0: float, sgB: float, T: float, Tmelt: float) -> float:
     so we only include the temperature dependence;
     including aterm = a/eta**(1.0/3.0)*pressure here just for completeness
     and setting aterm = 0;
-    see
     see Steinberg, Cochran, and Guinan, J. Appl. Phys. 51 (1980) 1498
     https://doi.org/10.1063/1.327799
     and Steinberg, Int. J. Impact Eng. 5 (1987) 603
