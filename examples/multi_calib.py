@@ -28,7 +28,6 @@ import json
 import os
 import pickle
 import random
-import sys
 from copy import deepcopy
 from datetime import datetime
 from math import log
@@ -62,36 +61,6 @@ PLOT_ERRORS = (
     pd.errors.ParserError,
     pickle.PickleError,
 )
-
-
-def find_repo_root(start: Path) -> Path:
-    """
-    Walk upward until we find the repo root.
-    Expected repo-root markers:
-      - impala/
-      - Helper_Functions/
-    """
-    start = start.resolve()
-
-    for p in [start] + list(start.parents):
-        if (p / "impala").is_dir() and (p / "Helper_Functions").is_dir():
-            return p
-
-    raise RuntimeError(
-        f"Could not find repo root above {start}. "
-        "Expected directories named 'impala' and 'Helper_Functions'."
-    )
-
-
-ROOT = find_repo_root(Path(__file__).parent)
-SRC = ROOT / "src"
-PHYS = ROOT / "impala" / "physics"
-
-# Prefer the local repo checkout over any installed impala package.
-# SRC is needed because post_process.py lives under src/impala/superCal.
-sys.path.insert(0, str(PHYS))
-sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(SRC))
 
 
 def register_cu_bgp_shear_floor() -> None:
@@ -1812,7 +1781,7 @@ def write_run_files(
 def main():
     ap = argparse.ArgumentParser(description="Unified PTW calibration script.")
     ap.add_argument("--mode", choices=["hier", "pooled"], required=True)
-    ap.add_argument("--config", type=Path, default=Path("be_config.yaml"))
+    ap.add_argument("--config", type=Path, default=Path("cu_config.yaml"))
     ap.add_argument("--seed", type=int, default=12345)
 
     ap.add_argument("--exclude-qs-shpb", action="store_true")
