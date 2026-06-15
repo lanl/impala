@@ -933,9 +933,11 @@ def parameter_trace_plot_rollmean(sample_parameters, ylim=None, num_draws=100):
     #    plt.show()
 
 
-### Shows the number of swaps between pairs of temperatures.
-### Want to see a substantial proportion of swaps
 def total_temperature_swaps(out, setup):
+    """
+    Shows the number of swaps between pairs of temperatures.
+    Want to see a substantial proportion of swaps.
+    """
     if "theta0" in dir(out):
         ax = sns.heatmap(out.count_temper, linewidths=0)
         ax.set_xlabel("Temperature Index")
@@ -1132,9 +1134,11 @@ def get_best_sse(results_csv, write_path):
         fp.write(sub_dat.to_csv(index=False))
 
 
-### Function for predicting the outcome for a given
-### value of theta in its unnormalized (i.e., native) domain
 def get_outcome_predictions_impala(setup, theta_input, disc_input=None):
+    """
+    Function for predicting the outcome for a given.
+    Value of theta in its unnormalized (i.e., native) domain.
+    """
     outcome_draws = [
         np.empty([theta_input.shape[0], setup.ys[i].shape[0]])
         for i in range(setup.nexp)
