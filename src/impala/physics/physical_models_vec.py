@@ -643,7 +643,8 @@ class Stein_Flow_Stress(BaseModel):
 
     def __init__(self, parent):
         BaseModel.__init__(self, parent)
-        # self.params = ["y0", "a", "b", "beta", "n", "ymax"] # TODO: generalize, include strain-rate dependence
+        # TODO: generalize this model to include strain-rate dependence
+        # self.params = ["y0", "a", "b", "beta", "n", "ymax"]
         ## params a, b are never used, so drop them:
         self.params = ["y0", "beta", "n", "ymax"]
         self.consts = ["G0", "epsi", "chi"]
