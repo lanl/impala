@@ -5,7 +5,7 @@ paths:
   path_to_dir: HOME/impala_runs/Cu
 
   # Directory containing the public Cu input data files from the impala repo.
-  path_to_data: HOME/impala/data/Cu
+  path_to_data: ../data/Cu
 
 # Material submodels used for the main stress-strain PTW block.
 # These names must match classes registered on impala.physics.
