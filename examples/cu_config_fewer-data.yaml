@@ -1,0 +1,126 @@
+# Paths may be absolute, use HOME as a shortcut for the user's home directory,
+# or be relative to the directory where this script is run.
+paths:
+  # Output directory for calibration results, plots, and run metadata.
+  path_to_dir: HOME/impala_runs/Cu
+
+  # Directory containing the public Cu input data files from the impala repo.
+  path_to_data: HOME/impala/data/Cu
+
+# Material submodels used for the main stress-strain PTW block.
+# These names must match classes registered on impala.physics.
+models:
+  flow_stress_model: PTW_Yield_Stress
+  melt_model: Linear_Melt_Temperature
+  shear_model: BGP_PW_Shear_Modulus
+  specific_heat_model: Quadratic_Specific_Heat
+  density_model: Linear_Density
+
+data_loading:
+  default:
+    # File parsing defaults:
+    # delimiter: auto lets pandas try whitespace first, then comma-separated data.
+    # comment: "#" ignores header/comment lines that start with #.
+    # stress_divisor: 1.0 leaves stress values unchanged.
+    delimiter: auto
+    comment: "#"
+    stress_divisor: 1.0
+
+  QS_SHPB:
+    # Public Cu-annealed files are used for the QS/SHPB stress-strain block.
+    # stress_divisor: 1.0e5 converts stress values to Mbar if source stress is in MPa.
+    delimiter: auto
+    comment: "#"
+    stress_divisor: 1.0e5
+
+# Temperatures must be in Kelvin and must match data_files.QS_SHPB order.
+# Temperatures & edots for these data found in /data/Cu/Cu-annealed/key.txt
+data_files:
+  QS_SHPB:
+    - file: Cu-annealed/CuRT203.txt
+      temp: 298.0
+      edot: 2000.0
+    - file: Cu-annealed/Cu20203.txt
+      temp: 473.0
+      edot: 2000.0
+    - file: Cu-annealed/Cu40203.txt
+      temp: 673.0
+      edot: 2000.0
+    - file: Cu-annealed/Cu60203.txt
+      temp: 873.0
+      edot: 2000.0
+    - file: Cu-annealed/CuRT10-1.SRC.txt
+      temp: 298.0
+      edot: 0.1
+    - file: Cu-annealed/CuRT10-3.SRC.txt
+      temp: 298.0
+      edot: 0.001
+
+cu_taylor_cylinder:
+  enabled: false
+
+cu_flyer:
+  enabled: false
+
+consts_ptw:
+  matomic: 63.546
+  rho0: 8.98
+  beta: 0.25
+  chi: 1.0
+
+  r0: 9.09
+  r1: -5.02e-4
+
+  c0: 3.48e-6
+  c1: 1.23e-9
+  c2: -6.77e-13
+
+  Tmelt0: 1833.77
+  tm0: -4579
+  tm1: 743.6
+
+  alpha: 0.28
+  rho_0: 9.02
+  G0: 0.521
+  gamma_1: 1.27
+  gamma_2: 2.82
+  q2: 0.7
+
+bounds_ptw:
+  theta: [0.001, 0.2]
+  p: [0.0, 5.0]
+  s0: [0.0001, 0.1]
+  sInf: [0.0001, 0.1]
+  kappa: [0.01, 0.5]
+  lgamma: [-18.0, -1.0]
+  y0: [0.00001, 0.1]
+  yInf: [0.00001, 0.1]
+  y1: [0.001, 0.5]
+  y2: [0.281, 5.0]
+
+settings:
+  nsamp: 50
+  gamma_log_base: exp
+
+  sd_est:
+    main_default: 0.002
+    last_main: 0.002
+    z_default: 0.0005
+
+  tempering:
+    base: 1.05
+    n: 50
+    start_temper: 2000
+
+  mcmc:
+    nmcmc: 10000
+    nburn: 500
+    thin: 1
+    decor: 100
+    start_tau_theta: -8.0
+
+  priors:
+    theta0_prior_mean: 0.5
+    theta0_prior_scale: 10.0
+    Sigma0_prior_df_offset: 20
+    Sigma0_prior_scale: 0.1

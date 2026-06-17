@@ -628,15 +628,31 @@ def read_xy_file(path: Path, delimiter="whitespace", comment="#"):
     return arr[:, :2]
 
 
-# Shared loader for stress-strain style data groups. Per-group YAML options
-# control delimiter handling, comments, stress scaling, and row dropping.
 def load_curve_group(
     cfg, group_name, temps_key, edots_key, stress_divisor=None
 ):
     """
     Load one stress-strain style group.
 
-    YAML can control delimiter and stress conversion with:
+    Supports either legacy split metadata:
+
+      data_files:
+        QS_SHPB:
+          - path/to/file.txt
+      temps_qs_shpb:
+        - 298.0
+      edots_qs_shpb:
+        - 2000.0
+
+    or inline per-file metadata:
+
+      data_files:
+        QS_SHPB:
+          - file: path/to/file.txt
+            temp: 298.0
+            edot: 2000.0
+
+    YAML can also control delimiter and stress conversion with:
 
       data_loading:
         QS_SHPB:
@@ -652,17 +668,32 @@ def load_curve_group(
 
     PDATA = expand_home(cfg["paths"]["path_to_data"])
 
-    files = cfg.get("data_files", {}).get(group_name, [])
-    if not files:
+    raw_entries = cfg.get("data_files", {}).get(group_name, [])
+    if not raw_entries:
         return [], [], [], []
 
-    temps = list(cfg.get(temps_key, []))
-    edots = list(cfg.get(edots_key, []))
+    if isinstance(raw_entries[0], dict):
+        required = {"file", "temp", "edot"}
+
+        for i, entry in enumerate(raw_entries):
+            missing = required - set(entry)
+            if missing:
+                raise ValueError(
+                    f"{group_name} entry {i} is missing required keys: {sorted(missing)}"
+                )
+
+        files = [entry["file"] for entry in raw_entries]
+        temps = [float(entry["temp"]) for entry in raw_entries]
+        edots = [float(entry["edot"]) for entry in raw_entries]
+    else:
+        files = raw_entries
+        temps = list(cfg.get(temps_key, []))
+        edots = list(cfg.get(edots_key, []))
 
     if not (len(files) == len(temps) == len(edots)):
         raise ValueError(
             f"{group_name} length mismatch: "
-            f"files={len(files)}, {temps_key}={len(temps)}, {edots_key}={len(edots)}"
+            f"files={len(files)}, temps={len(temps)}, edots={len(edots)}"
         )
 
     opts = get_loading_options(cfg, group_name)
