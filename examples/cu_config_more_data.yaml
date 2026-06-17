@@ -1,0 +1,176 @@
+# Paths may be absolute, use HOME as a shortcut for the user's home directory,
+# or be relative to the directory where this script is run.
+paths:
+  # Output directory for calibration results, plots, and run metadata.
+  path_to_dir: HOME/impala_runs/Cu
+
+  # Directory containing the Cu input data files referenced below.
+  # Replace this with your local data directory before running.
+  path_to_data: HOME/impala_runs/Cu/data/Cu
+
+# Material submodels used for the main stress-strain PTW block.
+# These names must match classes registered on impala.physics.
+models:
+  flow_stress_model: PTW_Yield_Stress
+  melt_model: Linear_Melt_Temperature
+  shear_model: BGP_PW_Shear_Modulus
+  specific_heat_model: Quadratic_Specific_Heat
+  density_model: Linear_Density
+
+data_loading:
+  default:
+    # File parsing defaults:
+    # delimiter: auto lets pandas try whitespace first, then comma-separated data.
+    # comment: "#" ignores header/comment lines that start with #.
+    # stress_divisor: 1.0 leaves stress values unchanged.
+    delimiter: auto
+    comment: "#"
+    stress_divisor: 1.0
+
+  QS_SHPB:
+    # Cu QS/SHPB files report stress in different source units.
+    # stress_divisor: 1.0e5 converts stress values to Mbar for the calibration.
+    delimiter: auto
+    comment: "#"
+    stress_divisor: 1.0e5
+    drop_first_data_row_files:
+      - Cu-annealed/Nemat-Nasser/Nemat-Nasser_0.1_296_MPa
+
+data_files:
+  QS_SHPB:
+    - Cu-annealed/Cu OFHC (annealed 600C 1hr)/Cu OFHC (annealed 600C 1hr)_77K_0.001s_1_clean.txt
+    - Cu-annealed/Cu OFHC (annealed 600C 1hr)/Cu OFHC (annealed 600C 1hr)_295K_0.1s_1_clean.txt
+    - Cu-annealed/Cu OFHC (annealed 600C 1hr)/Cu OFHC (annealed 600C 1hr)_295K_0.001s_1_clean.txt
+    - Cu-annealed/Cu OFHC (annealed 600C 1hr)/Cu OFHC (annealed 600C 1hr)_298K_2000s_1_clean.txt
+    - Cu-annealed/Cu OFHC (annealed 600C 1hr)/Cu OFHC (annealed 600C 1hr)_473K_0.1s_1_clean.txt
+    - Cu-annealed/Cu OFHC (annealed 600C 1hr)/Cu OFHC (annealed 600C 1hr)_473K_2000s_1_clean.txt
+    - Cu-annealed/Cu OFHC (annealed 600C 1hr)/Cu OFHC (annealed 600C 1hr)_673K_0.1s_1_clean.txt
+    - Cu-annealed/Cu OFHC (annealed 600C 1hr)/Cu OFHC (annealed 600C 1hr)_673K_2000s_1_clean.txt
+    - Cu-annealed/Cu OFHC (annealed 600C 1hr)/Cu OFHC (annealed 600C 1hr)_873K_0.1s_1_clean.txt
+    - Cu-annealed/Cu OFHC (annealed 600C 1hr)/Cu OFHC (annealed 600C 1hr)_873K_2000s_1_clean.txt
+    - Cu-annealed/Samanta/Samanta_0.066_1173_MPa
+    - Cu-annealed/Samanta/Samanta_960_1173_MPa
+    - Cu-annealed/Samanta/Samanta_1800_1023MPa
+    - Cu-annealed/Samanta/Samanta_2300_873_MPa
+    - Cu-annealed/Nemat-Nasser/Nemat-Nasser_0.1_296_MPa
+    - Cu-annealed/Nemat-Nasser/Nemat-Nasser_4000_77_MPa
+    - Cu-annealed/Nemat-Nasser/Nemat-Nasser_4000_496_MPa
+    - Cu-annealed/Nemat-Nasser/Nemat-Nasser_4000_696
+    - Cu-annealed/Nemat-Nasser/Nemat-Nasser_4000_896
+    - Cu-annealed/Nemat-Nasser/Nemat-Nasser_4000_1096_MPa
+    - Cu-annealed/Nemat-Nasser/Nemat-Nasser_8000_296_MPa
+
+temps_qs_shpb:
+  - 77
+  - 295
+  - 295
+  - 298
+  - 473
+  - 473
+  - 673
+  - 673
+  - 873
+  - 873
+  - 1173
+  - 1173
+  - 1023
+  - 873
+  - 296
+  - 77
+  - 496
+  - 696
+  - 896
+  - 1096
+  - 296
+
+edots_qs_shpb:
+  - 0.001
+  - 0.1
+  - 0.001
+  - 2000
+  - 0.1
+  - 2000
+  - 0.1
+  - 2000
+  - 0.1
+  - 2000
+  - 0.066
+  - 960
+  - 1800
+  - 2300
+  - 0.1
+  - 4000
+  - 4000
+  - 4000
+  - 4000
+  - 4000
+  - 8000
+
+cu_taylor_cylinder:
+  enabled: false
+
+cu_flyer:
+  enabled: false
+
+consts_ptw:
+  matomic: 63.546
+  rho0: 8.98
+  beta: 0.25
+  chi: 1.0
+
+  r0: 9.09
+  r1: -5.02e-4
+
+  c0: 3.48e-6
+  c1: 1.23e-9
+  c2: -6.77e-13
+
+  Tmelt0: 1833.77
+  tm0: -4579
+  tm1: 743.6
+
+  alpha: 0.28
+  rho_0: 9.02
+  G0: 0.521
+  gamma_1: 1.27
+  gamma_2: 2.82
+  q2: 0.7
+
+bounds_ptw:
+  theta: [0.001, 0.2]
+  p: [0.0, 5.0]
+  s0: [0.0001, 0.1]
+  sInf: [0.0001, 0.1]
+  kappa: [0.01, 0.5]
+  lgamma: [-18.0, -1.0]
+  y0: [0.00001, 0.1]
+  yInf: [0.00001, 0.1]
+  y1: [0.001, 0.5]
+  y2: [0.281, 5.0]
+
+settings:
+  nsamp: 50
+  gamma_log_base: exp
+
+  sd_est:
+    main_default: 0.002
+    last_main: 0.002
+    z_default: 0.0005
+
+  tempering:
+    base: 1.05
+    n: 50
+    start_temper: 2000
+    
+  mcmc:
+    nmcmc: 2000
+    nburn: 500
+    thin: 1
+    decor: 100
+    start_tau_theta: -8.0
+
+  priors:
+    theta0_prior_mean: 0.5
+    theta0_prior_scale: 10.0
+    Sigma0_prior_df_offset: 20
+    Sigma0_prior_scale: 0.1
