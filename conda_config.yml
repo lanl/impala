@@ -1,0 +1,11 @@
+name: impala_mirror
+channels:
+  - conda-forge
+dependencies:
+  - python
+  - scipy
+  - numpy
+  - matplotlib
+  - cython
+  - pint
+  - pandas

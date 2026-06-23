@@ -60,7 +60,14 @@ class AbstractModel:
         vec2 = vec * vec * cov["inv"]
         out = -0.5 * cov["ldet"] - 0.5 * vec2.sum()
         return out
-
+    
+    # @profile
+    def llik_v2(self, yobs, pred, cov, wt): # assumes diagonal cov, added for compatibility with _v2
+        vec = yobs.flatten() - pred.flatten()
+        vec2 = vec*vec*cov['inv']
+        out = ((-0.5 * cov['ldet'] - 0.5 * vec2)*wt).sum()
+        return out
+    
     # @profile
     def lik_cov_inv(self, s2vec):  # default is diagonal covariance matrix
         inv = 1 / s2vec
@@ -68,6 +75,13 @@ class AbstractModel:
         out = {"inv": inv, "ldet": ldet}
         return out
 
+    # @profile
+    def lik_cov_inv_v2(self, s2vec, inds = None):  # default is diagonal covariance matrix. Added inds argument, not needed for this implementation
+        inv = 1 / s2vec
+        ldet = np.log(s2vec).sum()
+        out = {"inv": inv, "ldet": ldet}
+        return out
+    
     def step(self):
         return
 
@@ -389,6 +403,34 @@ class ModelBpprPca_mult(AbstractModel):
         out = {"inv": inv, "ldet": ldet}
         return out
 
+    # @profile
+    def llik_v2(self, yobs, pred, cov, wt):
+        vec = np.sqrt(wt)*(yobs - pred).flatten()
+        out = -0.5 * (cov["ldet"]*np.sum(wt) + vec.T @ cov["inv"] @ vec)
+        return out
+    
+    
+    def lik_cov_inv_v2(self, s2vec, inds = None): #note: I have not tested this. There may need to be changes to the inds-based subsetting!
+        if inds is None:
+            inds = np.arange(0,len(s2vec),1)
+        n = len(s2vec)
+        Sigma = cor2cov(
+            self.meas_error_cor[inds, inds], np.sqrt(s2vec)
+        )  # :n is a hack for when ntheta>1 in heir...fix this sometime
+        mat = (
+            Sigma
+            + self.trunc_error_cov[inds, inds]
+            + self.discrep_cov
+            + self.basis[inds,:] @ np.diag(self.emu_vars) @ self.basis[inds,:].T
+        )
+        # this doesnt work for vectorized experiments...maybe dont allow those for BASS
+        chol = cholesky(mat)
+        ldet = 2 * np.sum(np.log(np.diag(chol)))
+        # la.dpotri(chol, overwrite_c=True) # overwrites chol with original matrix inverse
+        inv = np.linalg.inv(mat)
+        out = {"inv": inv, "ldet": ldet}
+        return out
+
 
 #######
 ### ModelBassPca_func: Model with BASS Emulator from pyBASS with Functional Response
@@ -457,17 +499,30 @@ class ModelBassPca_func(AbstractModel):
         # self.discrep = self.D @ self.discrep_vars
         return discrep_vars
 
+
+    def discrep_sample_v2(self, yobs, pred, cov, itemp, wt):
+        Wsqrt = np.diag(np.sqrt(wt))
+
+        weighted_inv_cov = Wsqrt @ cov["inv"] @ Wsqrt
+
+        S = np.linalg.inv(
+            np.eye(self.nd) / self.discrep_tau
+            + self.D.T @ weighted_inv_cov @ self.D
+        )
+
+        m = self.D.T @ weighted_inv_cov @ (yobs - pred)
+
+        discrep_vars = chol_sample(S @ m, S / itemp)
+
+        return discrep_vars
+
     # @profile
     def eval(self, parmat, pool=None, nugget=False):
         """
         parmat : ~
         """
-        parmat_array = np.vstack([
-            parmat[v] for v in self.input_names
-        ]).T  # get correct subset/ordering of inputs
-        pred = self.mod.predict(
-            parmat_array, mcmc_use=np.array([self.ii]), nugget=nugget
-        )[0, :, :]
+        parmat_array = np.vstack([parmat[v] for v in self.input_names]).T  # get correct subset/ordering of inputs
+        pred = self.mod.predict(parmat_array, mcmc_use=np.array([self.ii]), nugget=nugget)[0, :, :]
 
         if pool is True:
             return pred
@@ -492,14 +547,17 @@ class ModelBassPca_func(AbstractModel):
         vec = yobs - pred
         out = -0.5 * (cov["ldet"] + vec.T @ cov["inv"] @ vec)
         return out
+    
+    # @profile
+    def llik_v2(self, yobs, pred, cov, wt):
+        vec = np.sqrt(wt)*(yobs - pred).flatten()
+        out = -0.5 * (cov["ldet"]*np.sum(wt) + vec.T @ cov["inv"] @ vec)
+        return out
 
+        
     # @profile
     def lik_cov_inv(self, s2vec):
-        vec = self.trunc_error_var + s2vec
-        # mat = np.diag(vec) + self.basis @ np.diag(self.emu_vars) @ self.basis.T
-        # inv = np.linalg.inv(mat)
-        # ldet = np.linalg.slogdet(mat)[1]
-        # out = {'inv' : inv, 'ldet' : ldet}
+        vec = self.trunc_error_var + s2vec 
         Ainv = np.diag(1 / vec)
         Aldet = np.log(vec).sum()
         out = self.swm(
@@ -510,6 +568,16 @@ class ModelBassPca_func(AbstractModel):
             Aldet,
             np.log(self.emu_vars).sum(),
         )
+        return out
+    
+    # @profile
+    def lik_cov_inv_v2(self, s2vec, inds = None):
+        if inds is None:
+            inds = np.arange(0,len(s2vec),1)
+        vec = self.trunc_error_var[inds] + s2vec 
+        Ainv = np.diag(1/vec)
+        Aldet = np.log(vec).sum()
+        out = self.swm(Ainv, self.basis[inds,:], np.diag(1/self.emu_vars), self.basis[inds,:].T, Aldet, np.log(self.emu_vars).sum())
         return out
 
     # @profile
@@ -697,7 +765,7 @@ class ModelF(AbstractModel):
         if exp_ind is None:
             exp_ind = np.array(0)
         self.nexp = exp_ind.max() + 1
-        self.exp_ind = exp_ind
+        self.exp_ind = exp_ind 
         self.nd = 0
         self.s2 = s2
         self.constants = None
@@ -726,6 +794,58 @@ class ModelF(AbstractModel):
                 1,
             )
             return out_sub
+
+    def discrep_sample(
+        self, yobs, pred, cov, itemp
+    ):  # Added by Lauren on 11/17/23.
+        S = np.linalg.inv(
+            np.eye(self.nd) / self.discrep_tau  # defined by addVecExperiments
+            + self.D.T @ (cov["inv"].flatten() * np.eye(len(yobs))) @ self.D
+        )
+        m = self.D.T @ (cov["inv"] * np.eye(len(yobs))) @ (yobs - pred)
+        discrep_vars = chol_sample(S @ m, S / itemp)
+        return discrep_vars
+
+
+
+class ModelF_v2(AbstractModel):
+    """Custom Simulator/Emulator Model"""
+
+    def __init__(
+        self, f, input_names, exp_ind=None, s2="gibbs"
+    ):  # not sure if this is vectorized
+        """
+        f           : user-defined function taking single input with elements x[0] = first element of theta, x[1] = second element of theta, etc. Function must output predictions for all observations
+        input_names : list of the names of the inputs to bmod
+        s2          : method for handling experiment-specific noise s2; options are 'MH' (Metropolis-Hastings Sampling), 'fix' (fixed at s2_est from addVecExperiments call), and 'gibbs' (Gibbs sampling)
+        """
+        self.mod = f
+        self.input_names = input_names
+        self.stochastic = False
+        self.yobs = None
+        self.meas_error_cor = 1.0  # np.diag(self.basis.shape[0])
+        if exp_ind is None:
+            exp_ind = np.array(0)
+        self.nexp = exp_ind.max() + 1
+        self.exp_ind = exp_ind 
+        self.nd = 0
+        self.s2 = s2
+        self.constants = None
+
+    def eval(self, parmat, pool=None, nugget=False):
+        parmat_array = np.vstack([
+            parmat[v] for v in self.input_names
+        ]).T  # get correct subset/ordering of inputs
+        if pool is True:
+            return np.apply_along_axis(self.mod, 1, parmat_array)
+        else:
+            nrep = list(parmat.values())[0].shape[0] // self.nexp
+            self.out_all = self.mod(parmat_array)
+            self.res_array = np.zeros([nrep, len(self.exp_ind)])
+            # return np.concatenate([self.out_all[np.ix_(np.arange(i, nrep*self.nexp, self.nexp), np.where(self.exp_ind==i)[0])] for i in range(self.nexp)], 1)
+            for i in range(self.nexp):
+                self.res_array[:,np.where(self.exp_ind==i)[0]] = self.out_all[np.ix_(np.arange(i, nrep*self.nexp, self.nexp), np.where(self.exp_ind==i)[0])]
+            return self.res_array
             # this is evaluating all experiments for all thetas, which is overkill
         # need to have some way of dealing with non-pooled eval fo this and bassPCA version
 
@@ -739,7 +859,6 @@ class ModelF(AbstractModel):
         m = self.D.T @ (cov["inv"] * np.eye(len(yobs))) @ (yobs - pred)
         discrep_vars = chol_sample(S @ m, S / itemp)
         return discrep_vars
-
 
 #######
 ### ModelF_bigdata: Function for Simulator Model Evaluation or Evaluation of Alternative Emulator Model using Bigger Data
@@ -767,7 +886,7 @@ class ModelF_bigdata(AbstractModel):
         self.s2 = s2
         self.vec = np.linspace(
             1, 16200, 16200
-        )  # define to speed up llik evaluation
+        )  # define to speed up llik evaluation, change this dimension to n x n, where n = length(yobs)
         self.vec2 = np.linspace(
             1, 16200, 16200
         )  # define to speed up llik evaluation
@@ -783,31 +902,16 @@ class ModelF_bigdata(AbstractModel):
         self.constants = None
 
     def eval(self, parmat, pool=None, nugget=False):
-        parmat_array = np.vstack([
-            parmat[v] for v in self.input_names
-        ]).T  # get correct subset/ordering of inputs
+        parmat_array = np.vstack([parmat[v] for v in self.input_names]).T  # get correct subset/ordering of inputs #changed this eval for the clustered/hier setting to be more efficient
         if pool is True:
             return np.apply_along_axis(self.mod, 1, parmat_array)
         else:
-            nrep = next(iter(parmat.values())).shape[0] // self.nexp
-            out_all = np.apply_along_axis(self.mod, 1, parmat_array)
-
-            # out_sub = np.concatenate([out_all[(i*nrep):(i*nrep+nrep), self.exp_ind==i] for i in range(self.nexp)], 1)
-            out_sub = np.concatenate(
-                [
-                    out_all[
-                        np.ix_(
-                            np.arange(i, nrep * self.nexp, self.nexp),
-                            np.where(self.exp_ind == i)[0],
-                        )
-                    ]
-                    for i in range(self.nexp)
-                ],
-                1,
-            )
-            return out_sub
-            # this is evaluating all experiments for all thetas, which is overkill
-        # need to have some way of dealing with non-pooled eval fo this and bassPCA version
+            nrep = list(parmat.values())[0].shape[0] // self.nexp
+            self.res_array = np.zeros([nrep, len(self.exp_ind)])
+            for i in range(self.nexp):
+                    inds_to_run = np.ix_(np.arange(i, nrep*self.nexp, self.nexp), np.where(self.exp_ind==i)[0])
+                    self.res_array[:,np.where(self.exp_ind==i)[0]] = self.mod(self.parmat_array, inds_to_run) #note: this now has a second argument. This is to avoid unnecessary predictions
+            return self.res_array
 
     def discrep_sample(
         self, yobs, pred, cov, itemp
@@ -838,6 +942,25 @@ class ModelF_bigdata(AbstractModel):
         ldet = np.log(s2vec).sum()
         out = {"inv": self.inv, "ldet": ldet}
         return out
+
+    def llik_v2(self, yobs, pred, cov, wt): # assumes diagonal cov
+        self.vec = yobs.flatten() - pred.flatten()
+        self.vec2 = self.vec*self.vec*cov['inv']
+        out = ((-.5 * cov['ldet'] - .5 * self.vec2)*wt).sum()
+        return out
+    
+    def lik_cov_inv_v2(self, s2vec, inds = None): # default is diagonal covariance matrix
+        vec = s2vec
+        self.inv = 1/vec
+        ldet = np.log(vec).sum()
+        out = {'inv' : self.inv, 'ldet' : ldet}
+        return out
+
+
+
+
+
+
 
 
 #######
