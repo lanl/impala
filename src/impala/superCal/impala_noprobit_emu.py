@@ -112,6 +112,7 @@ class CalibSetup:
         self.s2_prior_kern = []
         self.constants = None
         self.theta0_start = None  # optional
+        self.theta_start = None  # optional
 
     def checkConstraints(self, x, *args):
         """Calls the constraint function set by the user. Argument x contains the parameters to be checked
