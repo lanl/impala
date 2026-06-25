@@ -887,7 +887,7 @@ class ModelF_v2(AbstractModel):
 #######
 ### ModelF_bigdata: Function for Simulator Model Evaluation or Evaluation of Alternative Emulator Model using Bigger Data
 class ModelF_bigdata(AbstractModel):
-    """Custom Simulator/Emulator Model"""
+    """Custom Simulator/Emulator Model, modified to better handle a large number of observations"""
 
     def __init__(
         self, f, input_names, exp_ind=None, s2="gibbs"

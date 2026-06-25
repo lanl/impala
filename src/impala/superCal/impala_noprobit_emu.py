@@ -59,7 +59,7 @@ class CalibSetup:
 
     """
 
-    def __init__(self, bounds, constraint_func="bounds"):
+    def __init__(self, bounds, constraint_func="bounds", theta0_start=None):
         """
         Initialize the structure for storing data, models, etc.
 
@@ -70,6 +70,11 @@ class CalibSetup:
             of 1s and 0s with 1s where the parameter combinations meet the constraint. Alternatively,
             if no constraints other than bounds exist, passing "bounds" for this argument will use
             the proper constraint function.
+        :param theta0_start: (optional) an array with dimension ntemps x # parameters with initial
+            values of the calibration parameters. Each parameter should already be rescaled to be within
+            [0,1] following the bounds provided. ntemps should match the number of temperatures provided in
+            setTemperatureLadder later on. If not specified, the sampler initialization is randomly chosen.
+
         """
 
         self.nexp = 0  # Number of independent emulators
@@ -107,7 +112,6 @@ class CalibSetup:
         self.s2_prior_kern = []
         self.constants = None
         self.theta0_start = None  # optional
-        self.theta_start = None  # optional
 
     def checkConstraints(self, x, *args):
         """Calls the constraint function set by the user. Argument x contains the parameters to be checked
@@ -1617,7 +1621,9 @@ def calibHier(setup):
 
 def calibHier_v2(setup):
     """
-    Hierarchical calibration
+    Hierarchical calibration with expanded capabilities, still undergoing testing
+    Some changes include:, allowing weights, allowing custom initializations, changing initial theta0 defaults,
+    estimation of separate s2 values within an experiment, adding truncated gibbs sampling for measurement errors
     """
     t0 = time.time()
     theta0 = np.zeros([setup.nmcmc, setup.ntemps, setup.p])
@@ -2457,22 +2463,22 @@ def calibPool(setup):
         (setup.s2_ind[i][:, None] == range(setup.ns2[i]))
         for i in range(setup.nexp)
     ]
-    theta_start = initfunc_unif(size=[setup.ntemps, setup.p])
+    theta_start0 = initfunc_unif(size=[setup.ntemps, setup.p])
     good = setup.checkConstraints(
-        tran_unif(theta_start, setup.bounds_mat, setup.bounds.keys())
+        tran_unif(theta_start0, setup.bounds_mat, setup.bounds.keys())
     )
     while np.any(np.logical_not(good)):
-        theta_start[np.where(np.logical_not(good))] = initfunc_unif(
+        theta_start0[np.where(np.logical_not(good))] = initfunc_unif(
             size=[(np.logical_not(good)).sum(), setup.p]
         )
         good[np.where(np.logical_not(good))] = setup.checkConstraints(
             tran_unif(
-                theta_start[np.where(np.logical_not(good))],
+                theta_start0[np.where(np.logical_not(good))],
                 setup.bounds_mat,
                 setup.bounds.keys(),
             )
         )
-    theta[0] = theta_start
+    theta[0] = theta_start0
 
     itl_mat = [  # matrix of temperatures for use with alpha calculation--to skip nested for loops.
         (np.ones((setup.ns2[i], setup.ntemps)) * setup.itl).T
@@ -2905,7 +2911,10 @@ def calibPool(setup):
 
 # @profile
 def calibPool_v2(setup):
-    """Perform pooled calibration"""
+    """
+    Perform pooled calibration with expanded capabilities, still undergoing testing
+    Some changes include:, allowing weights, allowing custom initializations, adding truncated gibbs sampling for measurement errors
+    """
     t0 = time.time()
     theta = np.empty([setup.nmcmc, setup.ntemps, setup.p])
     log_s2 = [
@@ -2919,24 +2928,24 @@ def calibPool_v2(setup):
         (setup.s2_ind[i][:, None] == range(setup.ns2[i]))
         for i in range(setup.nexp)
     ]
-    theta_start = initfunc_unif(size=[setup.ntemps, setup.p])
+    theta_start0 = initfunc_unif(size=[setup.ntemps, setup.p])
     good = setup.checkConstraints(
-        tran_unif(theta_start, setup.bounds_mat, setup.bounds.keys()),
+        tran_unif(theta_start0, setup.bounds_mat, setup.bounds.keys()),
         setup.bounds,
     )
     while np.any(~good):
-        theta_start[np.where(~good)] = initfunc_unif(
+        theta_start0[np.where(~good)] = initfunc_unif(
             size=[(~good).sum(), setup.p]
         )
         good[np.where(~good)] = setup.checkConstraints(
             tran_unif(
-                theta_start[np.where(~good)],
+                theta_start0[np.where(~good)],
                 setup.bounds_mat,
                 setup.bounds.keys(),
             ),
             setup.bounds,
         )
-    theta[0] = theta_start
+    theta[0] = theta_start0
 
     s2_which_mat = [
         [

@@ -357,6 +357,9 @@ OutCalibClust = namedtuple(
 
 
 def calibClust(setup, parallel=False):
+    """
+    Clustered calibration
+    """
     t0 = time.time()
 
     if parallel:
@@ -1211,6 +1214,11 @@ def calibClust(setup, parallel=False):
 ### - passing indices to loglik
 ### - add truncated gibbs sampling for measurement errors
 def calibClust_v2(setup):
+    """
+    Clustered calibration with expanded capabilities, still undergoing testing.
+    Some changes include:, allowing weights, allowing custom initializations, changing initial theta0 defaults,
+    estimation of separate s2 values within an experiment, adding truncated gibbs sampling for measurement errors
+    """
     t0 = time.time()
 
     ## Constants Declaration
