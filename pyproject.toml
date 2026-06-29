@@ -27,6 +27,9 @@ numba = [
 map = [
     "pyswarm>=0.8.0,<0.9.0",
 ]
+all = [
+    "impala-calib[fda,numba,map]",
+]
 
 [build-system]
 requires = ["setuptools>=68.1", "versioningit"]
