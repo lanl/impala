@@ -1105,10 +1105,7 @@ def mape_one_theta(preds, setup):
             mask = s2_ind == exp_id
 
             experiment_mapes.append(
-                np.mean(
-                    np.abs(pred[mask] - y[mask])
-                    / y[mask]
-                )
+                np.mean(np.abs(pred[mask] - y[mask]) / y[mask])
             )
 
     return 100 * float(np.mean(experiment_mapes))
