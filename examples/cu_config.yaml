@@ -1,5 +1,3 @@
-# Paths may be absolute, use HOME as a shortcut for the user's home directory,
-# or be relative to the directory where this script is run.
 paths:
   # Output directory for calibration results, plots, and run metadata.
   path_to_dir: ../impala_runs/Cu
