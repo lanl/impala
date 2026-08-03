@@ -2,7 +2,7 @@
 # or be relative to the directory where this script is run.
 paths:
   # Output directory for calibration results, plots, and run metadata.
-  path_to_dir: HOME/impala_runs/Cu
+  path_to_dir: ../impala_runs/Cu
 
   # Directory containing the public Cu input data files from the impala repo.
   path_to_data: ../data/Cu
