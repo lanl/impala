@@ -18,11 +18,17 @@ license = "BSD-3-Clause"
 license-files = ["LICENSE"]
 
 [project.optional-dependencies]
+fda = [
+    "fdasrsf>=2.6.8,<3.0",
+]
 numba = [
     "numba>=0.62.1",
 ]
 map = [
     "pyswarm>=0.8.0,<0.9.0",
+]
+all = [
+    "impala-calib[fda,numba,map]",
 ]
 
 [build-system]

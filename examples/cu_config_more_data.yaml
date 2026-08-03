@@ -1,3 +1,5 @@
+# Paths may be absolute or relative.
+# Use `HOME` for the user's home directory (e.g. `HOME/impala_runs/Cu`).
 paths:
   # Output directory for calibration results, plots, and run metadata.
   path_to_dir: ../impala_runs/Cu

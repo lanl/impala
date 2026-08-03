@@ -165,3 +165,5 @@ dmypy.json
 
 dev/
 .ipynb_checkpoints
+
+.vscode/settings.json
