@@ -1,12 +1,11 @@
-# Paths may be absolute, use HOME as a shortcut for the user's home directory,
-# or be relative to the directory where this script is run.
+# Paths may be absolute or relative.
+# Use `HOME` for the user's home directory (e.g. `HOME/impala_runs/Cu`).
 paths:
   # Output directory for calibration results, plots, and run metadata.
-  path_to_dir: HOME/impala_runs/Cu
+  path_to_dir: ../impala_runs/Cu
 
   # Directory containing the Cu input data files referenced below.
-  # Replace this with your local data directory before running.
-  path_to_data: HOME/impala_runs/Cu/data/Cu
+  path_to_data: ../impala_runs/Cu/data/Cu
 
 # Material submodels used for the main stress-strain PTW block.
 # These names must match classes registered on impala.physics.

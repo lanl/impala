@@ -1054,27 +1054,44 @@ def scale_draws_to_native(raw_draws, setup):
 
 
 def sse_by_draw(preds, setup):
+    """
+    Sum the per-experiment mean squared errors.
+
+    Each experiment receives equal weight regardless of its number of
+    observations. Despite the historical name "SSE", this is a sum of
+    experiment-level MSEs, matching the custom calibration script.
+    """
     total = None
 
     for b, pred in enumerate(preds):
         pred = np.asarray(pred)
-        y = np.asarray(setup.ys[b]).reshape(1, -1)
-
         if pred.ndim == 1:
             pred = pred.reshape(1, -1)
 
-        block_sse = ((pred - y) ** 2).mean(axis=1)
+        y = np.asarray(setup.ys[b])
+        s2_ind = np.asarray(setup.s2_ind[b])
 
-        if total is None:
-            total = block_sse
-        else:
-            total = total + block_sse
+        for exp_id in np.unique(s2_ind):
+            mask = s2_ind == exp_id
+
+            experiment_mse = (
+                (pred[:, mask] - y[mask].reshape(1, -1)) ** 2
+            ).mean(axis=1)
+
+            if total is None:
+                total = experiment_mse
+            else:
+                total = total + experiment_mse
 
     return total
 
 
 def mape_one_theta(preds, setup):
-    vals = []
+    """
+    Compute MAPE by averaging within each experiment first and then
+    averaging equally across experiments.
+    """
+    experiment_mapes = []
 
     for b, pred in enumerate(preds):
         pred = np.asarray(pred)
@@ -1082,9 +1099,16 @@ def mape_one_theta(preds, setup):
             pred = pred[0]
 
         y = np.asarray(setup.ys[b])
-        vals.append(np.mean(np.abs(pred - y) / y))
+        s2_ind = np.asarray(setup.s2_ind[b])
 
-    return 100 * float(np.mean(vals))
+        for exp_id in np.unique(s2_ind):
+            mask = s2_ind == exp_id
+
+            experiment_mapes.append(
+                np.mean(np.abs(pred[mask] - y[mask]) / y[mask])
+            )
+
+    return 100 * float(np.mean(experiment_mapes))
 
 
 def save_best_from_native_draws(native_draws, setup, cfg, results_dir: Path):
@@ -1648,16 +1672,7 @@ def make_all_plots(
             for i in range(n_exp_main)
         ]).reshape(-1)
 
-        parent_sse = sum(
-            (
-                (
-                    THETA_Y[0][:, np.where(s2_inds == i)[0]]
-                    - setup.ys[0][np.where(s2_inds == i)]
-                )
-                ** 2
-            ).mean(axis=1)
-            for i in range(n_exp_main)
-        )
+        parent_sse = sse_by_draw(THETA_Y, setup)
 
         best_idx = int(np.argmin(parent_sse))
 
