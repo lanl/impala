@@ -878,7 +878,9 @@ def pairs(setup, mat_st, col=None, s=None, path=None):
     #    plt.show()
 
 
-def parameter_trace_plot(sample_parameters, ylim=None, parameter_names=None, figsize=None):
+def parameter_trace_plot(
+    sample_parameters, ylim=None, parameter_names=None, figsize=None
+):
     """
     Generates a stack of trace plots showing the posterior draws for the
     calibration parameters (y-axis) as a function of the number of iterations
@@ -892,7 +894,7 @@ def parameter_trace_plot(sample_parameters, ylim=None, parameter_names=None, fig
         sample_parameters = sample_parameters.to_numpy()
 
     n, d = sample_parameters.shape
-    fig_h = max(2.0, 1. * d)
+    fig_h = max(2.0, 1.0 * d)
     if figsize is None:
         figsize = (8, fig_h)
     fig, axes = plt.subplots(d, 1, figsize=figsize, sharex=True)
@@ -903,7 +905,9 @@ def parameter_trace_plot(sample_parameters, ylim=None, parameter_names=None, fig
     if parameter_names is None:
         parameter_names = [""] * d
     for i, ax in enumerate(axes):
-        ax.plot(range(n), sample_parameters[:, i], color=palette(i), linewidth=1.)
+        ax.plot(
+            range(n), sample_parameters[:, i], color=palette(i), linewidth=1.0
+        )
 
         if ylim is not None:
             ax.set_ylim(ylim)
