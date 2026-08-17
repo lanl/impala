@@ -878,19 +878,27 @@ def pairs(setup, mat_st, col=None, s=None, path=None):
     #    plt.show()
 
 
-def parameter_trace_plot(sample_parameters, ylim=None):
+def parameter_trace_plot(sample_parameters, ylim=None, parameter_names=None):
     """
     Generates a stack of trace plots showing the posterior draws for the
     calibration parameters (y-axis) as a function of the number of iterations
     of the MCMC sampler (x-axis).
+    An optional list of 'parameter_names' may be passed to label the y-axis
+    of each plot (one per calibration parameter).
     """
     palette = plt.get_cmap("Set1")
     if len(sample_parameters.shape) == 1:
         n = sample_parameters.shape[0]
+        if parameter_names is None:
+            parameter_names = ""
         plt.plot(range(n), sample_parameters, marker="", linewidth=1)
+        ax = plt.gca()
+        ax.set_ylabel(parameter_names)
     else:
         # df = pd.DataFrame(sample_parameters, self.parameter_order)
         n, d = sample_parameters.shape
+        if parameter_names is None:
+            parameter_names = [""] * d
         for i in range(d):
             plt.subplot(d, 1, i + 1)
             plt.plot(
@@ -903,6 +911,17 @@ def parameter_trace_plot(sample_parameters, ylim=None):
             ax = plt.gca()
             if ylim is not None:
                 ax.set_ylim(ylim)
+            if i < d - 1:
+                ax.tick_params(axis="x", labelbottom=False)
+            if parameter_names[i] != "":
+                ax.set_ylabel(
+                    parameter_names[i],
+                    rotation=0,
+                    labelpad=20,
+                    ha="right",
+                    va="center",
+                )
+    plt.subplots_adjust(hspace=0.4)
     #    plt.show()
 
 
