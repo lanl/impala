@@ -9,7 +9,7 @@
 ###############
 
 import time
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 from math import floor, log, sqrt
 from multiprocessing import Pool
 
@@ -34,7 +34,6 @@ np.seterr(under="ignore")
 ###############################################################
 ### CalibSetup Class for Initializing the Calibration Model ###
 ###############################################################
-from collections import defaultdict
 
 
 def is_valid_mapping(theta_inds, s2_inds):
@@ -102,6 +101,8 @@ class CalibSetup:
         self.ig_a = []
         self.ig_b = []
         self.wt = []
+        self.sd_lower = []
+        self.sd_upper = []
         self.s2_ind = []
         self.s2_exp_ind = []
         self.ns2 = []
@@ -428,13 +429,16 @@ def chol_sample_nper(means, covs, n):
 
 
 def chol_sample_1per_constraints(
-    means, covs, cf, bounds_mat, bounds_keys, bounds, consts
+    means, covs, cf, bounds_mat, bounds_keys, bounds, consts, maxiter=1000000
 ):
     """Sample with constraints.  If fail constraints, resample."""
     chols = cholesky(covs)
     cand = means + np.einsum("ijk,ik->ij", chols, normal(size=means.shape))
     good = cf(tran_unif(cand, bounds_mat, bounds_keys), bounds, consts)
+    i=1
     while np.any(np.logical_not(good)):
+        if i>maxiter:
+            raise ValueError(f"Failed to find samples that fulfill the constraints after {maxiter} iterations.")
         cand[np.where(np.logical_not(good))] = +means[
             np.logical_not(good)
         ] + np.einsum(
@@ -446,11 +450,12 @@ def chol_sample_1per_constraints(
             tran_unif(cand[np.logical_not(good)], bounds_mat, bounds_keys),
             bounds,
         )
+        i += 1
     return cand
 
 
 def chol_sample_nper_constraints(
-    means, covs, n, cf, bounds_mat, bounds_keys, bounds, consts
+    means, covs, n, cf, bounds_mat, bounds_keys, bounds, consts, maxiter=1000000
 ):
     """Sample with constraints.  If fail constraints, resample."""
     chols = cholesky(covs)
@@ -459,7 +464,12 @@ def chol_sample_nper_constraints(
     )
     for i in range(cand.shape[0]):
         goodi = cf(tran_unif(cand[i], bounds_mat, bounds_keys), bounds, consts)
+        j = 0
         while np.any(np.logical_not(goodi)):
+            if j > maxiter:
+                raise ValueError(
+                    f"Failed to find samples that fulfill the constraints after {maxiter} iterations."
+                )
             cand[i, np.where(np.logical_not(goodi))[0]] = +means[i] + np.einsum(
                 "ik,nk->ni",
                 chols[i],
@@ -473,6 +483,7 @@ def chol_sample_nper_constraints(
                 ),
                 bounds,
             )
+            j += 1
     return cand
 
 
@@ -1696,7 +1707,7 @@ def calibHier_v2(setup):
                 ])
             )
             != 1
-        ) and ("gibbs" in setup.models[i].s2 == "gibbs"):
+        ) and (setup.models[i].s2 == "gibbs"):
             setup.models[i].s2 = "MH"
             print(
                 "Gibbs sampling for s2 only valid if weights are the same for all observations with same s2. Reverting to MH. "
@@ -2934,13 +2945,13 @@ def calibPool_v2(setup):
         tran_unif(theta_start0, setup.bounds_mat, setup.bounds.keys()),
         setup.bounds,
     )
-    while np.any(~good):
-        theta_start0[np.where(~good)] = initfunc_unif(
-            size=[(~good).sum(), setup.p]
+    while np.any(np.logical_not(good)):
+        theta_start0[np.where(np.logical_not(good))] = initfunc_unif(
+            size=[(np.logical_not(good)).sum(), setup.p]
         )
-        good[np.where(~good)] = setup.checkConstraints(
+        good[np.where(np.logical_not(good))] = setup.checkConstraints(
             tran_unif(
-                theta_start0[np.where(~good)],
+                theta_start0[np.where(np.logical_not(good))],
                 setup.bounds_mat,
                 setup.bounds.keys(),
             ),
