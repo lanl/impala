@@ -1,3 +1,7 @@
+####################################
+"""Impala postprocessing and plotting scripts"""
+
+####################################
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -274,6 +278,7 @@ def ptw_prediction_plots_hier(
 def ptw_prediction_plots_cluster(
     setup, calib_out, path, mcmc_use, ylim=None, alpha=0.05
 ):
+    """PTW Prediction Plots"""
     pred_theta_raw = [
         np.empty([mcmc_use.shape[0], setup.ys[i].shape[0]])
         for i in range(setup.nexp)
@@ -432,7 +437,7 @@ def kde_contour(x1, x2, percentile):
 def pairwise_theta_plot_hier(
     setup, calib_out, path, mcmc_use, alpha=0.05, highlight=None
 ):
-    """Pairwise Theta scatterplot"""
+    """Pairwise Theta scatterplot; specialized version for hierarchical calibration results."""
     lty = ["solid", "dotted", "dashed", "dashdot"]
     if highlight is None:
         highlight = [range(setup.ntheta[k]) for k in range(setup.nexp)]
@@ -552,7 +557,7 @@ def pairwise_theta_plot_hier(
 
 
 def pairwise_theta_plot_pool(setup, calib_out, path, mcmc_use, alpha=0.05):
-    """Pairwise Theta scatterplot"""
+    """Pairwise Theta scatterplot; specialized version for pooled calibration results."""
     theta_names = list(setup.bounds.keys())
     theta0_unst = sc.unnormalize(
         calib_out.theta[mcmc_use, 0, :], setup.bounds_mat
@@ -667,6 +672,7 @@ def pairwise_theta_plot_pool_compare(
 def pairwise_theta_plot_cluster(
     setup, calib_out, path, mcmc_use, alpha=0.05, highlight=None
 ):
+    """Pairwise Theta scatterplot; specialized version for clustered calibration results."""
     thetas = calib_out.theta[mcmc_use, 0]
     [calib_out.delta[i][mcmc_use] for i in range(setup.nexp)]
     nclustmax = max(calib_out.delta[i].max() for i in range(setup.nexp)) + 1
@@ -847,6 +853,9 @@ def hide_current_axis(*args, **kwds):
 
 
 def pairs(setup, mat_st, col=None, s=None, path=None):
+    """
+    Generates a standard pairwise scatterplot showing parameter draws for pairs of parameters.
+    """
     dat = pd.DataFrame(
         sc.tran_unif(mat_st, setup.bounds_mat, setup.bounds.keys())
     )
@@ -870,6 +879,11 @@ def pairs(setup, mat_st, col=None, s=None, path=None):
 
 
 def parameter_trace_plot(sample_parameters, ylim=None):
+    """
+    Generates a stack of trace plots showing the posterior draws for the
+    calibration parameters (y-axis) as a function of the number of iterations
+    of the MCMC sampler (x-axis).
+    """
     palette = plt.get_cmap("Set1")
     if len(sample_parameters.shape) == 1:
         n = sample_parameters.shape[0]
@@ -979,6 +993,7 @@ def total_temperature_swaps(out, setup):
 
 
 def save_parent_strength(setup, ptw_mod, calib_out, mcmc_use, path):
+    """writes the parent distribution to file 'path'."""
     theta_parent = sc.chol_sample_1per_constraints(
         calib_out.theta0[mcmc_use, 0],
         calib_out.Sigma0[mcmc_use, 0],
@@ -1024,7 +1039,10 @@ def save_parent_strength(setup, ptw_mod, calib_out, mcmc_use, path):
 
 
 def get_bounds(edot, strain, temp, results_csv, write_path, percentiles=None):
-    # rank parent distribution samples by stress at particular strain, strain rate, temperature, save to file
+    """
+    Function to get bounds;
+    rank parent distribution samples by stress at particular strain, strain rate, temperature, save to file
+    """
     if percentiles is None:
         percentiles = [0.05, 0.5, 0.95]
     edot * 1e-6  # first term is per second
