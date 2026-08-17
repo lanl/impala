@@ -46,6 +46,7 @@ import impala
 from impala import superCal as sc
 from impala.superCal.post_process import (
     get_outcome_predictions_impala,
+    parameter_trace_plot,
     total_temperature_swaps,
 )
 
@@ -880,7 +881,7 @@ def build_z_models(cfg, dat_z, temps_z, edots_z, pooled: bool):
     return models_z, z_stress
 
 
-def constraints_ptw_basic(x, bounds, consts=None, *args):
+def constraints_ptw_basic(x, bounds, consts=None):
     good = (
         (x["sInf"] < x["s0"])
         * (x["yInf"] < x["y0"])
@@ -1253,41 +1254,6 @@ def save_draws_hier(
 # ----------------------------------------------------------------------
 # Plotting
 # ----------------------------------------------------------------------
-
-
-def parameter_trace_plot_labeled(df_trace: pd.DataFrame, ylim=(0, 1)):
-    arr = df_trace.to_numpy()
-    labels = list(df_trace.columns)
-    n, d = arr.shape
-
-    fig_h = max(3.0, 1.8 * d)
-    fig, axes = plt.subplots(d, 1, figsize=(14, fig_h), sharex=True)
-
-    if d == 1:
-        axes = [axes]
-
-    palette = plt.get_cmap("Set1")
-
-    for i, ax in enumerate(axes):
-        ax.plot(range(n), arr[:, i], color=palette(i), linewidth=1.2)
-
-        if ylim is not None:
-            ax.set_ylim(ylim)
-
-        ax.set_ylabel(
-            labels[i],
-            fontsize=10,
-            rotation=0,
-            labelpad=55,
-            ha="right",
-            va="center",
-        )
-        ax.set_yticks([0.0, 0.5, 1.0])
-
-    axes[-1].set_xlabel("Iteration")
-    fig.subplots_adjust(left=0.12, hspace=0.35)
-
-    return fig, axes
 
 
 def load_pooled_theta(
@@ -1732,7 +1698,7 @@ def make_all_plots(
             theta_cols = list(setup.bounds.keys())
             df_trace = pd.read_csv(results_dir / "parent_draws.csv")[theta_cols]
 
-        parameter_trace_plot_labeled(df_trace)
+        parameter_trace_plot(df_trace)
         plt.savefig(plots_dir / "trace.png", dpi=200)
         plt.close("all")
 

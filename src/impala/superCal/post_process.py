@@ -878,7 +878,7 @@ def pairs(setup, mat_st, col=None, s=None, path=None):
     #    plt.show()
 
 
-def parameter_trace_plot(sample_parameters, ylim=None, parameter_names=None):
+def parameter_trace_plot(sample_parameters, ylim=None, parameter_names=None, figsize=None):
     """
     Generates a stack of trace plots showing the posterior draws for the
     calibration parameters (y-axis) as a function of the number of iterations
@@ -886,43 +886,42 @@ def parameter_trace_plot(sample_parameters, ylim=None, parameter_names=None):
     An optional list of 'parameter_names' may be passed to label the y-axis
     of each plot (one per calibration parameter).
     """
+    if isinstance(sample_parameters, pd.DataFrame):
+        if parameter_names is None:
+            parameter_names = list(sample_parameters.columns)
+        sample_parameters = sample_parameters.to_numpy()
+
+    n, d = sample_parameters.shape
+    fig_h = max(2.0, 1. * d)
+    if figsize is None:
+        figsize = (8, fig_h)
+    fig, axes = plt.subplots(d, 1, figsize=figsize, sharex=True)
     palette = plt.get_cmap("Set1")
-    if len(sample_parameters.shape) == 1:
-        n = sample_parameters.shape[0]
-        if parameter_names is None:
-            parameter_names = ""
-        plt.plot(range(n), sample_parameters, marker="", linewidth=1)
-        ax = plt.gca()
-        ax.set_ylabel(parameter_names)
-    else:
-        # df = pd.DataFrame(sample_parameters, self.parameter_order)
-        n, d = sample_parameters.shape
-        if parameter_names is None:
-            parameter_names = [""] * d
-        for i in range(d):
-            plt.subplot(d, 1, i + 1)
-            plt.plot(
-                range(n),
-                sample_parameters[:, i],
-                marker="",
-                color=palette(i),
-                linewidth=1,
+    if d == 1:
+        axes = [axes]
+
+    if parameter_names is None:
+        parameter_names = [""] * d
+    for i, ax in enumerate(axes):
+        ax.plot(range(n), sample_parameters[:, i], color=palette(i), linewidth=1.)
+
+        if ylim is not None:
+            ax.set_ylim(ylim)
+        if parameter_names[i] != "":
+            ax.set_ylabel(
+                parameter_names[i],
+                fontsize=10,
+                rotation=0,
+                labelpad=20,
+                ha="right",
+                va="center",
             )
-            ax = plt.gca()
-            if ylim is not None:
-                ax.set_ylim(ylim)
-            if i < d - 1:
-                ax.tick_params(axis="x", labelbottom=False)
-            if parameter_names[i] != "":
-                ax.set_ylabel(
-                    parameter_names[i],
-                    rotation=0,
-                    labelpad=20,
-                    ha="right",
-                    va="center",
-                )
-    plt.subplots_adjust(hspace=0.4)
+        ax.set_yticks([0.0, 0.5, 1.0])
+
+    axes[-1].set_xlabel("Iteration")
+    fig.subplots_adjust(left=0.12, hspace=0.35)
     #    plt.show()
+    # return fig, axes
 
 
 def parameter_trace_plot_rollmean(sample_parameters, ylim=None, num_draws=100):
