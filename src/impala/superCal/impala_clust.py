@@ -1417,6 +1417,7 @@ def calibClust_v2(setup):
             for j in range(setup.ntheta[i]):
                 marg_lik_cov_curr[i][t][j] = setup.models[i].lik_cov_inv_v2(
                     np.exp(s2_stretched[theta_which_mat[i][j]]),
+                    wt_mat[i][theta_which_mat[i][j]],
                     s2_which_mat[i][j],
                 )
                 llik_curr_theta[i][t][j] = setup.models[i].llik_v2(
@@ -1659,7 +1660,9 @@ def calibClust_v2(setup):
                 ),
                 False,
             )
-            llik_curr_theta[i][accept] = llik_cand_theta[i][accept]
+            llik_curr_theta[i][accept[:, i]] = llik_cand_theta[i][
+                accept[:, i]
+            ]  # Changed 8/18/26
 
         count += accept.sum(axis=1)
         cov_theta_cand.count_100 += accept.sum(axis=1)
@@ -1702,6 +1705,7 @@ def calibClust_v2(setup):
                             i
                         ].lik_cov_inv_v2(
                             np.exp(s2_stretched[theta_which_mat[i][j]]),
+                            wt_mat[i][theta_which_mat[i][j]],
                             s2_which_mat[i][j],
                         )
                         llik_curr_theta[i][t][j] = setup.models[i].llik_v2(
@@ -1792,6 +1796,7 @@ def calibClust_v2(setup):
                             i
                         ].lik_cov_inv_v2(
                             np.exp(s2_stretched[theta_which_mat[i][j]]),
+                            wt_mat[i][theta_which_mat[i][j]],
                             s2_which_mat[i][j],
                         )
                         llik_curr_theta[i][t][j] = setup.models[i].llik_v2(
@@ -1811,12 +1816,14 @@ def calibClust_v2(setup):
                             i
                         ].lik_cov_inv_v2(
                             np.exp(s2_stretched[s2_which_mat[i][j]]),
+                            wt_mat[i][theta_which_mat[i][j]],
                             s2_which_mat[i][j],
                         )
-                        llik_curr_theta[i][t][j] = setup.models[i].llik(
+                        llik_curr_theta[i][t][j] = setup.models[i].llik_v2(
                             setup.ys[i][s2_which_mat[i][j]],
                             pred_curr_theta[i][t][s2_which_mat[i][j]],
                             marg_lik_cov_curr[i][t][j],
+                            wt_mat[i][theta_which_mat[i][j]],
                         )
 
             else:

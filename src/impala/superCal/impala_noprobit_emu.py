@@ -1747,6 +1747,7 @@ def calibHier_v2(setup):
             for j in range(setup.ntheta[i]):
                 marg_lik_cov_curr[i][t][j] = setup.models[i].lik_cov_inv_v2(
                     np.exp(s2_stretched[theta_which_mat[i][j]]),
+                    wt_mat[i][theta_which_mat[i][j]],
                     s2_which_mat[i][j],
                 )
                 llik_curr[i][t][j] = setup.models[i].llik_v2(
@@ -1984,6 +1985,7 @@ def calibHier_v2(setup):
                             i
                         ].lik_cov_inv_v2(
                             np.exp(s2_stretched[theta_which_mat[i][j]]),
+                            wt_mat[i][theta_which_mat[i][j]],
                             s2_which_mat[i][j],
                         )
                         llik_curr[i][t][j] = setup.models[i].llik_v2(
@@ -2076,6 +2078,7 @@ def calibHier_v2(setup):
                             i
                         ].lik_cov_inv_v2(
                             np.exp(s2_stretched[theta_which_mat[i][j]]),
+                            wt_mat[i][theta_which_mat[i][j]],
                             s2_which_mat[i][j],
                         )
                         llik_curr[i][t][j] = setup.models[i].llik_v2(
@@ -2120,12 +2123,14 @@ def calibHier_v2(setup):
                             np.exp(ls2_candi[t, setup.s2_ind[i]])[
                                 setup.s2_ind[i] == j
                             ],
+                            wt_mat[i][theta_which_mat[i][j]],
                             s2_which_mat[i][j],
                         )  # s2[i][0, t, setup.s2_ind[i]])
-                        llik_candi[t][j] = setup.models[i].llik(
+                        llik_candi[t][j] = setup.models[i].llik_v2(
                             setup.ys[i][setup.theta_ind[i] == j],
                             pred_curr[i][t][setup.theta_ind[i] == j],
                             marg_lik_cov_candi[t][j],
+                            wt_mat[i][theta_which_mat[i][j]],
                         )
                         # something wrong still, getting way too large of variance
                     # marg_lik_cov_candi[t] = setup.models[i].lik_cov_inv(np.exp(ls2_candi[t])[setup.s2_ind[i]])#s2[i][0, t, setup.s2_ind[i]])
@@ -2988,6 +2993,7 @@ def calibPool_v2(setup):
         for t in range(setup.ntemps):
             marg_lik_cov_curr[i][t] = setup.models[i].lik_cov_inv_v2(
                 np.exp(log_s2[i][0, t, setup.s2_ind[i]])[setup.s2_ind[i]],
+                wt_mat[i],
                 setup.s2_ind[i],
             )
             # ask around: is list of lists lookup slow?? ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3224,6 +3230,7 @@ def calibPool_v2(setup):
                     )
                     marg_lik_cov_curr[i][t] = setup.models[i].lik_cov_inv_v2(
                         np.exp(log_s2[i][m][t])[setup.s2_ind[i]],
+                        wt_mat[i],
                         setup.s2_ind[i],
                     )
                     llik_curr[i, t] = setup.models[i].llik_v2(
@@ -3310,6 +3317,7 @@ def calibPool_v2(setup):
 
                     marg_lik_cov_curr[i][t] = setup.models[i].lik_cov_inv_v2(
                         np.exp(log_s2[i][m][t])[setup.s2_ind[i]],
+                        wt_mat[i],
                         setup.s2_ind[i],
                     )
                     llik_curr[i, t] = setup.models[i].llik_v2(
@@ -3336,7 +3344,9 @@ def calibPool_v2(setup):
                 marg_lik_cov_candi = [None] * setup.ntemps
                 for t in range(setup.ntemps):
                     marg_lik_cov_candi[t] = setup.models[i].lik_cov_inv_v2(
-                        np.exp(ls2_candi[t])[setup.s2_ind[i]], setup.s2_ind[i]
+                        np.exp(ls2_candi[t])[setup.s2_ind[i]],
+                        wt_mat[i],
+                        setup.s2_ind[i],
                     )
                     llik_candi[t] = setup.models[i].llik_v2(
                         setup.ys[i] - discrep_curr[i][t],
