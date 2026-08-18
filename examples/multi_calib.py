@@ -119,46 +119,7 @@ np.seterr(under="ignore", over="ignore", divide="ignore", invalid="ignore")
 # Supported model classes
 # ----------------------------------------------------------------------
 
-MODEL_KINDS = {
-    "flow_stress_model": [
-        "Constant_Yield_Stress",
-        "JC_Yield_Stress",
-        "PTW_Yield_Stress",
-        "PTWbp_Yield_Stress",
-        "Stein_Flow_Stress",
-    ],
-    "melt_model": [
-        "Constant_Melt_Temperature",
-        "Linear_Melt_Temperature",
-        "Quadratic_Melt_Temperature",
-        "Cubic_Melt_Temperature",
-        "BGP_Melt_Temperature",
-    ],
-    "shear_model": [
-        "Constant_Shear_Modulus",
-        "Linear_Cold_PW_Shear_Modulus",
-        "Quadratic_Cold_PW_Shear_Modulus",
-        "Simple_Shear_Modulus",
-        "BGP_PW_Shear_Modulus",
-        "Cu_BGP_PW_Shear_Modulus",
-        "Stein_Shear_Modulus",
-    ],
-    "specific_heat_model": [
-        "Constant_Specific_Heat",
-        "Linear_Specific_Heat",
-        "Quadratic_Specific_Heat",
-        "Cubic_Specific_Heat",
-        "Piecewise_Linear_Specific_Heat",
-        "Piecewise_Quadratic_Specific_Heat",
-        "Piecewise_Cubic_Specific_Heat",
-    ],
-    "density_model": [
-        "Constant_Density",
-        "Linear_Density",
-        "Quadratic_Density",
-        "Cubic_Density",
-    ],
-}
+MODEL_KINDS = sc.getoptions_ModelMaterialStrength()
 
 
 DEFAULT_MODELS = {
