@@ -73,7 +73,7 @@ def test_friedman_fit():
         model=model,
         # yobs error standard deviation estimate (possibly a vector of estimates
         # for different parts of yobs vector).
-        sd_est=[1.0],
+        sd_est=[0.1],
         # yobs error degrees of freedom (larger means more confidence in
         # sd_est), same shape as sd_est.
         s2_df=[0],
