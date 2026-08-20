@@ -913,6 +913,8 @@ class ModelF(AbstractModel):
         self.nexp = exp_ind.max() + 1
         self.exp_ind = exp_ind
         self.nd = 0
+        self.discrep_tau = 1.0
+        self.D = None
         self.s2 = s2
         self.constants = None
 
@@ -974,6 +976,8 @@ class ModelF_v2(AbstractModel):
         self.nexp = exp_ind.max() + 1
         self.exp_ind = exp_ind
         self.nd = 0
+        self.discrep_tau = 1.0
+        self.D = None
         self.s2 = s2
         self.constants = None
 
@@ -985,7 +989,7 @@ class ModelF_v2(AbstractModel):
             return np.apply_along_axis(self.mod, 1, parmat_array)
         else:
             # nrep = list(parmat.values())[0].shape[0] // self.nexp
-            nrep = next(iter(parmat.values())) // self.nexp
+            nrep = next(iter(parmat.values())).shape[0] // self.nexp
             self.out_all = self.mod(parmat_array)
             # self.out_all = self.mod(next(iter(parmat.values())))
             self.res_array = np.zeros([nrep, len(self.exp_ind)])
@@ -1038,6 +1042,8 @@ class ModelF_bigdata(AbstractModel):
         self.nexp = exp_ind.max() + 1
         self.exp_ind = exp_ind
         self.nd = 0
+        self.discrep_tau = 1.0
+        self.D = None
         self.s2 = s2
         self.vec = np.linspace(
             1, 16200, 16200
@@ -1072,7 +1078,7 @@ class ModelF_bigdata(AbstractModel):
                     np.where(self.exp_ind == i)[0],
                 )
                 self.res_array[:, np.where(self.exp_ind == i)[0]] = self.mod(
-                    self.parmat_array, inds_to_run
+                    parmat_array, inds_to_run
                 )  # note: this now has a second argument. This is to avoid unnecessary predictions
             return self.res_array
 
