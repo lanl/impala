@@ -435,7 +435,7 @@ def chol_sample_1per_constraints(
     chols = cholesky(covs)
     cand = means + np.einsum("ijk,ik->ij", chols, normal(size=means.shape))
     good = cf(tran_unif(cand, bounds_mat, bounds_keys), bounds, consts)
-    j = 1
+    j = 0
     while np.any(np.logical_not(good)):
         if j > maxiter:
             raise ValueError(
