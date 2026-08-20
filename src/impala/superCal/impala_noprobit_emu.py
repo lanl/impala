@@ -437,7 +437,7 @@ def chol_sample_1per_constraints(
     good = cf(tran_unif(cand, bounds_mat, bounds_keys), bounds, consts)
     j = 0
     while np.any(np.logical_not(good)):
-        if j > maxiter:
+        if j >= maxiter:
             raise ValueError(
                 f"Failed to find samples that fulfill the constraints after {maxiter} iterations."
             )
@@ -468,7 +468,7 @@ def chol_sample_nper_constraints(
         goodi = cf(tran_unif(cand[i], bounds_mat, bounds_keys), bounds, consts)
         j = 0
         while np.any(np.logical_not(goodi)):
-            if j > maxiter:
+            if j >= maxiter:
                 raise ValueError(
                     f"Failed to find samples that fulfill the constraints after {maxiter} iterations."
                 )
