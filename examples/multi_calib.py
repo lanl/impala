@@ -1303,7 +1303,11 @@ def make_all_plots(
             ax.set_title("Observed RMI stress-strain")
             ax.legend()
             plt.tight_layout()
-            plt.savefig(plots_dir / "observed_data_rmi.png", dpi=200)
+            plt.savefig(
+                plots_dir / "observed_data_rmi.png",
+                dpi=200,
+                bbox_inches="tight",
+            )
             plt.close("all")
 
         except PLOT_ERRORS as e:
@@ -1316,7 +1320,7 @@ def make_all_plots(
         plt.close("all")
         total_temperature_swaps(out, setup)
         plt.tight_layout()
-        plt.savefig(plots_dir / "tempering.png", dpi=200)
+        plt.savefig(plots_dir / "tempering.png", dpi=200, bbox_inches="tight")
         plt.close("all")
 
     except PLOT_ERRORS as e:
@@ -1465,7 +1469,11 @@ def make_all_plots(
                 )
                 ax.legend()
                 plt.tight_layout()
-                plt.savefig(plots_dir / f"experiment_{exp_ind}.png", dpi=200)
+                plt.savefig(
+                    plots_dir / f"experiment_{exp_ind}.png",
+                    dpi=200,
+                    bbox_inches="tight",
+                )
                 plt.close("all")
 
             if include_z:
@@ -1641,7 +1649,7 @@ def make_all_plots(
         ax.set_title("Prediction for All Experiments, Main Block")
         ax.legend()
         plt.tight_layout()
-        plt.savefig(plots_dir / "best_all.png", dpi=200)
+        plt.savefig(plots_dir / "best_all.png", dpi=200, bbox_inches="tight")
         plt.close("all")
 
     except PLOT_ERRORS as e:
@@ -1660,7 +1668,7 @@ def make_all_plots(
             df_trace = pd.read_csv(results_dir / "parent_draws.csv")[theta_cols]
 
         parameter_trace_plot(df_trace)
-        plt.savefig(plots_dir / "trace.png", dpi=200)
+        plt.savefig(plots_dir / "trace.png", dpi=200, bbox_inches="tight")
         plt.close("all")
 
     except PLOT_ERRORS as e:
