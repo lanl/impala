@@ -1281,11 +1281,9 @@ def getoptions_ModelMaterialStrength():
     flow_stress_model = list(
         filter(re.compile(".*Yield_Stress").match, mod_options)
     )
-    flow_stress_model = np.append(
-        flow_stress_model,
-        list(filter(re.compile(".*Flow_Stress").match, mod_options)),
+    flow_stress_model += list(
+        filter(re.compile(".*Flow_Stress").match, mod_options)
     )
-    flow_stress_model = list(flow_stress_model)
     melt_model = list(
         filter(re.compile(".*Melt_Temperature").match, mod_options)
     )

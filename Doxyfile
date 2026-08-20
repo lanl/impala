@@ -1,0 +1,11 @@
+# Difference with default Doxyfile 1.17.0
+PROJECT_NAME           = IMPALA
+OPTIMIZE_OUTPUT_JAVA   = YES
+EXTRACT_ALL            = YES
+INPUT                  = src/impala \
+                         README.md
+RECURSIVE              = YES
+SOURCE_BROWSER         = YES
+HAVE_DOT               = YES
+CALL_GRAPH             = YES
+CALLER_GRAPH           = YES

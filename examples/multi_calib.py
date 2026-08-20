@@ -46,6 +46,7 @@ import impala
 from impala import superCal as sc
 from impala.superCal.post_process import (
     get_outcome_predictions_impala,
+    parameter_trace_plot,
     total_temperature_swaps,
 )
 
@@ -118,46 +119,7 @@ np.seterr(under="ignore", over="ignore", divide="ignore", invalid="ignore")
 # Supported model classes
 # ----------------------------------------------------------------------
 
-MODEL_KINDS = {
-    "flow_stress_model": [
-        "Constant_Yield_Stress",
-        "JC_Yield_Stress",
-        "PTW_Yield_Stress",
-        "PTWbp_Yield_Stress",
-        "Stein_Flow_Stress",
-    ],
-    "melt_model": [
-        "Constant_Melt_Temperature",
-        "Linear_Melt_Temperature",
-        "Quadratic_Melt_Temperature",
-        "Cubic_Melt_Temperature",
-        "BGP_Melt_Temperature",
-    ],
-    "shear_model": [
-        "Constant_Shear_Modulus",
-        "Linear_Cold_PW_Shear_Modulus",
-        "Quadratic_Cold_PW_Shear_Modulus",
-        "Simple_Shear_Modulus",
-        "BGP_PW_Shear_Modulus",
-        "Cu_BGP_PW_Shear_Modulus",
-        "Stein_Shear_Modulus",
-    ],
-    "specific_heat_model": [
-        "Constant_Specific_Heat",
-        "Linear_Specific_Heat",
-        "Quadratic_Specific_Heat",
-        "Cubic_Specific_Heat",
-        "Piecewise_Linear_Specific_Heat",
-        "Piecewise_Quadratic_Specific_Heat",
-        "Piecewise_Cubic_Specific_Heat",
-    ],
-    "density_model": [
-        "Constant_Density",
-        "Linear_Density",
-        "Quadratic_Density",
-        "Cubic_Density",
-    ],
-}
+MODEL_KINDS = sc.getoptions_ModelMaterialStrength()
 
 
 DEFAULT_MODELS = {
@@ -880,7 +842,7 @@ def build_z_models(cfg, dat_z, temps_z, edots_z, pooled: bool):
     return models_z, z_stress
 
 
-def constraints_ptw_basic(x, bounds, consts=None, *args):
+def constraints_ptw_basic(x, bounds, consts=None):
     good = (
         (x["sInf"] < x["s0"])
         * (x["yInf"] < x["y0"])
@@ -1255,41 +1217,6 @@ def save_draws_hier(
 # ----------------------------------------------------------------------
 
 
-def parameter_trace_plot_labeled(df_trace: pd.DataFrame, ylim=(0, 1)):
-    arr = df_trace.to_numpy()
-    labels = list(df_trace.columns)
-    n, d = arr.shape
-
-    fig_h = max(3.0, 1.8 * d)
-    fig, axes = plt.subplots(d, 1, figsize=(14, fig_h), sharex=True)
-
-    if d == 1:
-        axes = [axes]
-
-    palette = plt.get_cmap("Set1")
-
-    for i, ax in enumerate(axes):
-        ax.plot(range(n), arr[:, i], color=palette(i), linewidth=1.2)
-
-        if ylim is not None:
-            ax.set_ylim(ylim)
-
-        ax.set_ylabel(
-            labels[i],
-            fontsize=10,
-            rotation=0,
-            labelpad=55,
-            ha="right",
-            va="center",
-        )
-        ax.set_yticks([0.0, 0.5, 1.0])
-
-    axes[-1].set_xlabel("Iteration")
-    fig.subplots_adjust(left=0.12, hspace=0.35)
-
-    return fig, axes
-
-
 def load_pooled_theta(
     results_pooled: Path, setup, cfg: dict, which: str = "parent_minsse"
 ) -> np.ndarray:
@@ -1376,7 +1303,11 @@ def make_all_plots(
             ax.set_title("Observed RMI stress-strain")
             ax.legend()
             plt.tight_layout()
-            plt.savefig(plots_dir / "observed_data_rmi.png", dpi=200)
+            plt.savefig(
+                plots_dir / "observed_data_rmi.png",
+                dpi=200,
+                bbox_inches="tight",
+            )
             plt.close("all")
 
         except PLOT_ERRORS as e:
@@ -1389,7 +1320,7 @@ def make_all_plots(
         plt.close("all")
         total_temperature_swaps(out, setup)
         plt.tight_layout()
-        plt.savefig(plots_dir / "tempering.png", dpi=200)
+        plt.savefig(plots_dir / "tempering.png", dpi=200, bbox_inches="tight")
         plt.close("all")
 
     except PLOT_ERRORS as e:
@@ -1538,7 +1469,11 @@ def make_all_plots(
                 )
                 ax.legend()
                 plt.tight_layout()
-                plt.savefig(plots_dir / f"experiment_{exp_ind}.png", dpi=200)
+                plt.savefig(
+                    plots_dir / f"experiment_{exp_ind}.png",
+                    dpi=200,
+                    bbox_inches="tight",
+                )
                 plt.close("all")
 
             if include_z:
@@ -1714,7 +1649,7 @@ def make_all_plots(
         ax.set_title("Prediction for All Experiments, Main Block")
         ax.legend()
         plt.tight_layout()
-        plt.savefig(plots_dir / "best_all.png", dpi=200)
+        plt.savefig(plots_dir / "best_all.png", dpi=200, bbox_inches="tight")
         plt.close("all")
 
     except PLOT_ERRORS as e:
@@ -1732,8 +1667,8 @@ def make_all_plots(
             theta_cols = list(setup.bounds.keys())
             df_trace = pd.read_csv(results_dir / "parent_draws.csv")[theta_cols]
 
-        parameter_trace_plot_labeled(df_trace)
-        plt.savefig(plots_dir / "trace.png", dpi=200)
+        parameter_trace_plot(df_trace)
+        plt.savefig(plots_dir / "trace.png", dpi=200, bbox_inches="tight")
         plt.close("all")
 
     except PLOT_ERRORS as e:
