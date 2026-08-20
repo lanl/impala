@@ -435,9 +435,9 @@ def chol_sample_1per_constraints(
     chols = cholesky(covs)
     cand = means + np.einsum("ijk,ik->ij", chols, normal(size=means.shape))
     good = cf(tran_unif(cand, bounds_mat, bounds_keys), bounds, consts)
-    i = 1
+    j = 1
     while np.any(np.logical_not(good)):
-        if i > maxiter:
+        if j > maxiter:
             raise ValueError(
                 f"Failed to find samples that fulfill the constraints after {maxiter} iterations."
             )
@@ -452,7 +452,7 @@ def chol_sample_1per_constraints(
             tran_unif(cand[np.logical_not(good)], bounds_mat, bounds_keys),
             bounds,
         )
-        i += 1
+        j += 1
     return cand
 
 
