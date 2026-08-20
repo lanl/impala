@@ -441,7 +441,7 @@ def chol_sample_1per_constraints(
             raise ValueError(
                 f"Failed to find samples that fulfill the constraints after {maxiter} iterations."
             )
-        cand[np.where(np.logical_not(good))] = +means[
+        cand[np.where(np.logical_not(good))] = means[
             np.logical_not(good)
         ] + np.einsum(
             "ijk,ik->ij",
@@ -472,7 +472,7 @@ def chol_sample_nper_constraints(
                 raise ValueError(
                     f"Failed to find samples that fulfill the constraints after {maxiter} iterations."
                 )
-            cand[i, np.where(np.logical_not(goodi))[0]] = +means[i] + np.einsum(
+            cand[i, np.where(np.logical_not(goodi))[0]] = means[i] + np.einsum(
                 "ik,nk->ni",
                 chols[i],
                 normal(size=((np.logical_not(goodi)).sum(), means.shape[1])),
