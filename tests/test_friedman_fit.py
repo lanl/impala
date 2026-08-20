@@ -37,8 +37,8 @@ def generate_data(n_features: int, gridsize: int):
     # only the first four elements. So the remaining elements should have
     # uniform posteriors.
     # theta = np.random.rand(1, n_features)
-    theta = np.repeat(
-        0.5, n_features
+    theta = np.repeat(0.5, n_features).reshape(
+        1, n_features
     )  # avoid errors due to true theta being up against bounds
     # True observation error standard deviation.
     sigma = 0.1
