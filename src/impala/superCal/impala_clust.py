@@ -2087,10 +2087,11 @@ def calibClust_v2(setup):
     count_temper = (
         count_temper + count_temper.T - np.diag(np.diag(count_temper))
     )
+    s2 = [np.exp(log_s2[i]) for i in range(len(log_s2))]
     out = OutCalibClust(
         theta,
         theta_hist,
-        np.exp(log_s2),  # this is s2, not log_s2
+        s2,  # this is s2, not log_s2
         count,
         count_temper,
         pred_curr,
