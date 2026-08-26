@@ -114,6 +114,20 @@ class CalibSetup:
         self.constants = None
         self.theta0_start = None  # optional
         self.theta_start = None  # optional
+        self.nswap_per = None
+        self.start_temper = None
+        self.start_var_theta = None
+        self.start_tau_theta = None
+        self.start_var_ls2 = None
+        self.start_tau_ls2 = None
+        self.start_adapt_iter = None
+        self.theta0_prior_mean = None
+        self.theta0_prior_cov = None
+        self.Sigma0_prior_df = None
+        self.Sigma0_prior_scale = None
+        self.nclustmax = None
+        self.eta_prior_shape = None
+        self.eta_prior_rate = None
 
     def checkConstraints(self, x, *args):
         """Calls the constraint function set by the user. Argument x contains the parameters to be checked

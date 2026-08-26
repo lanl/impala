@@ -980,6 +980,8 @@ class ModelF_v2(AbstractModel):
         self.D = None
         self.s2 = s2
         self.constants = None
+        self.out_all = None
+        self.res_array = None
 
     def eval(self, parmat, pool=None, nugget=False):
         parmat_array = np.vstack([
@@ -1061,6 +1063,7 @@ class ModelF_bigdata(AbstractModel):
             1, 16200, 16200
         )  # define to speed up discrep_sample evaluation
         self.constants = None
+        self.res_array = None
 
     def eval(self, parmat, pool=None, nugget=False):
         parmat_array = np.vstack([
@@ -1172,11 +1175,11 @@ class ModelMaterialStrength(AbstractModel):
         self.strain_max = self.meas_strain_max.max()
         self.nhists = sum(len(v) for v in strain_histories)
         self.model = pm_vec.MaterialModel(
-            flow_stress_model=eval("pm_vec." + flow_stress_model),
-            shear_modulus_model=eval("pm_vec." + shear_model),
-            specific_heat_model=eval("pm_vec." + specific_heat_model),
-            melt_model=eval("pm_vec." + melt_model),
-            density_model=eval("pm_vec." + density_model),
+            flow_stress_model=getattr(pm_vec, flow_stress_model),
+            shear_modulus_model=getattr(pm_vec, shear_model),
+            specific_heat_model=getattr(pm_vec, specific_heat_model),
+            melt_model=getattr(pm_vec, melt_model),
+            density_model=getattr(pm_vec, density_model),
         )
         self.model_info = [
             flow_stress_model,
