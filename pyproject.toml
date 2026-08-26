@@ -60,4 +60,3 @@ pycodestyle.max-doc-length = 80
 # Ignore test file documentation linting.
 [tool.ruff.lint.extend-per-file-ignores]
 "tests/**/*.py" = ["D"]
-"src/**/__init__.py" = ["F", "E402"]
