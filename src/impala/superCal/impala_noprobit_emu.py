@@ -1886,10 +1886,15 @@ def calibHier_v2(setup):
     else:
         theta0_start = initfunc_unif(size=[setup.ntemps, setup.p])
         good = setup.checkConstraints(
-            tran_unif(theta0_start, setup.bounds_mat, setup.bounds.keys()),
-            setup.bounds,
+            tran_unif(theta0_start, setup.bounds_mat, setup.bounds.keys())
         )
+        maxiter=1000000
+        j = 0
         while np.any(np.logical_not(good)):
+            if j >= maxiter:
+                raise ValueError(
+                    f"Failed to find samples that fulfill the constraints after {maxiter} iterations."
+                )
             theta0_start[np.where(np.logical_not(good))] = initfunc_unif(
                 size=[(np.logical_not(good)).sum(), setup.p]
             )
@@ -1898,9 +1903,9 @@ def calibHier_v2(setup):
                     theta0_start[np.where(np.logical_not(good))],
                     setup.bounds_mat,
                     setup.bounds.keys(),
-                ),
-                setup.bounds,
+                )
             )
+            j += 1
     theta0[0] = theta0_start
     Sigma0[0] = setup.Sigma0_prior_scale / (
         setup.Sigma0_prior_df - setup.p - 1
@@ -3174,10 +3179,15 @@ def calibPool_v2(setup):
     ]
     theta_start0 = initfunc_unif(size=[setup.ntemps, setup.p])
     good = setup.checkConstraints(
-        tran_unif(theta_start0, setup.bounds_mat, setup.bounds.keys()),
-        setup.bounds,
+        tran_unif(theta_start0, setup.bounds_mat, setup.bounds.keys())
     )
+    maxiter=1000000
+    j = 0
     while np.any(np.logical_not(good)):
+        if j >= maxiter:
+            raise ValueError(
+                f"Failed to find samples that fulfill the constraints after {maxiter} iterations."
+            )
         theta_start0[np.where(np.logical_not(good))] = initfunc_unif(
             size=[(np.logical_not(good)).sum(), setup.p]
         )
@@ -3186,9 +3196,9 @@ def calibPool_v2(setup):
                 theta_start0[np.where(np.logical_not(good))],
                 setup.bounds_mat,
                 setup.bounds.keys(),
-            ),
-            setup.bounds,
+            )
         )
+        j += 1
     theta[0] = theta_start0
 
     s2_which_mat = [
