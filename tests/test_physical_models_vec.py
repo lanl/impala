@@ -156,12 +156,12 @@ def test_constparams():
         s2_ind=[0] * len(yobs),
     )
     setup_pool_ptw.setTemperatureLadder(1.05 ** np.arange(20))
-    setup_pool_ptw.setMCMC(nmcmc=2000, decor=100)
+    setup_pool_ptw.setMCMC(nmcmc=5000, decor=100)
     np.seterr(divide="ignore")
     np.seterr(invalid="ignore")
     out = sc.calibPool(setup_pool_ptw)
     # index of posterior samples I will use
-    uu = np.arange(1000, 2000, 5)
+    uu = np.arange(1000, 5000, 5)
 
     mle_idx = np.argmax(out.llik[uu])
     mat = np.vstack((
