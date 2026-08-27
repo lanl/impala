@@ -11,7 +11,7 @@ from impala.superCal.impala_noprobit_emu import (
     theta_log_prior,
 )
 
-if np.version < "2":
+if np.lib.NumpyVersion(np.__version__) < "2.0.0":
     np.trapezoid = np.trapz
 
 
