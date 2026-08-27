@@ -1888,7 +1888,7 @@ def calibHier_v2(setup):
         good = setup.checkConstraints(
             tran_unif(theta0_start, setup.bounds_mat, setup.bounds.keys())
         )
-        maxiter=1000000
+        maxiter = 1000000
         j = 0
         while np.any(np.logical_not(good)):
             if j >= maxiter:
@@ -3181,7 +3181,7 @@ def calibPool_v2(setup):
     good = setup.checkConstraints(
         tran_unif(theta_start0, setup.bounds_mat, setup.bounds.keys())
     )
-    maxiter=1000000
+    maxiter = 1000000
     j = 0
     while np.any(np.logical_not(good)):
         if j >= maxiter:
