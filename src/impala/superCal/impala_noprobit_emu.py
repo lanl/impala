@@ -615,6 +615,9 @@ def tran_probit(th, bounds, names):
 
 
 def tran_unif(th, bounds, names):
+    """
+    transforms th from 0-1 scale to the native scale according to the bounds
+    """
     return dict(zip(names, unnormalize(th, bounds).T))  # If uniform
 
 
@@ -821,6 +824,10 @@ OutCalibHier = namedtuple(
 
 
 class AMcov_pool:
+    """
+    Stores and updates the covariance matrix for Adaptive Metropolis
+    for a pooled calibration
+    """
     def __init__(
         self, ntemps, p, start_var=1e-4, start_adapt_iter=300, tau_start=0.0
     ):
@@ -837,6 +844,10 @@ class AMcov_pool:
         self.count_100 = np.zeros(ntemps, dtype=int)
 
     def update(self, x, m):
+        """
+        updates the covariance of the previous MCMC samples;
+        called in m-th iteration, so latest value is x[m-1]
+        """
         if m > self.start_adapt_iter:
             self.mu += (x[m - 1] - self.mu) / m
             self.cov = +((m - 1) / m) * self.cov + (
@@ -859,7 +870,9 @@ class AMcov_pool:
             )
 
     def update_tau(self, m):
-        # diminishing adaptation based on acceptance rate for each temperature
+        """
+        diminishing adaptation based on acceptance rate for each temperature
+        """
         if (m % 100 == 0) and (m > self.start_adapt_iter):
             delta = min(0.5, 5 / sqrt(m + 1))
             self.tau[np.where(self.count_100 < 23)] = (
@@ -872,6 +885,7 @@ class AMcov_pool:
             # note, e^tau scales whole covariance matrix, so it shrinks covariance for inert inputs too much...need decor for those.
 
     def gen_cand(self, x, m):
+        """generate a candidate"""
         x_cand = +x[m - 1] + np.einsum(
             "ijk,ik->ij", cholesky(self.S), normal(size=(self.ntemps, self.p))
         )
@@ -879,6 +893,10 @@ class AMcov_pool:
 
 
 class AMcov_hier:
+    """
+    Stores and updates the covariance matrix for Adaptive Metropolis
+    for a hierarchical calibration
+    """
     def __init__(
         self,
         nexp,
@@ -905,9 +923,11 @@ class AMcov_hier:
         self.start_adapt_iter = start_adapt_iter
         self.count_100 = [np.zeros((ntemps, ntheta[i])) for i in range(nexp)]
 
-    def update(
-        self, x, m
-    ):  # called in mth iteration, so latest value is x[i][m-1]
+    def update(self, x, m):
+        """
+        updates the covariance of the previous MCMC samples;
+        called in m-th iteration, so latest value is x[i][m-1]
+        """
         if m > self.start_adapt_iter:
             for i in range(self.nexp):
                 self.mu[i] += (x[i][m - 1] - self.mu[i]) / m
@@ -936,7 +956,9 @@ class AMcov_hier:
                 )
 
     def update_tau(self, m):
-        # diminishing adaptation based on acceptance rate for each temperature
+        """
+        diminishing adaptation based on acceptance rate for each temperature
+        """
         if (m % 100 == 0) and (m > self.start_adapt_iter):
             delta = min(0.5, 5 / np.sqrt(m + 1))
             for i in range(self.nexp):
@@ -945,6 +967,7 @@ class AMcov_hier:
                 self.count_100[i] *= 0
 
     def gen_cand(self, x, m):
+        """generate a candidate"""
         x_cand = [
             chol_sample_1per(x[i][m - 1], self.S[i]) for i in range(self.nexp)
         ]
@@ -3757,8 +3780,10 @@ def calibPool_v2(setup):
 
 
 class PoolCalib:
-    # adapted from https://stackoverflow.com/questions/1816958/cant-pickle-type-instancemethod-when-using-multiprocessing-pool-map/41959862#41959862 answer by parisjohn
-    # somewhat slow collection of results
+    """
+    adapted from https://stackoverflow.com/questions/1816958/cant-pickle-type-instancemethod-when-using-multiprocessing-pool-map/41959862#41959862 answer by parisjohn
+    somewhat slow collection of results
+    """
     def __init__(self, setup_list):
         self.setup_list = setup_list
 
