@@ -58,7 +58,6 @@ class AbstractModel:
     @abc.abstractmethod
     def eval(self, parmat):
         """this must be implemented for each model type"""
-        pass
 
     # @profile
     def llik(self, yobs, pred, cov):  # assumes diagonal cov
@@ -68,9 +67,7 @@ class AbstractModel:
         return out
 
     # @profile
-    def llik_v2(
-        self, yobs, pred, cov, wt
-    ):  # added for compatibility with _v2
+    def llik_v2(self, yobs, pred, cov, wt):  # added for compatibility with _v2
         """
         log-likelyhood, assuming a diagonal covariance matrix.
         cov (created by method .lik_cov_inv()) is a dictionary storing the
@@ -587,7 +584,9 @@ class ModelBpprPca_mult(AbstractModel):
         """
         returns a dictionary containing the inverse of the covariance matrix and the log-determinant
         """
-        if inds is None: # TODO: test this. There may need to be changes to the inds-based subsetting!
+        if (
+            inds is None
+        ):  # TODO: test this. There may need to be changes to the inds-based subsetting!
             inds = np.arange(0, len(s2vec), 1)
         Sigma = cor2cov(
             self.meas_error_cor[inds, inds], np.sqrt(s2vec)

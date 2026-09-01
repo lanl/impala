@@ -828,6 +828,7 @@ class AMcov_pool:
     Stores and updates the covariance matrix for Adaptive Metropolis
     for a pooled calibration
     """
+
     def __init__(
         self, ntemps, p, start_var=1e-4, start_adapt_iter=300, tau_start=0.0
     ):
@@ -897,6 +898,7 @@ class AMcov_hier:
     Stores and updates the covariance matrix for Adaptive Metropolis
     for a hierarchical calibration
     """
+
     def __init__(
         self,
         nexp,
@@ -3784,6 +3786,7 @@ class PoolCalib:
     adapted from https://stackoverflow.com/questions/1816958/cant-pickle-type-instancemethod-when-using-multiprocessing-pool-map/41959862#41959862 answer by parisjohn
     somewhat slow collection of results
     """
+
     def __init__(self, setup_list):
         self.setup_list = setup_list
 
