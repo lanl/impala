@@ -1972,6 +1972,8 @@ def main():
     print("Results in:", str(results_dir))
     print("Plots in:", str(plots_dir))
 
+    return setup, out, (run_dir, results_dir, plots_dir)
+
 
 if __name__ == "__main__":
-    main()
+    setup, out, folders = main()
