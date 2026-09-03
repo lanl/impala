@@ -33,8 +33,7 @@ from scipy.stats import halfcauchy, invgamma, qmc
 from impala import superCal as sc
 
 
-### Function for obtaining the MAP estimator associated
-### with the pooled Impala model
+###
 def get_map_impalapool(
     setup,
     n_samples=1000,
@@ -45,6 +44,9 @@ def get_map_impalapool(
     T=1,
     n_cores=10,
 ):
+    """
+    Function for obtaining the MAP estimator associated with the pooled Impala model
+    """
     if str(type(niter)) == "<class 'NoneType'>":
         niter = setup.p * 10
 
@@ -282,7 +284,6 @@ def get_map_impalapool(
     else:
         raise ValueError("Invalid optmethod")
 
-
     if optmethod == "bh":
         res_trans0 = copy.deepcopy(res.x)
     elif optmethod == "pso":
@@ -299,10 +300,13 @@ def get_map_impalapool(
     return res_trans
 
 
-### Monte Carlo integrated posterior for pooled impala model, integrating out everything but v (basis coefficients for discrepancy)
+###
 def eval_partialintlogposterior_impalapool(
     setup, n_samples=1000, theta=None, disc_v=None
 ):
+    """
+    Monte Carlo integrated posterior for pooled impala model, integrating out everything but v (basis coefficients for discrepancy)
+    """
     ### Draw s2
     s2 = [np.empty([n_samples, len(setup.ig_a[i])]) for i in range(setup.nexp)]
     for i in range(setup.nexp):
@@ -399,8 +403,11 @@ def eval_partialintlogposterior_impalapool(
     return loglik
 
 
-### Monte Carlo integrated posterior for pooled impala model, integrating out everything including v (basis coefficients for discrepancy)
+###
 def eval_fullintlogposterior_impalapool(setup, n_samples=1000, theta=None):
+    """
+    Monte Carlo integrated posterior for pooled impala model, integrating out everything including v (basis coefficients for discrepancy)
+    """
     ### Draw s2
     s2 = [np.empty([n_samples, len(setup.ig_a[i])]) for i in range(setup.nexp)]
     for i in range(setup.nexp):

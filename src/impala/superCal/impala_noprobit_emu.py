@@ -3336,9 +3336,8 @@ def calibPool_v2(setup):
 
     ## start MCMC
     for m in pbar(range(1, setup.nmcmc)):
-        theta[m] = theta[
-            m - 1
-        ].copy()  # current set to previous, will change if accepted
+        theta[m] = theta[m - 1].copy()
+        # current set to previous, will change if accepted
         for i in range(setup.nexp):
             log_s2[i][m] = log_s2[i][m - 1].copy()
             if setup.models[i].nd > 0:  # update discrepancy
@@ -3434,10 +3433,7 @@ def calibPool_v2(setup):
                     size=setup.ntemps
                 )  # independence proposal, will vectorize of columns
                 good_values = setup.checkConstraints(
-                    tran_unif(
-                        theta_cand, setup.bounds_mat, setup.bounds.keys()
-                    ),
-                    setup.bounds,
+                    tran_unif(theta_cand, setup.bounds_mat, setup.bounds.keys())
                 )
                 pred_cand = [_.copy() for _ in pred_curr]
                 llik_cand[:] = llik_curr.copy()
