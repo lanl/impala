@@ -5,6 +5,15 @@ Created on Mon Apr 24 09:30:15 2023
 """
 
 ### Imports
+import copy
+
+try:
+    import multiprocess as mp
+except ImportError:
+    print("multiprocess is not installed. Install with:")
+    print("pip install 'impala-calib[map]'")
+    print("or")
+    print("pip install multiprocess")
 try:
     import pyswarm
 except ImportError:
@@ -18,8 +27,8 @@ except ImportError:
 
 
 import numpy as np
-from scipy.optimize import NonlinearConstraint, basinhopping
-from scipy.stats import halfcauchy, invgamma
+from scipy.optimize import NonlinearConstraint, basinhopping, minimize
+from scipy.stats import halfcauchy, invgamma, qmc
 
 from impala import superCal as sc
 
@@ -77,7 +86,6 @@ def get_map_impalapool(
                         setup.bounds_mat,
                         setup.bounds.keys(),
                     ),
-                    setup.bounds,
                 )[0]
             )
             return A
@@ -93,7 +101,6 @@ def get_map_impalapool(
                         setup.bounds_mat,
                         setup.bounds.keys(),
                     ),
-                    setup.bounds,
                 )[0]
             )
             return A - 0.5
@@ -120,11 +127,10 @@ def get_map_impalapool(
         else:
             theta_cur = y[0, :].reshape(1, -1)
         CONSTRAINTS = setup.checkConstraints(
-            sc.tran_unif(theta_cur, setup.bounds_mat, setup.bounds.keys()),
-            setup.bounds,
+            sc.tran_unif(theta_cur, setup.bounds_mat, setup.bounds.keys())
         )
         if (
-            CONSTRAINTS[0] == True
+            CONSTRAINTS[0] is True
             and (theta_cur <= 0).sum() == 0
             and (theta_cur >= 1).sum() == 0
         ):
@@ -221,10 +227,6 @@ def get_map_impalapool(
             maxiter=niter,
         )
     elif optmethod == "grid":
-        import multiprocess as mp
-        from scipy.optimize import minimize
-        from scipy.stats import qmc
-
         sampler = qmc.LatinHypercube(d=setup.p)
         sample = sampler.random(n=10000)
         sample = np.append(
@@ -233,8 +235,7 @@ def get_map_impalapool(
             axis=0,
         )
         CONSTRAINTS = setup.checkConstraints(
-            sc.tran_unif(sample, setup.bounds_mat, setup.bounds.keys()),
-            setup.bounds,
+            sc.tran_unif(sample, setup.bounds_mat, setup.bounds.keys())
         )
         sample = sample[CONSTRAINTS, :]
         niter = np.min((niter, sample.shape[0]))
@@ -279,10 +280,8 @@ def get_map_impalapool(
         with mp.Pool(n_cores) as pool:
             A = pool.map(run_mcmc_in_parallel, range(niter))
     else:
-        print("Invalid optmethod")
-        return
+        raise ValueError("Invalid optmethod")
 
-    import copy
 
     if optmethod == "bh":
         res_trans0 = copy.deepcopy(res.x)

@@ -677,7 +677,7 @@ def load_curve_group(
         if f in drop_first_files:
             arr = arr[1:, :]
 
-        if divisor != 1.0:
+        if abs(divisor - 1.0) > 1e-15:
             arr = arr.copy()
             arr[:, 1] /= divisor
 
