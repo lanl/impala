@@ -1759,7 +1759,7 @@ def write_run_files(
 # ----------------------------------------------------------------------
 
 
-def main():
+def main(args=None):
     ap = argparse.ArgumentParser(description="Unified PTW calibration script.")
     ap.add_argument("--mode", choices=["hier", "pooled"], required=True)
     ap.add_argument("--config", type=Path, default=Path("cu_config.yaml"))
@@ -1777,7 +1777,10 @@ def main():
         help="Optional pooled results directory to overlay pooled best-SSE curve on hierarchical experiment plots.",
     )
 
-    args = ap.parse_args()
+    if args is None:
+        args = ap.parse_args()
+    else:
+        args = ap.parse_args(args)
 
     print(f"seed={args.seed}")
     seeds(args.seed)
