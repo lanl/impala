@@ -36,6 +36,9 @@ np.seterr(under="ignore")
 
 
 def is_valid_mapping(theta_inds, s2_inds):
+    """
+    Verify that there aren't multiple thetas with shared measurement error.
+    """
     error_to_x = defaultdict(set)
 
     for x, e in zip(theta_inds, s2_inds):
@@ -608,6 +611,9 @@ def subset_dict(dd, idx):
 
 
 def tran_probit(th, bounds, names):
+    """
+    transforms th from 0-1 scale to the native scale according to the bounds
+    """
     return dict(zip(names, unnormalize(invprobit(th), bounds).T))  # If probit
     # return dict(zip(names, unnormalize(th, bounds).T)) # If uniform
 
@@ -620,18 +626,21 @@ def tran_unif(th, bounds, names):
 
 
 def chol_sample(mean, cov):
+    """generate samples"""
     return mean + np.dot(
         np.linalg.cholesky(cov), np.random.standard_normal(mean.size)
     )
 
 
 def chol_sample_1per(means, covs):
+    """generate samples"""
     return means + np.einsum(
         "tnpq,tnq->tnp", cholesky(covs), normal(size=means.shape)
     )
 
 
 def chol_sample_nper(means, covs, n):
+    """generate samples"""
     return means + np.einsum(
         "ijk,ilk->ilj", cholesky(covs), normal(size=(*means.shape, n))
     )
