@@ -17,6 +17,7 @@ from scipy.interpolate import interp1d
 from scipy.linalg import cho_factor, cholesky
 
 from .. import physics as pm_vec
+from .impala_noprobit_emu import chol_sample
 
 try:
     import fdasrsf as fs
@@ -30,14 +31,12 @@ except ImportError:
 ########################
 
 
-def cor2cov(R, s):  # R is correlation matrix, s is sd vector
+def cor2cov(R, s):
+    """
+    Returns the covariance matrix.
+    R is the correlation matrix, s is the standard deviation vector.
+    """
     return np.outer(s, s) * R
-
-
-def chol_sample(mean, cov):
-    return mean + np.dot(
-        np.linalg.cholesky(cov), np.random.standard_normal(mean.size)
-    )
 
 
 #####################
@@ -56,8 +55,8 @@ class AbstractModel:
         pass
 
     @abc.abstractmethod
-    def eval(self, parmat):  # this must be implemented for each model type
-        pass
+    def eval(self, parmat):
+        """this must be implemented for each model type"""
 
     # @profile
     def llik(self, yobs, pred, cov):  # assumes diagonal cov
@@ -67,12 +66,15 @@ class AbstractModel:
         return out
 
     # @profile
-    def llik_v2(
-        self, yobs, pred, cov, wt
-    ):  # assumes diagonal cov, added for compatibility with _v2
+    def llik_v2(self, yobs, pred, cov, wt):  # added for compatibility with _v2
+        """
+        log-likelyhood, assuming a diagonal covariance matrix.
+        cov (created by method .lik_cov_inv()) is a dictionary storing the
+        diagonal of the inverse covariance matrix as well as the log-determinant.
+        """
         vec = yobs.flatten() - pred.flatten()
         vec2 = vec * vec * cov["inv"]
-        out = ((-0.5 * cov["ldet"] - 0.5 * vec2) * wt).sum()
+        out = -0.5 * cov["ldet"] - 0.5 * (vec2 * wt).sum()
         return out
 
     # @profile
@@ -84,10 +86,14 @@ class AbstractModel:
 
     # @profile
     def lik_cov_inv_v2(
-        self, s2vec, inds=None
-    ):  # default is diagonal covariance matrix. Added inds argument, not needed for this implementation
+        self, s2vec, wt, inds=None
+    ):  # Added inds argument, not needed for this implementation
+        """
+        returns a dictionary containing the inverse of the covariance matrix and the log-determinant
+        In this default implementation, we assume a diagnoal covariance matrix.
+        """
         inv = 1 / s2vec
-        ldet = np.log(s2vec).sum()
+        ldet = (wt * np.log(s2vec)).sum()
         out = {"inv": inv, "ldet": ldet}
         return out
 
@@ -190,11 +196,19 @@ class ModelmvBayes(AbstractModel):
             # this is evaluating all experiments for all thetas, which is overkill
 
     def llik(self, yobs, pred, cov):
+        """
+        log-likelyhood
+        cov (created by method .lik_cov_inv()) is a dictionary storing the
+        inverse covariance matrix as well as the log-determinant.
+        """
         vec = yobs - pred
         out = -0.5 * (cov["ldet"] + vec.T @ cov["inv"] @ vec)
         return out
 
     def lik_cov_inv(self, s2vec):
+        """
+        returns a dictionary containing the inverse of the covariance matrix and the log-determinant
+        """
         n = len(s2vec)
         Sigma = cor2cov(
             self.meas_error_cor[:n, :n], np.sqrt(s2vec)
@@ -316,11 +330,19 @@ class ModelmvBayes_mf(AbstractModel):
         return pred
 
     def llik(self, yobs, pred, cov):
+        """
+        log-likelyhood
+        cov (created by method .lik_cov_inv()) is a dictionary storing the
+        inverse covariance matrix as well as the log-determinant.
+        """
         vec = yobs - pred
         out = -0.5 * (cov["ldet"] + vec.T @ cov["inv"] @ vec)
         return out
 
     def lik_cov_inv(self, s2vec):
+        """
+        returns a dictionary containing the inverse of the covariance matrix and the log-determinant
+        """
         n = len(s2vec)
         Sigma = cor2cov(
             self.meas_error_cor[:n, :n], np.sqrt(s2vec)
@@ -415,11 +437,19 @@ class ModelBassPca_mult(AbstractModel):
             # this is evaluating all experiments for all thetas, which is overkill
 
     def llik(self, yobs, pred, cov):
+        """
+        log-likelyhood
+        cov (created by method .lik_cov_inv()) is a dictionary storing the
+        inverse covariance matrix as well as the log-determinant.
+        """
         vec = yobs - pred
         out = -0.5 * (cov["ldet"] + vec.T @ cov["inv"] @ vec)
         return out
 
     def lik_cov_inv(self, s2vec):
+        """
+        returns a dictionary containing the inverse of the covariance matrix and the log-determinant
+        """
         n = len(s2vec)
         Sigma = cor2cov(
             self.meas_error_cor[:n, :n], np.sqrt(s2vec)
@@ -540,13 +570,20 @@ class ModelBpprPca_mult(AbstractModel):
 
     # @profile
     def llik_v2(self, yobs, pred, cov, wt):
+        """
+        log-likelyhood
+        cov (created by method .lik_cov_inv()) is a dictionary storing the
+        inverse covariance matrix as well as the log-determinant.
+        """
         vec = np.sqrt(wt) * (yobs - pred).flatten()
-        out = -0.5 * (cov["ldet"] * np.sum(wt) + vec.T @ cov["inv"] @ vec)
+        out = -0.5 * cov["ldet"] + vec.T @ cov["inv"] @ vec
         return out
 
-    def lik_cov_inv_v2(
-        self, s2vec, inds=None
-    ):  # note: I have not tested this. There may need to be changes to the inds-based subsetting!
+    def lik_cov_inv_v2(self, s2vec, wt, inds=None):
+        """
+        returns a dictionary containing the inverse of the covariance matrix and the log-determinant
+        """
+        # TODO: test this. There may need to be changes to the inds-based subsetting!
         if inds is None:
             inds = np.arange(0, len(s2vec), 1)
         Sigma = cor2cov(
@@ -562,7 +599,7 @@ class ModelBpprPca_mult(AbstractModel):
         )
         # this doesnt work for vectorized experiments...maybe dont allow those for BASS
         chol = cholesky(mat)
-        ldet = 2 * np.sum(np.log(np.diag(chol)))
+        ldet = 2 * np.sum(wt * np.log(np.diag(chol)))
         # la.dpotri(chol, overwrite_c=True) # overwrites chol with original matrix inverse
         inv = np.linalg.inv(mat)
         out = {"inv": inv, "ldet": ldet}
@@ -690,6 +727,11 @@ class ModelBassPca_func(AbstractModel):
 
     # @profile
     def llik_v2(self, yobs, pred, cov, wt):
+        """
+        log-likelyhood
+        cov (created by method .lik_cov_inv()) is a dictionary storing the
+        inverse covariance matrix as well as the log-determinant.
+        """
         vec = np.sqrt(wt) * (yobs - pred).flatten()
         out = -0.5 * (cov["ldet"] * np.sum(wt) + vec.T @ cov["inv"] @ vec)
         return out
@@ -710,12 +752,15 @@ class ModelBassPca_func(AbstractModel):
         return out
 
     # @profile
-    def lik_cov_inv_v2(self, s2vec, inds=None):
+    def lik_cov_inv_v2(self, s2vec, wt, inds=None):
+        """
+        returns a dictionary containing the inverse of the covariance matrix and the log-determinant
+        """
         if inds is None:
             inds = np.arange(0, len(s2vec), 1)
         vec = self.trunc_error_var[inds] + s2vec
         Ainv = np.diag(1 / vec)
-        Aldet = np.log(vec).sum()
+        Aldet = (wt * np.log(vec)).sum()
         out = self.swm(
             Ainv,
             self.basis[inds, :],
@@ -737,9 +782,8 @@ class ModelBassPca_func(AbstractModel):
         return out
 
     # @profile
-    def swm(
-        self, Ainv, U, Cinv, V, Aldet, Cldet
-    ):  # sherman woodbury morrison (A+UCV)^-1 and |A+UCV|
+    def swm(self, Ainv, U, Cinv, V, Aldet, Cldet):
+        """Sherman Woodbury Morrison (A+UCV)^-1 and |A+UCV|"""
         in_mat = self.chol_solve(Cinv + V @ Ainv @ U)
         inv = Ainv - Ainv @ U @ in_mat["inv"] @ V @ Ainv
         ldet = in_mat["ldet"] + Aldet + Cldet
@@ -846,12 +890,20 @@ class ModelBpprPca_func(AbstractModel):
 
     # @profile
     def llik(self, yobs, pred, cov):
+        """
+        log-likelyhood
+        cov (created by method .lik_cov_inv()) is a dictionary storing the
+        inverse covariance matrix as well as the log-determinant.
+        """
         vec = yobs - pred
         out = -0.5 * (cov["ldet"] + vec.T @ cov["inv"] @ vec)
         return out
 
     # @profile
     def lik_cov_inv(self, s2vec):
+        """
+        returns a dictionary containing the inverse of the covariance matrix and the log-determinant
+        """
         vec = self.trunc_error_var + s2vec
         # mat = np.diag(vec) + self.basis @ np.diag(self.emu_vars) @ self.basis.T
         # inv = np.linalg.inv(mat)
@@ -880,9 +932,8 @@ class ModelBpprPca_func(AbstractModel):
         return out
 
     # @profile
-    def swm(
-        self, Ainv, U, Cinv, V, Aldet, Cldet
-    ):  # sherman woodbury morrison (A+UCV)^-1 and |A+UCV|
+    def swm(self, Ainv, U, Cinv, V, Aldet, Cldet):
+        """Sherman Woodbury Morrison (A+UCV)^-1 and |A+UCV|"""
         in_mat = self.chol_solve(Cinv + V @ Ainv @ U)
         inv = Ainv - Ainv @ U @ in_mat["inv"] @ V @ Ainv
         ldet = in_mat["ldet"] + Aldet + Cldet
@@ -980,6 +1031,8 @@ class ModelF_v2(AbstractModel):
         self.D = None
         self.s2 = s2
         self.constants = None
+        self.out_all = None
+        self.res_array = None
 
     def eval(self, parmat, pool=None, nugget=False):
         parmat_array = np.vstack([
@@ -1061,6 +1114,7 @@ class ModelF_bigdata(AbstractModel):
             1, 16200, 16200
         )  # define to speed up discrep_sample evaluation
         self.constants = None
+        self.res_array = None
 
     def eval(self, parmat, pool=None, nugget=False):
         parmat_array = np.vstack([
@@ -1070,7 +1124,7 @@ class ModelF_bigdata(AbstractModel):
             return np.apply_along_axis(self.mod, 1, parmat_array)
         else:
             # nrep = list(parmat.values())[0].shape[0] // self.nexp
-            nrep = next(iter(parmat.values())) // self.nexp
+            nrep = next(iter(parmat.values())).shape[0] // self.nexp
             self.res_array = np.zeros([nrep, len(self.exp_ind)])
             for i in range(self.nexp):
                 inds_to_run = np.ix_(
@@ -1113,17 +1167,24 @@ class ModelF_bigdata(AbstractModel):
         return out
 
     def llik_v2(self, yobs, pred, cov, wt):  # assumes diagonal cov
+        """
+        log-likelyhood, assuming a diagonal covariance matrix.
+        cov (created by method .lik_cov_inv()) is a dictionary storing the
+        diagonal of the inverse covariance matrix as well as the log-determinant.
+        """
         self.vec = yobs.flatten() - pred.flatten()
         self.vec2 = self.vec * self.vec * cov["inv"]
         out = ((-0.5 * cov["ldet"] - 0.5 * self.vec2) * wt).sum()
         return out
 
-    def lik_cov_inv_v2(
-        self, s2vec, inds=None
-    ):  # default is diagonal covariance matrix
+    def lik_cov_inv_v2(self, s2vec, wt, inds=None):
+        """
+        returns a dictionary containing the inverse of the covariance matrix and the log-determinant
+        In this default implementation, we assume a diagnoal covariance matrix.
+        """
         vec = s2vec
         self.inv = 1 / vec
-        ldet = np.log(vec).sum()
+        ldet = (wt * np.log(vec)).sum()
         out = {"inv": self.inv, "ldet": ldet}
         return out
 
@@ -1172,11 +1233,11 @@ class ModelMaterialStrength(AbstractModel):
         self.strain_max = self.meas_strain_max.max()
         self.nhists = sum(len(v) for v in strain_histories)
         self.model = pm_vec.MaterialModel(
-            flow_stress_model=eval("pm_vec." + flow_stress_model),
-            shear_modulus_model=eval("pm_vec." + shear_model),
-            specific_heat_model=eval("pm_vec." + specific_heat_model),
-            melt_model=eval("pm_vec." + melt_model),
-            density_model=eval("pm_vec." + density_model),
+            flow_stress_model=getattr(pm_vec, flow_stress_model),
+            shear_modulus_model=getattr(pm_vec, shear_model),
+            specific_heat_model=getattr(pm_vec, specific_heat_model),
+            melt_model=getattr(pm_vec, melt_model),
+            density_model=getattr(pm_vec, density_model),
         )
         self.model_info = [
             flow_stress_model,
@@ -1275,8 +1336,10 @@ def interpolate_experiment(args):
 
 
 #######
-### getoptions_ModelMaterialStrength: Provides current options for ModelMaterialStrength physical models
 def getoptions_ModelMaterialStrength():
+    """
+    Provides current options for ModelMaterialStrength physical models
+    """
     mod_options = dir(pm_vec)
     flow_stress_model = list(
         filter(re.compile(".*Yield_Stress").match, mod_options)
@@ -1302,9 +1365,9 @@ def getoptions_ModelMaterialStrength():
 
 
 #######
-### showdef_ModelMaterialStrength: Shows the definition for a given ModelMaterialStrength function listed in getoptions_ModelMaterialStrength()
 def showdef_ModelMaterialStrength(func_name):
     """
+    Shows the definition for a given ModelMaterialStrength function listed in getoptions_ModelMaterialStrength()
     func_name: string listing a function listed in get_ModelMaterialStrength_options(), e.g., showdef_ModelMaterialStrength('Linear_Specific_Heat')
     """
 

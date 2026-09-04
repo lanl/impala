@@ -1,3 +1,7 @@
+####################################
+"""Impala clustered calibration"""
+
+####################################
 import multiprocessing as mp
 import time
 from collections import namedtuple
@@ -1223,10 +1227,15 @@ def calibClust_v2(setup):
     else:
         theta0_start = initfunc_unif(size=[setup.ntemps, setup.p])
         good = setup.checkConstraints(
-            tran_unif(theta0_start, setup.bounds_mat, setup.bounds.keys()),
-            setup.bounds,
+            tran_unif(theta0_start, setup.bounds_mat, setup.bounds.keys())
         )
+        maxiter = 1000000
+        j = 0
         while np.any(np.logical_not(good)):
+            if j >= maxiter:
+                raise ValueError(
+                    f"Failed to find samples that fulfill the constraints after {maxiter} iterations."
+                )
             theta0_start[np.where(np.logical_not(good))] = initfunc_unif(
                 size=[(np.logical_not(good)).sum(), setup.p]
             )
@@ -1235,9 +1244,9 @@ def calibClust_v2(setup):
                     theta0_start[np.where(np.logical_not(good))],
                     setup.bounds_mat,
                     setup.bounds.keys(),
-                ),
-                setup.bounds,
+                )
             )
+            j += 1
     theta0[0] = theta0_start
 
     s2_which_mat = [
@@ -1385,6 +1394,7 @@ def calibClust_v2(setup):
             for j in range(setup.ntheta[i]):
                 marg_lik_cov_curr[i][t][j] = setup.models[i].lik_cov_inv_v2(
                     np.exp(s2_stretched[theta_which_mat[i][j]]),
+                    wt_mat[i][theta_which_mat[i][j]],
                     s2_which_mat[i][j],
                 )
                 llik_curr_theta[i][t][j] = setup.models[i].llik_v2(
@@ -1627,7 +1637,9 @@ def calibClust_v2(setup):
                 ),
                 False,
             )
-            llik_curr_theta[i][accept] = llik_cand_theta[i][accept]
+            llik_curr_theta[i][accept[:, i]] = llik_cand_theta[i][
+                accept[:, i]
+            ]  # Changed 8/18/26
 
         count += accept.sum(axis=1)
         cov_theta_cand.count_100 += accept.sum(axis=1)
@@ -1670,6 +1682,7 @@ def calibClust_v2(setup):
                             i
                         ].lik_cov_inv_v2(
                             np.exp(s2_stretched[theta_which_mat[i][j]]),
+                            wt_mat[i][theta_which_mat[i][j]],
                             s2_which_mat[i][j],
                         )
                         llik_curr_theta[i][t][j] = setup.models[i].llik_v2(
@@ -1760,6 +1773,7 @@ def calibClust_v2(setup):
                             i
                         ].lik_cov_inv_v2(
                             np.exp(s2_stretched[theta_which_mat[i][j]]),
+                            wt_mat[i][theta_which_mat[i][j]],
                             s2_which_mat[i][j],
                         )
                         llik_curr_theta[i][t][j] = setup.models[i].llik_v2(
@@ -1779,12 +1793,14 @@ def calibClust_v2(setup):
                             i
                         ].lik_cov_inv_v2(
                             np.exp(s2_stretched[s2_which_mat[i][j]]),
+                            wt_mat[i][theta_which_mat[i][j]],
                             s2_which_mat[i][j],
                         )
-                        llik_curr_theta[i][t][j] = setup.models[i].llik(
+                        llik_curr_theta[i][t][j] = setup.models[i].llik_v2(
                             setup.ys[i][s2_which_mat[i][j]],
                             pred_curr_theta[i][t][s2_which_mat[i][j]],
                             marg_lik_cov_curr[i][t][j],
+                            wt_mat[i][theta_which_mat[i][j]],
                         )
 
             else:

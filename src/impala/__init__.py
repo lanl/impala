@@ -9,3 +9,5 @@ except PackageNotFoundError:
     __version__ = (
         "local"  ## use this if impala is not installed,  but imported locally
     )
+
+__all__ = ["physics", "superCal"]
