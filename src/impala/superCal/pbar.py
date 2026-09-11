@@ -87,7 +87,7 @@ class pbar:
     def print(self, toc):
         if self.i == 0:
             self.bar = f"{self.clean(datetime.now())}"
-            print(f"[{self.bar}]", end="\r", flush=True)
+            print(f"\n[{self.bar}]", end="\r", flush=True)
         elif toc - self.tic > self.min_interval or self.i == self.iters:
             elapsed = toc - self.genesis
             speed = f"{self.i / elapsed:.2f}" if self.i > 0 else "???"
