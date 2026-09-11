@@ -37,7 +37,7 @@ def test_no_prior_is_zero_and_default_empty():
     theta = np.random.rand(5, 2)
     lp = theta_log_prior(setup, theta)
     assert lp.shape == (5,)
-    assert np.all(lp == 0.0)
+    assert np.all(np.abs(lp) < 1e-15)
 
 
 def test_independent_priors_match_scipy():
@@ -211,6 +211,7 @@ def test_calibPool_prior_shifts_posterior():
     assert abs(flat_mean - truth[0]) < 0.1
     # with a tight prior at 0.2 the posterior is pulled well away from it
     assert prior_mean < flat_mean - 0.2
+    assert abs(prior_mean - 0.2) < 0.05
 
 
 def test_calibPool_recovers_prior_with_no_information():
@@ -241,29 +242,6 @@ def test_calibPool_recovers_prior_with_no_information():
     # t_1 has no prior, so it should still be uniform
     draws1 = out.theta[4000::2, 0, 1]
     assert abs(draws1.mean() - 0.5) < 0.05
-
-
-def test_calibPool_v2_prior_shifts_posterior():
-    np.random.seed(0)
-    grid = np.linspace(0, 1, 30)
-    line = Line(grid)
-    model = sc.ModelF(line, input_names=["t_0", "t_1"])
-    yobs = np.random.normal(line(np.array([0.8, 0.2])), 0.1)
-
-    np.random.seed(1)
-    out_flat = sc.calibPool_v2(build_line_setup(yobs, model, nmcmc=3000))
-
-    setup = build_line_setup(yobs, model, nmcmc=3000)
-    setup.addThetaPrior(
-        dist="normal", params={"mean": 0.2, "sd": 0.02}, pname="t_0"
-    )
-    np.random.seed(1)
-    out_prior = sc.calibPool_v2(setup)
-
-    flat_mean = out_flat.theta[1500:, 0, 0].mean()
-    prior_mean = out_prior.theta[1500:, 0, 0].mean()
-    assert prior_mean < flat_mean - 0.2
-    assert abs(prior_mean - 0.2) < 0.05
 
 
 def test_calibPool_unchanged_without_prior():

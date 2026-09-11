@@ -59,14 +59,7 @@ class AbstractModel:
         """this must be implemented for each model type"""
 
     # @profile
-    def llik(self, yobs, pred, cov):  # assumes diagonal cov
-        vec = yobs - pred
-        vec2 = vec * vec * cov["inv"]
-        out = -0.5 * cov["ldet"] - 0.5 * vec2.sum()
-        return out
-
-    # @profile
-    def llik_v2(self, yobs, pred, cov, wt):  # added for compatibility with _v2
+    def llik(self, yobs, pred, cov, wt):
         """
         log-likelyhood, assuming a diagonal covariance matrix.
         cov (created by method .lik_cov_inv()) is a dictionary storing the
@@ -78,14 +71,7 @@ class AbstractModel:
         return out
 
     # @profile
-    def lik_cov_inv(self, s2vec):  # default is diagonal covariance matrix
-        inv = 1 / s2vec
-        ldet = np.log(s2vec).sum()
-        out = {"inv": inv, "ldet": ldet}
-        return out
-
-    # @profile
-    def lik_cov_inv_v2(
+    def lik_cov_inv(
         self, s2vec, wt, inds=None
     ):  # Added inds argument, not needed for this implementation
         """
@@ -195,7 +181,7 @@ class ModelmvBayes(AbstractModel):
             )
             # this is evaluating all experiments for all thetas, which is overkill
 
-    def llik(self, yobs, pred, cov):
+    def llik(self, yobs, pred, cov, wt=None):
         """
         log-likelyhood
         cov (created by method .lik_cov_inv()) is a dictionary storing the
@@ -205,7 +191,7 @@ class ModelmvBayes(AbstractModel):
         out = -0.5 * (cov["ldet"] + vec.T @ cov["inv"] @ vec)
         return out
 
-    def lik_cov_inv(self, s2vec):
+    def lik_cov_inv(self, s2vec, wt=None, inds=None):
         """
         returns a dictionary containing the inverse of the covariance matrix and the log-determinant
         """
@@ -329,7 +315,7 @@ class ModelmvBayes_mf(AbstractModel):
 
         return pred
 
-    def llik(self, yobs, pred, cov):
+    def llik(self, yobs, pred, cov, wt=None):
         """
         log-likelyhood
         cov (created by method .lik_cov_inv()) is a dictionary storing the
@@ -339,7 +325,7 @@ class ModelmvBayes_mf(AbstractModel):
         out = -0.5 * (cov["ldet"] + vec.T @ cov["inv"] @ vec)
         return out
 
-    def lik_cov_inv(self, s2vec):
+    def lik_cov_inv(self, s2vec, wt=None, inds=None):
         """
         returns a dictionary containing the inverse of the covariance matrix and the log-determinant
         """
@@ -436,7 +422,7 @@ class ModelBassPca_mult(AbstractModel):
             )
             # this is evaluating all experiments for all thetas, which is overkill
 
-    def llik(self, yobs, pred, cov):
+    def llik(self, yobs, pred, cov, wt=None):
         """
         log-likelyhood
         cov (created by method .lik_cov_inv()) is a dictionary storing the
@@ -446,7 +432,7 @@ class ModelBassPca_mult(AbstractModel):
         out = -0.5 * (cov["ldet"] + vec.T @ cov["inv"] @ vec)
         return out
 
-    def lik_cov_inv(self, s2vec):
+    def lik_cov_inv(self, s2vec, wt=None, inds=None):
         """
         returns a dictionary containing the inverse of the covariance matrix and the log-determinant
         """
@@ -544,32 +530,7 @@ class ModelBpprPca_mult(AbstractModel):
             )
             # this is evaluating all experiments for all thetas, which is overkill
 
-    def llik(self, yobs, pred, cov):
-        vec = yobs - pred
-        out = -0.5 * (cov["ldet"] + vec.T @ cov["inv"] @ vec)
-        return out
-
-    def lik_cov_inv(self, s2vec):
-        n = len(s2vec)
-        Sigma = cor2cov(
-            self.meas_error_cor[:n, :n], np.sqrt(s2vec)
-        )  # :n is a hack for when ntheta>1 in heir...fix this sometime
-        mat = (
-            Sigma
-            + self.trunc_error_cov
-            + self.discrep_cov
-            + self.basis @ np.diag(self.emu_vars) @ self.basis.T
-        )
-        # this doesnt work for vectorized experiments...maybe dont allow those for BASS
-        chol = cholesky(mat)
-        ldet = 2 * np.sum(np.log(np.diag(chol)))
-        # la.dpotri(chol, overwrite_c=True) # overwrites chol with original matrix inverse
-        inv = np.linalg.inv(mat)
-        out = {"inv": inv, "ldet": ldet}
-        return out
-
-    # @profile
-    def llik_v2(self, yobs, pred, cov, wt):
+    def llik(self, yobs, pred, cov, wt):
         """
         log-likelyhood
         cov (created by method .lik_cov_inv()) is a dictionary storing the
@@ -579,7 +540,7 @@ class ModelBpprPca_mult(AbstractModel):
         out = -0.5 * cov["ldet"] + vec.T @ cov["inv"] @ vec
         return out
 
-    def lik_cov_inv_v2(self, s2vec, wt, inds=None):
+    def lik_cov_inv(self, s2vec, wt, inds=None):
         """
         returns a dictionary containing the inverse of the covariance matrix and the log-determinant
         """
@@ -662,18 +623,7 @@ class ModelBassPca_func(AbstractModel):
         self.ii = np.random.choice(range(self.nmcmc), 1).item()
         self.emu_vars = self.mod_s2[self.ii]
 
-    # @profile
-    def discrep_sample(self, yobs, pred, cov, itemp):
-        # if self.nd>0:
-        S = np.linalg.inv(
-            np.eye(self.nd) / self.discrep_tau + self.D.T @ cov["inv"] @ self.D
-        )
-        m = self.D.T @ cov["inv"] @ (yobs - pred)
-        discrep_vars = chol_sample(S @ m, S / itemp)
-        # self.discrep = self.D @ self.discrep_vars
-        return discrep_vars
-
-    def discrep_sample_v2(self, yobs, pred, cov, itemp, wt):
+    def discrep_sample(self, yobs, pred, cov, itemp, wt):
         Wsqrt = np.diag(np.sqrt(wt))
 
         weighted_inv_cov = Wsqrt @ cov["inv"] @ Wsqrt
@@ -720,13 +670,7 @@ class ModelBassPca_func(AbstractModel):
             # this is evaluating all experiments for all thetas, which is overkill
 
     # @profile
-    def llik(self, yobs, pred, cov):
-        vec = yobs - pred
-        out = -0.5 * (cov["ldet"] + vec.T @ cov["inv"] @ vec)
-        return out
-
-    # @profile
-    def llik_v2(self, yobs, pred, cov, wt):
+    def llik(self, yobs, pred, cov, wt):
         """
         log-likelyhood
         cov (created by method .lik_cov_inv()) is a dictionary storing the
@@ -737,22 +681,7 @@ class ModelBassPca_func(AbstractModel):
         return out
 
     # @profile
-    def lik_cov_inv(self, s2vec):
-        vec = self.trunc_error_var + s2vec
-        Ainv = np.diag(1 / vec)
-        Aldet = np.log(vec).sum()
-        out = self.swm(
-            Ainv,
-            self.basis,
-            np.diag(1 / self.emu_vars),
-            self.basis.T,
-            Aldet,
-            np.log(self.emu_vars).sum(),
-        )
-        return out
-
-    # @profile
-    def lik_cov_inv_v2(self, s2vec, wt, inds=None):
+    def lik_cov_inv(self, s2vec, wt, inds=None):
         """
         returns a dictionary containing the inverse of the covariance matrix and the log-determinant
         """
@@ -889,7 +818,7 @@ class ModelBpprPca_func(AbstractModel):
             # this is evaluating all experiments for all thetas, which is overkill
 
     # @profile
-    def llik(self, yobs, pred, cov):
+    def llik(self, yobs, pred, cov, wt=None):
         """
         log-likelyhood
         cov (created by method .lik_cov_inv()) is a dictionary storing the
@@ -900,7 +829,7 @@ class ModelBpprPca_func(AbstractModel):
         return out
 
     # @profile
-    def lik_cov_inv(self, s2vec):
+    def lik_cov_inv(self, s2vec, wt=None, inds=None):
         """
         returns a dictionary containing the inverse of the covariance matrix and the log-determinant
         """
@@ -944,69 +873,6 @@ class ModelBpprPca_func(AbstractModel):
 #######
 ### ModelF: Function for Simulator Model Evaluation or Evaluation of Alternative Emulator Model
 class ModelF(AbstractModel):
-    """Custom Simulator/Emulator Model"""
-
-    def __init__(
-        self, f, input_names, exp_ind=None, s2="gibbs"
-    ):  # not sure if this is vectorized
-        """
-        f           : user-defined function taking single input with elements x[0] = first element of theta, x[1] = second element of theta, etc. Function must output predictions for all observations
-        input_names : list of the names of the inputs to bmod
-        s2          : method for handling experiment-specific noise s2; options are 'MH' (Metropolis-Hastings Sampling), 'fix' (fixed at s2_est from addVecExperiments call), and 'gibbs' (Gibbs sampling)
-        """
-        self.mod = f
-        self.input_names = input_names
-        self.stochastic = False
-        self.yobs = None
-        self.meas_error_cor = 1.0  # np.diag(self.basis.shape[0])
-        if exp_ind is None:
-            exp_ind = np.array(0)
-        self.nexp = exp_ind.max() + 1
-        self.exp_ind = exp_ind
-        self.nd = 0
-        self.discrep_tau = 1.0
-        self.D = None
-        self.s2 = s2
-        self.constants = None
-
-    def eval(self, parmat, pool=None, nugget=False):
-        parmat_array = np.vstack([
-            parmat[v] for v in self.input_names
-        ]).T  # get correct subset/ordering of inputs
-        if pool is True:
-            return np.apply_along_axis(self.mod, 1, parmat_array)
-        else:
-            nrep = next(iter(parmat.values())).shape[0] // self.nexp
-            out_all = np.apply_along_axis(self.mod, 1, parmat_array)
-
-            # out_sub = np.concatenate([out_all[(i*nrep):(i*nrep+nrep), self.exp_ind==i] for i in range(self.nexp)], 1)
-            out_sub = np.concatenate(
-                [
-                    out_all[
-                        np.ix_(
-                            np.arange(i, nrep * self.nexp, self.nexp),
-                            np.where(self.exp_ind == i)[0],
-                        )
-                    ]
-                    for i in range(self.nexp)
-                ],
-                1,
-            )
-            return out_sub
-
-    def discrep_sample(
-        self, yobs, pred, cov, itemp
-    ):  # Added by Lauren on 11/17/23.
-        S = np.linalg.inv(
-            np.eye(self.nd) / self.discrep_tau  # defined by addVecExperiments
-            + self.D.T @ (cov["inv"].flatten() * np.eye(len(yobs))) @ self.D
-        )
-        m = self.D.T @ (cov["inv"] * np.eye(len(yobs))) @ (yobs - pred)
-        discrep_vars = chol_sample(S @ m, S / itemp)
-        return discrep_vars
-
-
-class ModelF_v2(AbstractModel):
     """Custom Simulator/Emulator Model"""
 
     def __init__(
@@ -1154,19 +1020,7 @@ class ModelF_bigdata(AbstractModel):
         discrep_vars = chol_sample((S @ self.m).flatten(), S / itemp)
         return discrep_vars
 
-    def llik(self, yobs, pred, cov):  # assumes diagonal cov
-        self.vec = yobs.flatten() - pred.flatten()
-        self.vec2 = self.vec * self.vec * cov["inv"]
-        out = -0.5 * cov["ldet"] - 0.5 * self.vec2.sum()
-        return out
-
-    def lik_cov_inv(self, s2vec):  # default is diagonal covariance matrix
-        self.inv = 1 / s2vec
-        ldet = np.log(s2vec).sum()
-        out = {"inv": self.inv, "ldet": ldet}
-        return out
-
-    def llik_v2(self, yobs, pred, cov, wt):  # assumes diagonal cov
+    def llik(self, yobs, pred, cov, wt):
         """
         log-likelyhood, assuming a diagonal covariance matrix.
         cov (created by method .lik_cov_inv()) is a dictionary storing the
@@ -1177,7 +1031,7 @@ class ModelF_bigdata(AbstractModel):
         out = ((-0.5 * cov["ldet"] - 0.5 * self.vec2) * wt).sum()
         return out
 
-    def lik_cov_inv_v2(self, s2vec, wt, inds=None):
+    def lik_cov_inv(self, s2vec, wt, inds=None):
         """
         returns a dictionary containing the inverse of the covariance matrix and the log-determinant
         In this default implementation, we assume a diagnoal covariance matrix.
