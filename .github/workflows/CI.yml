@@ -20,6 +20,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.10", "3.14"]
     steps:
       - uses: actions/checkout@v6
       - name: Install uv
@@ -27,6 +28,8 @@ jobs:
         with:
           version: "0.11.27"
       - name: Test against latest supported dependencies
+        if: matrix.python-version == '3.14'
         run: uv run -p 3.14 --isolated --resolution=highest pytest -n auto -rP --durations=0
       - name: Test against oldest supported dependencies
+        if: matrix.python-version == '3.10'
         run: uv run -p 3.10 --isolated --resolution=lowest-direct pytest -n auto -rP --durations=0
