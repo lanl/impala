@@ -3,11 +3,11 @@ import numpy as np
 from impala import superCal as sc
 
 
-def test_hier():
+def test_clust():
     """
-    this regression test suite is based on jupyter notebook examples/ex_shpb_hierarchical.ipynb
+    this regression test suite is based on jupyter notebook examples/ex_shpb_clustering.ipynb
     """
-    np.random.seed(0)  ## make everything reproducible
+    np.random.seed(1)  ## make everything reproducible
     ### Read in Data for Three SHPB Experiments
     dat0 = np.array([
         [0.01, 0.0100583],
@@ -111,6 +111,7 @@ def test_hier():
     dat_all = [dat0, dat1, dat2]
     temps = [temp0, temp1, temp2]
     edots = [edot0, edot1, edot2]
+    nexp = len(dat_all)  # number of experiments
 
     stress_stacked = np.hstack([np.array(v)[:, 1] for v in dat_all])
     strain_hist_list = [np.array(v)[:, 0] for v in dat_all]
@@ -189,7 +190,7 @@ def test_hier():
         1.05 ** np.arange(ntemps), start_temper=2000
     )  # temperature ladder, typically (1 + step)**np.arange(ntemps)
     setup.setMCMC(
-        nmcmc=5000, decor=100
+        nmcmc=2000, decor=100
     )  # MCMC number of iterations, and how often to take a decorrelation step
     setup.setHierPriors(
         theta0_prior_mean=best_pool,  # prior mean for theta_0 values
@@ -201,8 +202,13 @@ def test_hier():
         * 0.1
         ** 2,  # scale for Inverse Wishart prior for Sigma_0. Generally, larger values indicate greater borrowing across experiments.
     )
+    setup.setClusterPriors(
+        nclustmax=nexp,  # maximum number of unique clusters allowed. Usually, this can be set equal to the number of experiments.
+        eta_prior_shape=2,  # shape parameter for Gamma prior for eta, the "concentration" parameter controlling the propensity for experiments to join existing clusters
+        eta_prior_rate=0.1,  # rate parameter for Gamma prior for eta, the "concentration" parameter controlling the propensity for experiments to join existing clusters
+    )
     setup.theta0_start = np.repeat(best_pool.reshape(1, -1), ntemps, axis=0)
-    out = sc.calibHier(setup)
+    out = sc.calibClust(setup)
 
     theta_parent = sc.chol_sample_1per_constraints(
         out.theta0[:, 0],
@@ -213,7 +219,7 @@ def test_hier():
         setup.bounds,
         setup.constants,
     )
-    mcmc_use = np.arange(2500, 5000, 2)  # burn and thin index
+    mcmc_use = np.arange(1000, 2000, 2)  # burn and thin index
     mat = theta_parent[mcmc_use, :]
     pred = setup.models[0].eval(
         sc.tran_unif(np.array(mat), setup.bounds_mat, setup.bounds.keys()),
@@ -227,15 +233,15 @@ def test_hier():
     )
     theta_minsse = mat[np.where(pred_sse == pred_sse.min())[0][0], :]
     theta_minsse_baseline = np.array([
-        0.12125296,
-        0.889518,
-        0.7980942,
-        0.00803078,
-        0.31638529,
-        0.04834673,
-        0.49717085,
-        0.00753855,
-        0.87773007,
-        0.03336257,
+        0.12128295,
+        0.37003977,
+        0.83441036,
+        0.02567501,
+        0.33820767,
+        0.05227873,
+        0.5005156,
+        0.12528871,
+        0.44356897,
+        0.32361081,
     ])
     assert np.allclose(theta_minsse, theta_minsse_baseline)
