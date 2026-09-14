@@ -988,893 +988,6 @@ class AMcov_hier:
 # @profile
 def calibHier(setup):
     """
-    Hierarchical calibration
-    """
-    t0 = time.time()
-    theta0 = np.zeros([setup.nmcmc, setup.ntemps, setup.p])
-    theta0 += 0.0
-    Sigma0 = np.zeros([setup.nmcmc, setup.ntemps, setup.p, setup.p])
-    Sigma0 += 0.0
-    ntheta = np.sum(setup.ntheta)
-    log_s2 = [
-        np.zeros([setup.nmcmc, setup.ntemps, setup.ns2[i]]) + 0.0
-        for i in range(setup.nexp)
-    ]
-    for i in range(setup.nexp):
-        log_s2[i][0] = np.log(setup.sd_est[i] ** 2)
-
-    # sse    = [np.ones([setup.nmcmc, setup.ntemps, setup.ns2[i]]) for i in range(setup.nexp)]
-    theta = [
-        np.zeros([setup.nmcmc, setup.ntemps, setup.ntheta[i], setup.p]) + 0.0
-        for i in range(setup.nexp)
-    ]
-    theta_ind_mat = [
-        (setup.theta_ind[i][:, None] == range(setup.ntheta[i]))
-        for i in range(setup.nexp)
-    ]
-    s2_ind_mat = [
-        (setup.s2_ind[i][:, None] == range(setup.ns2[i]))
-        for i in range(setup.nexp)
-    ]
-    s2_which_mat = [
-        [np.where(s2_ind_mat[i][:, j])[0] for j in range(setup.ntheta[i])]
-        for i in range(setup.nexp)
-    ]
-    theta_which_mat = [
-        [np.where(theta_ind_mat[i][:, j])[0] for j in range(setup.ntheta[i])]
-        for i in range(setup.nexp)
-    ]
-    theta0_start = initfunc_unif(size=[setup.ntemps, setup.p])
-    good = setup.checkConstraints(
-        tran_unif(theta0_start, setup.bounds_mat, setup.bounds.keys())
-    )
-    while np.any(np.logical_not(good)):
-        theta0_start[np.where(np.logical_not(good))] = initfunc_unif(
-            size=[(np.logical_not(good)).sum(), setup.p]
-        )
-        good[np.where(np.logical_not(good))] = setup.checkConstraints(
-            tran_unif(
-                theta0_start[np.where(np.logical_not(good))],
-                setup.bounds_mat,
-                setup.bounds.keys(),
-            )
-        )
-    theta0[0] = theta0_start
-    Sigma0[0] = np.eye(setup.p) * 0.25**2
-
-    pred_curr = [None] * setup.nexp  # [i], ntemps x ylens[i]
-    pred_cand = [None] * setup.nexp  # [i], ntemps x ylens[i]
-    llik_curr = [None] * setup.nexp  # [i], ntheta[i] x ntemps
-    llik_cand = [None] * setup.nexp  # [i], ntheta[i] x ntemps
-    # dev_sq    = [None] * setup.nexp # [i], ntheta[i] x ntemps
-    itl_mat = [  # matrix of temperatures for use with alpha calculation--to skip nested for loops.
-        (np.ones((setup.ntheta[i], setup.ntemps)) * setup.itl).T
-        for i in range(setup.nexp)
-    ]
-
-    marg_lik_cov_curr = [None] * setup.nexp
-
-    for i in range(setup.nexp):
-        theta[i][0] = chol_sample_nper_constraints(
-            theta0[0],
-            Sigma0[0],
-            setup.ntheta[i],
-            setup.checkConstraints,
-            setup.bounds_mat,
-            setup.bounds.keys(),
-            setup.bounds,
-            setup.constants,
-        )
-        pred_curr[i] = setup.models[i].eval(
-            tran_unif(
-                theta[i][0].reshape(setup.ntemps * setup.ntheta[i], setup.p),
-                setup.bounds_mat,
-                setup.bounds.keys(),
-            ),
-            pool=False,
-        )  # .reshape(setup.ntemps, setup.y_lens[i])
-        pred_cand[i] = pred_curr[i].copy()
-
-        marg_lik_cov_curr[i] = [None] * setup.ntemps
-        llik_curr[i] = np.empty([setup.ntemps, setup.ntheta[i]])
-        for t in range(setup.ntemps):
-            marg_lik_cov_curr[i][t] = [None] * setup.ntheta[i]
-            s2_stretched = log_s2[i][0][t, setup.theta_ind[i]]
-            for j in range(setup.ntheta[i]):
-                # marg_lik_cov_curr[i][t][j] = setup.models[i].lik_cov_inv(np.exp(log_s2[i][0, t, setup.s2_ind[i]])[setup.s2_ind[i]==j])
-                marg_lik_cov_curr[i][t][j] = setup.models[i].lik_cov_inv(
-                    np.exp(s2_stretched[s2_which_mat[i][j]])
-                )
-                # right now, assuming for vectorized models that new theta means new s2.
-                # if you wanted to have multiple s2 for one theta, you would have to update thetas
-                # jointly or sequentially (not independently), unless working with diagonal
-                # many possible cases, for now make it work for strength project, generalize later
-                # llik_curr[i][t][j] = setup.models[i].llik(setup.ys[i][setup.theta_ind[i]==j], pred_curr[i][t][setup.theta_ind[i]==j], marg_lik_cov_curr[i][t][j])
-                llik_curr[i][t][j] = setup.models[i].llik(
-                    setup.ys[i][theta_which_mat[i][j]],
-                    pred_curr[i][t][theta_which_mat[i][j]],
-                    marg_lik_cov_curr[i][t][j],
-                )
-                # this isnt getting nthetas correct, probably need to change models script...
-                # there should be a separate likelihood evaluation (with separate covariance)
-                # for every i, t, ntheta. In diagonal case, we could vectorize over t ntheta...
-                # for now, break into separate calls.  Later may be worthwhile to try to vectorize more.
-        llik_cand[i] = llik_curr[i].copy()
-    # requirements: pooled, anything goes; hier, must have theta_ind matching s2_ind
-    # tau = [-0 * np.ones((setup.ntemps, setup.ntheta[i])) for i in range(setup.nexp)]
-    # S   = [np.empty((setup.ntemps, setup.ntheta[i], setup.p, setup.p)) for i in range(setup.nexp)]
-    # cov = [np.empty((setup.ntemps, setup.ntheta[i], setup.p, setup.p)) for i in range(setup.nexp)]
-    # mu  = [np.empty((setup.ntemps, setup.ntheta[i], setup.p)) for i in range(setup.nexp)]
-    # for i in range(setup.nexp):
-    #     S[i][:] = np.eye(setup.p) * 1e-4
-
-    cov_theta_cand = AMcov_hier(
-        setup.nexp,
-        np.array([setup.ntheta[i] for i in range(setup.nexp)]),
-        setup.ntemps,
-        setup.p,
-        start_var=setup.start_var_theta,
-        start_adapt_iter=setup.start_adapt_iter,
-        tau_start=setup.start_tau_theta,
-    )
-    cov_ls2_cand = [
-        AMcov_pool(
-            setup.ntemps,
-            setup.ns2[i],
-            start_var=setup.start_var_ls2,
-            start_adapt_iter=setup.start_adapt_iter,
-            tau_start=setup.start_tau_ls2,
-        )
-        for i in range(setup.nexp)
-    ]
-
-    theta0_prior_mean = setup.theta0_prior_mean  # np.repeat(0.5, setup.p)
-    theta0_prior_cov = setup.theta0_prior_cov  # np.eye(setup.p)*1**2
-    theta0_prior_prec = scipy.linalg.inv(theta0_prior_cov)
-    theta0_prior_ldet = slogdet(theta0_prior_cov)[1]
-
-    tbar = np.empty(theta0[0].shape)
-    mat = np.zeros((setup.ntemps, setup.p, setup.p))
-
-    Sigma0_prior_df = setup.Sigma0_prior_df  # setup.p
-    Sigma0_prior_scale = (
-        setup.Sigma0_prior_scale
-    )  # np.eye(setup.p)*1**2#/setup.p
-    Sigma0_dfs = Sigma0_prior_df + ntheta * setup.itl
-
-    Sigma0_ldet_curr = slogdet(Sigma0[0])[1]
-    Sigma0_inv_curr = np.linalg.inv(Sigma0[0])
-
-    count_temper = np.zeros([setup.ntemps, setup.ntemps])
-    count = [
-        np.zeros((setup.ntemps, setup.ntheta[i])) for i in range(setup.nexp)
-    ]
-    # count_decor = [
-    #     np.zeros((setup.ntemps, setup.ntheta[i], setup.p))
-    #     for i in range(setup.nexp)
-    # ]
-    count_decor2 = np.zeros((setup.ntemps, setup.p))
-    # count_100 = [np.zeros((setup.ntemps, setup.ntheta[i])) for i in range(setup.nexp)]
-    count_s2 = np.zeros([setup.nexp, setup.ntemps], dtype=int)
-
-    # theta_cand = [
-    #     np.empty([setup.ntemps, setup.ntheta[i], setup.p])
-    #     for i in range(setup.nexp)
-    # ]
-    theta_cand_mat = [
-        np.empty([setup.ntemps * setup.ntheta[i], setup.p])
-        for i in range(setup.nexp)
-    ]
-    theta_eval_mat = [
-        np.empty(theta_cand_mat[i].shape) for i in range(setup.nexp)
-    ]
-
-    alpha = [
-        np.ones((setup.ntemps, setup.ntheta[i])) * -np.inf
-        for i in range(setup.nexp)
-    ]
-    alpha_s2 = np.ones([setup.nexp, setup.ntemps]) * (-np.inf)
-    accept = [np.zeros(alpha[i].shape, dtype=bool) for i in range(setup.nexp)]
-    sw_alpha = np.zeros(setup.nswap_per)
-    good_values = [
-        np.zeros(alpha[i].shape, dtype=bool) for i in range(setup.nexp)
-    ]
-    good_values_mat = [
-        good_values[i].reshape(setup.ntheta[i] * setup.ntemps)
-        for i in range(setup.nexp)
-    ]
-    ## start MCMC
-    for m in pbar(range(1, setup.nmcmc)):
-        for i in range(setup.nexp):
-            theta[i][m] = theta[i][
-                m - 1
-            ].copy()  # current set to previous, will change if accepted
-            log_s2[i][m] = log_s2[i][m - 1].copy()
-            setup.models[i].step()
-            if setup.models[i].stochastic:  # update emulator
-                pred_curr[i] = setup.models[i].eval(
-                    tran_unif(
-                        theta[i][m].reshape(
-                            setup.ntemps * setup.ntheta[i], setup.p
-                        ),
-                        setup.bounds_mat,
-                        setup.bounds.keys(),
-                    ),
-                    pool=False,
-                )
-                for t in range(setup.ntemps):
-                    for j in range(setup.ntheta[i]):
-                        llik_curr[i][t][j] = setup.models[i].llik(
-                            setup.ys[i][theta_which_mat[i][j]],
-                            pred_curr[i][t][theta_which_mat[i][j]],
-                            marg_lik_cov_curr[i][t][j],
-                        )
-        # No discrepancy for now...update here if added later
-
-        # ------------------------------------------------------------------------------------------
-        ## adaptive Metropolis for each temperature / experiment
-        # if m > 300:
-        #     for i in range(setup.nexp):
-        #         mu[i] += (theta[i][m-1] - mu[i]) / m
-        #         cov[i][:] = (
-        #             + ((m-1) / m) * cov[i]
-        #             + ((m-1) / (m * m)) * np.einsum(
-        #                 'tej,tel->tejl', theta[i][m-1] - mu[i], theta[i][m-1] - mu[i],
-        #                 )
-        #             )
-        #         S[i] = AM_SCALAR * np.einsum(
-        #             'tejl,te->tejl', cov[i] + np.eye(setup.p) * eps, np.exp(tau[i]),
-        #             )
-        # elif m == 300:
-        #     for i in range(setup.nexp):
-        #         mu[i][:]  = theta[i][:m].mean(axis = 0)
-        #         cov[i][:] = cov_4d_pcm(theta[i][:m], mu[i])
-        #         S[i][:]   = AM_SCALAR * np.einsum('tejl,te->tejl', cov[i] + np.eye(setup.p) * eps, np.exp(tau[i]))
-        # else:
-        #     pass
-
-        cov_theta_cand.update(theta, m)
-        # ------------------------------------------------------------------------------------------
-        # MCMC update for thetas
-        theta_cand = cov_theta_cand.gen_cand(theta, m)
-
-        for i in range(setup.nexp):
-            # Find new candidate values for theta
-            theta_eval_mat[i][:] = theta[i][m - 1].reshape(
-                setup.ntemps * setup.ntheta[i], setup.p
-            )
-            # theta_cand[i][:] = chol_sample_1per(theta[i][m-1], S[i])
-            theta_cand_mat[i][:] = theta_cand[i].reshape(
-                setup.ntemps * setup.ntheta[i], setup.p
-            )
-            # Check constraints
-            good_values_mat[i][:] = setup.checkConstraints(
-                tran_unif(
-                    theta_cand_mat[i], setup.bounds_mat, setup.bounds.keys()
-                )
-            )
-            good_values[i][:] = good_values_mat[i].reshape(
-                setup.ntemps, setup.ntheta[i]
-            )
-            # Generate Predictions at new Theta values
-            theta_eval_mat[i][good_values_mat[i]] = theta_cand_mat[i][
-                good_values_mat[i]
-            ]
-            pred_cand[i][:] = setup.models[i].eval(
-                tran_unif(
-                    theta_eval_mat[i], setup.bounds_mat, setup.bounds.keys()
-                ),
-                pool=False,
-            )  # .reshape(setup.ntemps, setup.y_lens[i])
-
-            # marg_lik_cov_curr[i] = [None] * setup.ntemps
-            for t in range(setup.ntemps):
-                for j in range(setup.ntheta[i]):
-                    # marg_lik_cov_curr[i][t][j] = setup.models[i].lik_cov_inv(np.exp(log_s2[i][0, t, setup.s2_ind[i]])[setup.s2_ind[i]==j])
-                    llik_cand[i][t][j] = setup.models[i].llik(
-                        setup.ys[i][theta_which_mat[i][j]],
-                        pred_cand[i][t][theta_which_mat[i][j]],
-                        marg_lik_cov_curr[i][t][j],
-                    )
-
-            # sse_cand[i][:] = ((pred_cand[i] - setup.ys[i])**2 @ s2_ind_mat[i]) / s2[i][m-1]
-            # Calculate log-probability of MCMC accept
-            alpha[i][:] = -np.inf
-            alpha[i][good_values[i]] = itl_mat[i][good_values[i]] * (
-                # - 0.5 * (sse_cand[i][good_values[i]] - sse_curr[i][good_values[i]])
-                llik_cand[i][good_values[i]]
-                - llik_curr[i][good_values[i]]
-                + mvnorm_logpdf_(
-                    theta_cand[i],
-                    theta0[m - 1],
-                    Sigma0_inv_curr,
-                    Sigma0_ldet_curr,
-                )[good_values[i]]
-                - mvnorm_logpdf_(
-                    theta[i][m - 1],
-                    theta0[m - 1],
-                    Sigma0_inv_curr,
-                    Sigma0_ldet_curr,
-                )[good_values[i]]
-            )
-            # MCMC Accept
-            accept[i][:] = np.log(uniform(size=alpha[i].shape)) < alpha[i]
-            # Where accept, make changes
-            theta[i][m][accept[i]] = theta_cand[i][accept[i]].copy()
-            # ind = accept[i] @ theta_ind_mat[i].T
-            # pred_curr[i][ind] = pred_cand[i][ind].copy()
-
-            for t in range(setup.ntemps):
-                accept_t = np.where(accept[i][t])[0]
-                if accept_t.shape[0] > 0:
-                    ind = np.hstack([theta_which_mat[i][j] for j in accept_t])
-                    pred_curr[i][t][ind] = pred_cand[i][t][ind].copy()
-                # for j in np.where(accept[i][t])[0]:
-                #    pred_curr[i][t][theta_which_mat[i][j]] = pred_cand[i][t][theta_which_mat[i][j]]
-            llik_curr[i][accept[i]] = llik_cand[i][accept[i]].copy()
-            count[i][accept[i]] += 1
-            cov_theta_cand.count_100[i][accept[i]] += 1
-            # count_100[i][accept[i]] += 1
-
-        cov_theta_cand.update_tau(m)
-
-        # if m>10000:
-        #    print('help')
-
-        # # Adaptive Metropolis Update
-        # if m % 100 == 0 and m > 300:
-        #     delta = min(0.1, 1/np.sqrt(m+1)*5)
-        #     for i in range(setup.nexp):
-        #         tau[i][count_100[i] < 23] -= delta
-        #         tau[i][count_100[i] > 23] += delta
-        #         count_100[i] *= 0
-
-        ## Decorrelation Step
-        # if False:  # m % setup.decor == 0:
-        #     for i in range(setup.nexp):
-        #         for k in range(setup.p):
-        #             # Find new candidate values for theta
-        #             theta_cand[i][:] = theta[i][m].copy()
-        #             theta_eval_mat[i][:] = theta[i][m].reshape(
-        #                 setup.ntheta[i] * setup.ntemps, setup.p
-        #             )
-        #             theta_cand[i][:, :, k] = initfunc(
-        #                 size=(setup.ntemps, setup.ntheta[i])
-        #             )
-        #             theta_cand_mat[i][:] = theta_cand[i].reshape(
-        #                 setup.ntheta[i] * setup.ntemps, setup.p
-        #             )
-        #             # Compute constraint flags
-        #             good_values_mat[i][:] = setup.checkConstraints(
-        #                 tran(
-        #                     theta_cand_mat[i],
-        #                     setup.bounds_mat,
-        #                     setup.bounds.keys(),
-        #                 )
-        #             )
-        #             # Generate predictions at "good" candidate values
-        #             theta_eval_mat[i][good_values_mat[i]] = theta_cand_mat[i][
-        #                 good_values_mat[i]
-        #             ]
-        #             good_values[i][:] = good_values_mat[i].reshape(
-        #                 setup.ntemps, setup.ntheta[i]
-        #             )
-        #             pred_cand[i][:] = setup.models[i].eval(
-        #                 tran(
-        #                     theta_eval_mat[i],
-        #                     setup.bounds_mat,
-        #                     setup.bounds.keys(),
-        #                 )
-        #             )
-        #             sse_cand[i][:] = (
-        #                 ((pred_cand[i] - setup.ys[i]) ** 2 @ s2_ind_mat[i])
-        #                 / s2[i][m - 1]
-        #             )  ## check the [:] here !!!!! ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        #             # Calculate log-probability of MCMC Accept
-        #             alpha[i][:] = -np.inf
-        #             alpha[i][good_values[i]] = (
-        #                 -0.5
-        #                 * itl_mat[i][good_values[i]]
-        #                 * (
-        #                     sse_cand[i][good_values[i]]
-        #                     - sse_curr[i][good_values[i]]
-        #                 )
-        #                 + itl_mat[i][good_values[i]]
-        #                 * (
-        #                     +mvnorm_logpdf_(
-        #                         theta_cand[i],
-        #                         theta0[m - 1],
-        #                         Sigma0_inv_curr,
-        #                         Sigma0_ldet_curr,
-        #                     )[good_values[i]]
-        #                     - mvnorm_logpdf_(
-        #                         theta[i][m],
-        #                         theta0[m - 1],
-        #                         Sigma0_inv_curr,
-        #                         Sigma0_ldet_curr,
-        #                     )[good_values[i]]
-        #                 )
-        #             )  ## THIS NEEDS SOMETHING FOR THE PROPOSAL~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        #             # MCMC Accept
-        #             accept[i][:] = (
-        #                 np.log(uniform(size=alpha[i].shape)) < alpha[i]
-        #             )
-        #             # Where accept, make changes
-        #             theta[i][m][accept[i]] = theta_cand[i][accept[i]].copy()
-        #             pred_curr[i][accept[i] @ s2_ind_mat[i].T] = pred_cand[i][
-        #                 accept[i] @ s2_ind_mat[i].T
-        #             ].copy()
-        #             sse_curr[i][accept[i]] = sse_cand[i][accept[i]].copy()
-        #             count_decor[i][accept[i], k] = (
-        #                 count_decor[i][accept[i], k] + 1
-        #             )
-
-        # ------------------------------------------------------------------------------------------
-        ## update s2
-        for i in range(setup.nexp):
-            if setup.models[i].s2 == "gibbs":
-                ## gibbs update s2
-                dev_sq = (pred_curr[i] - setup.ys[i]) ** 2 @ s2_ind_mat[
-                    i
-                ]  # squared deviations
-                log_s2[i][m] = np.log(
-                    1
-                    / np.random.gamma(
-                        itl_mat[i] * (setup.ny_s2[i] / 2 + setup.ig_a[i] + 1)
-                        - 1,
-                        1 / (itl_mat[i] * (setup.ig_b[i] + dev_sq / 2)),
-                    )
-                )
-                for t in range(setup.ntemps):
-                    s2_stretched = log_s2[i][m][t, setup.theta_ind[i]]
-                    for j in range(setup.ntheta[i]):
-                        marg_lik_cov_curr[i][t][j] = setup.models[
-                            i
-                        ].lik_cov_inv(np.exp(s2_stretched[s2_which_mat[i][j]]))
-                        llik_curr[i][t][j] = setup.models[i].llik(
-                            setup.ys[i][s2_which_mat[i][j]],
-                            pred_curr[i][t][s2_which_mat[i][j]],
-                            marg_lik_cov_curr[i][t][j],
-                        )
-
-            elif setup.models[i].s2 == "fix":
-                log_s2[i][m] = np.log(setup.sd_est[i] ** 2)
-
-                # for t in range(setup.ntemps):
-                #    for j in range(setup.ntheta[i]):
-                #        marg_lik_cov_curr[i][t][j] = setup.models[i].lik_cov_inv(np.exp(log_s2[i][m][t, setup.s2_ind[i]])[setup.s2_ind[i]==j])
-                #        llik_curr[i][t][j] = setup.models[i].llik(setup.ys[i][setup.theta_ind[i]==j], pred_curr[i][t][setup.theta_ind[i]==j], marg_lik_cov_curr[i][t][j])
-
-            else:  # this needs to be fixed ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                # this needs to be fixed ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                # this needs to be fixed ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                # this needs to be fixed ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                # this needs to be fixed ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                # this needs to be fixed ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                # this needs to be fixed ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                ## M-H update s2
-                # NOTE: there is something wrong with this...with no tempering, 10 kolski experiments,
-                # reasonable priors, s2 can diverge for some experiments (not a random walk, has weird patterns).
-                # This seems to be because of the joint update, but is strange.  Could be that individual updates
-                # would make it go away, but it shouldn't be there anyway.
-
-                cov_ls2_cand[i].update(log_s2[i], m)
-                ls2_candi = cov_ls2_cand[i].gen_cand(log_s2[i], m)
-
-                llik_candi = np.zeros([setup.ntemps, setup.ntheta[i]])
-                marg_lik_cov_candi = [None] * setup.ntemps
-                for t in range(setup.ntemps):
-                    marg_lik_cov_candi[t] = [None] * setup.ntheta[i]
-                    for j in range(setup.ntheta[i]):
-                        marg_lik_cov_candi[t][j] = setup.models[i].lik_cov_inv(
-                            np.exp(ls2_candi[t, setup.s2_ind[i]])[
-                                setup.s2_ind[i] == j
-                            ]
-                        )  # s2[i][0, t, setup.s2_ind[i]])
-                        llik_candi[t][j] = setup.models[i].llik(
-                            setup.ys[i][setup.theta_ind[i] == j],
-                            pred_curr[i][t][setup.theta_ind[i] == j],
-                            marg_lik_cov_candi[t][j],
-                        )
-                        # something wrong still, getting way too large of variance
-                    # marg_lik_cov_candi[t] = setup.models[i].lik_cov_inv(np.exp(ls2_candi[t])[setup.s2_ind[i]])#s2[i][0, t, setup.s2_ind[i]])
-                    # llik_candi[t] = setup.models[i].llik(setup.ys[i], pred_curr[i][t], marg_lik_cov_candi[t])
-
-                llik_diffi = llik_candi - llik_curr[i]
-                alpha_s2 = setup.itl * (llik_diffi)
-                alpha_s2 += (
-                    setup.itl
-                    * setup.s2_prior_kern[i](
-                        np.exp(ls2_candi), setup.ig_a[i], setup.ig_b[i]
-                    ).sum(axis=1)
-                )  # ldhc_kern(np.exp(ls2_cand[i])).sum(axis=1)#ldig_kern(np.exp(ls2_cand[i]),setup.ig_a[i],setup.ig_b[i]).sum(axis=1)
-                alpha_s2 += setup.itl * ls2_candi.sum(axis=1)
-                alpha_s2 -= (
-                    setup.itl
-                    * setup.s2_prior_kern[i](
-                        np.exp(log_s2[i][m - 1]), setup.ig_a[i], setup.ig_b[i]
-                    ).sum(axis=1)
-                )  # ldhc_kern(np.exp(log_s2[i][m-1])).sum(axis=1)#ldig_kern(np.exp(log_s2[i][m-1]),setup.ig_a[i],setup.ig_b[i]).sum(axis=1)
-                alpha_s2 -= setup.itl * log_s2[i][m - 1].sum(axis=1)
-
-                runif = np.log(uniform(size=setup.ntemps))
-                for t in np.where(runif < alpha_s2)[0]:
-                    count_s2[i, t] += 1
-                    llik_curr[i][t] = llik_candi[t].copy()
-                    log_s2[i][m][t] = ls2_candi[t].copy()
-                    marg_lik_cov_curr[i][t] = marg_lik_cov_candi[t].copy()
-                    cov_ls2_cand[i].count_100[t] += 1
-
-                cov_ls2_cand[i].update_tau(m)
-
-        if False:
-            ## MH update s2
-            for i in range(setup.nexp):
-                cov_ls2_cand[i].update(log_s2[i], m)
-                llik_cand[i][:] = 0.0
-
-            ls2_cand = [
-                cov_ls2_cand[i].gen_cand(log_s2[i], m)
-                for i in range(setup.nexp)
-            ]
-
-            marg_lik_cov_cand = [None] * setup.nexp
-            for i in range(setup.nexp):
-                marg_lik_cov_cand[i] = [None] * setup.ntemps
-                for t in range(setup.ntemps):
-                    marg_lik_cov_cand[i][t] = [None] * setup.ntheta[i]
-                    for j in range(setup.ntheta[i]):
-                        marg_lik_cov_cand[i][t][j] = setup.models[
-                            i
-                        ].lik_cov_inv(
-                            np.exp(ls2_cand[i][t, setup.s2_ind[i]])[
-                                setup.s2_ind[i] == j
-                            ]
-                        )  # s2[i][0, t, setup.s2_ind[i]])
-                        llik_cand[i][t][j] = setup.models[i].llik(
-                            setup.ys[i][setup.theta_ind[i] == j],
-                            pred_curr[i][t][setup.theta_ind[i] == j],
-                            marg_lik_cov_cand[i][t][j],
-                        )
-
-            ## joint update for ntheta[i] s2s
-            # llik_diff = (llik_cand.sum(axis=2) - llik_curr.sum(axis=2)) # should be summing over the nthera axis
-            alpha_s2[:] = -np.inf
-            # alpha_s2 = setup.itl * (llik_diff)
-            for i in range(
-                setup.nexp
-            ):  # this needs help...sum over ntheta axis
-                alpha_s2[i, :] = setup.itl * (
-                    llik_cand[i].sum(axis=1) - llik_curr[i].sum(axis=1)
-                )
-                alpha_s2[i, :] += setup.itl * setup.s2_prior_kern[i](
-                    np.exp(ls2_cand[i]), setup.ig_a[i], setup.ig_b[i]
-                ).sum(axis=1)
-                alpha_s2[i, :] += setup.itl * ls2_cand[i].sum(axis=1)
-                alpha_s2[i, :] -= setup.itl * setup.s2_prior_kern[i](
-                    np.exp(log_s2[i][m - 1]), setup.ig_a[i], setup.ig_b[i]
-                ).sum(axis=1)
-                alpha_s2[i, :] -= setup.itl * log_s2[i][m - 1].sum(axis=1)
-
-            runif = np.log(uniform(size=[setup.nexp, setup.ntemps]))
-            for i in range(setup.nexp):
-                for t in np.where(runif[i] < alpha_s2[i])[0]:
-                    if np.any(ls2_cand[0][0] > np.log(100)) and t == 0:
-                        print("bad")
-                    count_s2[i, t] += 1
-                    llik_curr[i][t] = llik_cand[i][t].copy()
-                    log_s2[i][m][t] = ls2_cand[i][t].copy()
-                    marg_lik_cov_curr[i][t] = marg_lik_cov_cand[i][t].copy()
-                    cov_ls2_cand[i].count_100[t] += 1
-
-            for i in range(setup.nexp):
-                cov_ls2_cand[i].update_tau(m)
-
-            # dev_sq[i][:] = (pred_curr[i] - setup.ys[i])**2 @ s2_ind_mat[i]
-            # s2[i][m] = 1 / np.random.gamma(
-            #     (itl_mat[i] * setup.ny_s2[i] / 2 + setup.ig_a[i] + 1) - 1,
-            #     1 / (itl_mat[i] * (setup.ig_b[i] +  dev_sq[i] / 2)),
-            #     )
-            # sse_curr[i][:] = dev_sq[i] / s2[i][m]
-
-        ## Gibbs update theta0
-        cc = np.linalg.inv(
-            np.einsum("t,tpq->tpq", ntheta * setup.itl, Sigma0_inv_curr)
-            + theta0_prior_prec,
-        )
-        tbar *= 0.0
-        for i in range(setup.nexp):
-            tbar += theta[i][m].sum(axis=1)
-        tbar /= ntheta
-        dd = +np.einsum(
-            "t,tl->tl",
-            setup.itl,
-            np.einsum("tlk,tk->tl", ntheta * Sigma0_inv_curr, tbar),
-        ) + np.dot(theta0_prior_prec, theta0_prior_mean)
-        theta0[m][:] = chol_sample_1per_constraints(
-            np.einsum("tlk,tk->tl", cc, dd),
-            cc,
-            setup.checkConstraints,
-            setup.bounds_mat,
-            setup.bounds.keys(),
-            setup.bounds,
-            setup.constants,
-        )
-
-        ## Gibbs update Sigma0
-        mat *= 0.0
-        for i in range(setup.nexp):
-            mat += np.einsum(
-                "tnp,tnq->tpq",
-                theta[i][m] - theta0[m].reshape(setup.ntemps, 1, setup.p),
-                theta[i][m] - theta0[m].reshape(setup.ntemps, 1, setup.p),
-            )
-        Sigma0_scales = Sigma0_prior_scale + np.einsum(
-            "t,tml->tml", setup.itl, mat
-        )
-        for t in range(setup.ntemps):
-            Sigma0[m, t] = invwishart.rvs(
-                df=Sigma0_dfs[t], scale=Sigma0_scales[t]
-            )
-        Sigma0_ldet_curr[:] = np.linalg.slogdet(Sigma0[m])[1]
-        Sigma0_inv_curr[:] = np.linalg.inv(Sigma0[m])
-
-        # better decorrelation step, joint
-        if m % setup.decor == 0:
-            for k in range(setup.p):
-                z = np.random.normal() * 0.1
-                theta0_cand = theta0[m].copy()
-                theta0_cand[:, k] += z
-                good_values_theta0 = setup.checkConstraints(
-                    tran_unif(
-                        theta0_cand, setup.bounds_mat, setup.bounds.keys()
-                    )
-                )
-
-                for i in range(setup.nexp):
-                    # Find new candidate values for theta
-                    theta_cand[i][:] = theta[i][m].copy()
-                    theta_eval_mat[i][:] = theta[i][m].reshape(
-                        setup.ntheta[i] * setup.ntemps, setup.p
-                    )
-                    theta_cand[i][:, :, k] += z
-                    theta_cand_mat[i][:] = theta_cand[i].reshape(
-                        setup.ntheta[i] * setup.ntemps, setup.p
-                    )
-                    # Compute constraint flags
-                    good_values_mat[i][:] = setup.checkConstraints(
-                        tran_unif(
-                            theta_cand_mat[i],
-                            setup.bounds_mat,
-                            setup.bounds.keys(),
-                        )
-                    )
-                    # Generate predictions at "good" candidate values
-                    theta_eval_mat[i][good_values_mat[i]] = theta_cand_mat[i][
-                        good_values_mat[i]
-                    ]
-                    good_values[i][:] = (
-                        good_values_mat[i]
-                        .reshape(setup.ntemps, setup.ntheta[i])
-                        .T
-                        * good_values_theta0
-                    ).T
-                    pred_cand[i][:] = setup.models[i].eval(
-                        tran_unif(
-                            theta_eval_mat[i],
-                            setup.bounds_mat,
-                            setup.bounds.keys(),
-                        ),
-                        pool=False,
-                    )  # .reshape(setup.ntemps, setup.ntheta[i], setup.y_lens[i])
-                    # sse_cand[i][:] = ((pred_cand[i] - setup.ys[i])**2 @ s2_ind_mat[i]) / s2[i][m]
-                    for t in range(setup.ntemps):
-                        for j in range(setup.ntheta[i]):
-                            # llik_cand[i][t][j] = setup.models[i].llik(setup.ys[i][setup.theta_ind[i]==j], pred_cand[i][t][setup.theta_ind[i]==j], marg_lik_cov_curr[i][t][j])
-                            llik_cand[i][t][j] = setup.models[i].llik(
-                                setup.ys[i][theta_which_mat[i][j]],
-                                pred_cand[i][t][theta_which_mat[i][j]],
-                                marg_lik_cov_curr[i][t][j],
-                            )
-
-                    alpha[i][:] = -np.inf
-                    alpha[i][good_values[i]] = itl_mat[i][good_values[i]] * (
-                        llik_cand[i][good_values[i]]
-                        - llik_curr[i][good_values[i]]
-                    ) + itl_mat[i][good_values[i]] * (
-                        +mvnorm_logpdf_(
-                            theta_cand[i],
-                            theta0_cand,
-                            Sigma0_inv_curr,
-                            Sigma0_ldet_curr,
-                        )[good_values[i]]
-                        - mvnorm_logpdf_(
-                            theta[i][m],
-                            theta0[m],
-                            Sigma0_inv_curr,
-                            Sigma0_ldet_curr,
-                        )[good_values[i]]
-                    )
-                # now sum over alpha (for each temperature), add alpha for theta0 to prior, accept or reject
-                # alpha_tot = mvnorm_logpdf_(theta0_cand, theta0_prior_mean.reshape(setup.ntemps,setup.p), theta0_prior_prec, theta0_prior_ldet)*itl + sum(alpha)
-                alpha_tot = (
-                    sum(alpha).T
-                    - 0.5
-                    * setup.itl
-                    * np.diag(
-                        (theta0_cand - theta0_prior_mean)
-                        @ theta0_prior_prec
-                        @ (theta0_cand - theta0_prior_mean).T
-                    )
-                    + 0.5
-                    * setup.itl
-                    * np.diag(
-                        (theta0[m] - theta0_prior_mean)
-                        @ theta0_prior_prec
-                        @ (theta0[m] - theta0_prior_mean).T
-                    )
-                )
-
-                accept_tot = np.log(uniform(size=setup.ntemps)) < alpha_tot.sum(
-                    axis=0
-                )
-                # accept[i][:] = (np.log(uniform(size = alpha[i].shape)) < alpha[i])
-                # Where accept, make changes
-                theta0[m][accept_tot, :] = theta0_cand[accept_tot, :]
-                for i in range(setup.nexp):
-                    theta[i][m][accept_tot] = theta_cand[i][accept_tot].copy()
-                    pred_curr[i][accept_tot, :] = pred_cand[i][
-                        accept_tot, :
-                    ].copy()
-                    llik_curr[i][accept_tot] = llik_cand[i][accept_tot].copy()
-
-                count_decor2[accept_tot, k] = count_decor2[accept_tot, k] + 1
-
-        ## tempering swaps
-        if m > setup.start_temper and setup.ntemps > 1:
-            for _ in range(setup.nswap):
-                sw = np.random.choice(
-                    setup.ntemps, 2 * setup.nswap_per, replace=False
-                ).reshape(-1, 2)
-                sw_alpha[:] = 0.0  # reset swap probability
-                sw_alpha[:] = sw_alpha + (
-                    setup.itl[sw.T[1]] - setup.itl[sw.T[0]]
-                ) * (
-                    +mvnorm_logpdf(
-                        theta0[m][sw.T[0]],
-                        theta0_prior_mean,
-                        theta0_prior_prec,
-                        theta0_prior_ldet,
-                    )
-                    - mvnorm_logpdf(
-                        theta0[m][sw.T[1]],
-                        theta0_prior_mean,
-                        theta0_prior_prec,
-                        theta0_prior_ldet,
-                    )
-                    + invwishart_logpdf(
-                        Sigma0[m][sw.T[0]], Sigma0_prior_df, Sigma0_prior_scale
-                    )
-                    - invwishart_logpdf(
-                        Sigma0[m][sw.T[1]], Sigma0_prior_df, Sigma0_prior_scale
-                    )
-                )
-                for i in range(setup.nexp):
-                    sw_alpha[:] = sw_alpha + (
-                        setup.itl[sw.T[1]] - setup.itl[sw.T[0]]
-                    ) * (
-                        # for t_0
-                        +setup.s2_prior_kern[i](
-                            np.exp(log_s2[i][m][sw.T[0]]),
-                            setup.ig_a[i],
-                            setup.ig_b[i],
-                        ).sum(axis=1)
-                        + mvnorm_logpdf_(
-                            theta[i][m][sw.T[0]],
-                            theta0[m, sw.T[0]],
-                            Sigma0_inv_curr[sw.T[0]],
-                            Sigma0_ldet_curr[sw.T[0]],
-                        ).sum(axis=1)
-                        # - 0.5 * (setup.ny_s2[i] * np.log(s2[i][m])).sum(axis = 1)[sw.T[0]]
-                        # - 0.5 * sse_curr[i][sw.T[0]].sum(axis = 1)
-                        + llik_curr[i][sw.T[0]].sum(axis=1)
-                        # for t_1
-                        - setup.s2_prior_kern[i](
-                            np.exp(log_s2[i][m][sw.T[1]]),
-                            setup.ig_a[i],
-                            setup.ig_b[i],
-                        ).sum(axis=1)
-                        - mvnorm_logpdf_(
-                            theta[i][m][sw.T[1]],
-                            theta0[m, sw.T[1]],
-                            Sigma0_inv_curr[sw.T[1]],
-                            Sigma0_ldet_curr[sw.T[1]],
-                        ).sum(axis=1)
-                        # + 0.5 * (setup.ny_s2[i] * np.log(s2[i][m])).sum(axis = 1)[sw.T[1]]
-                        # + 0.5 * sse_curr[i][sw.T[1]].sum(axis = 1)
-                        - llik_curr[i][sw.T[1]].sum(axis=1)
-                    )
-                for tt in sw[
-                    np.where(np.log(uniform(size=setup.nswap_per)) < sw_alpha)
-                ]:
-                    count_temper[tt[0], tt[1]] = count_temper[tt[0], tt[1]] + 1
-                    for i in range(setup.nexp):
-                        theta[i][m, tt[0]], theta[i][m, tt[1]] = (
-                            theta[i][m, tt[1]].copy(),
-                            theta[i][m, tt[0]].copy(),
-                        )
-                        log_s2[i][m][tt[0]], log_s2[i][m][tt[1]] = (
-                            log_s2[i][m][tt[1]].copy(),
-                            log_s2[i][m][tt[0]].copy(),
-                        )
-                        pred_curr[i][tt[0]], pred_curr[i][tt[1]] = (
-                            pred_curr[i][tt[1]].copy(),
-                            pred_curr[i][tt[0]].copy(),
-                        )
-                        llik_curr[i][tt[0]], llik_curr[i][tt[1]] = (
-                            llik_curr[i][tt[1]].copy(),
-                            llik_curr[i][tt[0]].copy(),
-                        )
-                    theta0[m, tt[0]], theta0[m, tt[1]] = (
-                        theta0[m, tt[1]].copy(),
-                        theta0[m, tt[0]].copy(),
-                    )
-                    Sigma0[m, tt[0]], Sigma0[m, tt[1]] = (
-                        Sigma0[m, tt[1]].copy(),
-                        Sigma0[m, tt[0]].copy(),
-                    )
-                    Sigma0_inv_curr[tt[0]], Sigma0_inv_curr[tt[1]] = (
-                        Sigma0_inv_curr[tt[1]].copy(),
-                        Sigma0_inv_curr[tt[0]].copy(),
-                    )
-                    Sigma0_ldet_curr[tt[0]], Sigma0_ldet_curr[tt[1]] = (
-                        Sigma0_ldet_curr[tt[1]].copy(),
-                        Sigma0_ldet_curr[tt[0]].copy(),
-                    )
-                # if np.exp(log_s2[i][m,0,0])>1:
-                #    print('a')
-        # print('\rCalibration MCMC {:.01%} Complete'.format(m / setup.nmcmc), end='')
-
-    t1 = time.time()
-    print(f"\rCalibration MCMC Complete. Time: {t1 - t0:f} seconds.")
-
-    # theta_parent_01 = chol_sample_1per_constraints(
-    #    theta0[:,0], Sigma0[:,0], setup.checkConstraints,
-    #    setup.bounds_mat, setup.bounds.keys(), setup.bounds, setup.constants
-    #    )
-
-    # theta_native = [tran_unif(theta[i][:,0], setup.bounds_mat, setup.bounds.keys()) for i in range(setup.nexp)]
-    # theta0_native = tran_unif(theta0[:,0], setup.bounds_mat, setup.bounds.keys())
-    # theta_parent_native = tran_unif(theta_parent_01, setup.bounds_mat, setup.bounds.keys())
-    # pred = [setup.models[i].eval(theta_parent_native, pool=True) for i in range(setup.nexp)]
-    # llik = sum([((pred[i]-setup.ys[i])**2).mean(axis=1) for i in range(setup.nexp)])
-
-    s2 = log_s2.copy()
-    for i in range(setup.nexp):
-        s2[i] = np.exp(log_s2[i])
-
-    count_temper = (
-        count_temper + count_temper.T - np.diag(np.diag(count_temper))
-    )
-    # theta_reshape = [np.swapaxes(t,1,2) for t in theta]
-    out = OutCalibHier(
-        theta,
-        s2,
-        count,
-        count_s2,
-        count_decor2,
-        cov_theta_cand,
-        cov_ls2_cand,
-        count_temper,
-        pred_curr,
-        theta0,
-        Sigma0,
-    )  # , llik, theta_native, theta0_native, theta_parent_native)
-    return out
-
-
-def calibHier_v2(setup):
-    """
     Hierarchical calibration with expanded capabilities, still undergoing testing
     Some changes include:, allowing weights, allowing custom initializations, changing initial theta0 defaults,
     estimation of separate s2 values within an experiment, adding truncated gibbs sampling for measurement errors
@@ -2003,12 +1116,12 @@ def calibHier_v2(setup):
             marg_lik_cov_curr[i][t] = [None] * setup.ntheta[i]
             s2_stretched = log_s2[i][0][t, setup.s2_ind[i]]
             for j in range(setup.ntheta[i]):
-                marg_lik_cov_curr[i][t][j] = setup.models[i].lik_cov_inv_v2(
+                marg_lik_cov_curr[i][t][j] = setup.models[i].lik_cov_inv(
                     np.exp(s2_stretched[theta_which_mat[i][j]]),
                     wt_mat[i][theta_which_mat[i][j]],
                     s2_which_mat[i][j],
                 )
-                llik_curr[i][t][j] = setup.models[i].llik_v2(
+                llik_curr[i][t][j] = setup.models[i].llik(
                     setup.ys[i][theta_which_mat[i][j]],
                     pred_curr[i][t][theta_which_mat[i][j]],
                     marg_lik_cov_curr[i][t][j],
@@ -2117,7 +1230,7 @@ def calibHier_v2(setup):
                 )
                 for t in range(setup.ntemps):
                     for j in range(setup.ntheta[i]):
-                        llik_curr[i][t][j] = setup.models[i].llik_v2(
+                        llik_curr[i][t][j] = setup.models[i].llik(
                             setup.ys[i][theta_which_mat[i][j]],
                             pred_curr[i][t][theta_which_mat[i][j]],
                             marg_lik_cov_curr[i][t][j],
@@ -2146,8 +1259,7 @@ def calibHier_v2(setup):
             good_values_mat[i][:] = setup.checkConstraints(
                 tran_unif(
                     theta_cand_mat[i], setup.bounds_mat, setup.bounds.keys()
-                ),
-                setup.bounds,
+                )
             )
             good_values[i][:] = good_values_mat[i].reshape(
                 setup.ntemps, setup.ntheta[i]
@@ -2165,7 +1277,7 @@ def calibHier_v2(setup):
 
             for t in range(setup.ntemps):
                 for j in range(setup.ntheta[i]):
-                    llik_cand[i][t][j] = setup.models[i].llik_v2(
+                    llik_cand[i][t][j] = setup.models[i].llik(
                         setup.ys[i][theta_which_mat[i][j]],
                         pred_cand[i][t][theta_which_mat[i][j]],
                         marg_lik_cov_curr[i][t][j],
@@ -2227,26 +1339,26 @@ def calibHier_v2(setup):
                                 itl_mat_s2[i][t]
                                 * (setup.ny_s2[i] / 2 + setup.ig_a[i] + 1)
                                 - 1
-                            ).astype("float64"),
+                            ),
                             (
                                 1
                                 / (
                                     itl_mat_s2[i][t]
                                     * (setup.ig_b[i] + dev_sq[t].flatten() / 2)
                                 )
-                            ).astype("float64"),
-                        ).astype("float64")
+                            ),
+                        )
                     )
                     s2_stretched = log_s2[i][m][t, setup.s2_ind[i]]
                     for j in range(setup.ntheta[i]):
                         marg_lik_cov_curr[i][t][j] = setup.models[
                             i
-                        ].lik_cov_inv_v2(
+                        ].lik_cov_inv(
                             np.exp(s2_stretched[theta_which_mat[i][j]]),
                             wt_mat[i][theta_which_mat[i][j]],
                             s2_which_mat[i][j],
                         )
-                        llik_curr[i][t][j] = setup.models[i].llik_v2(
+                        llik_curr[i][t][j] = setup.models[i].llik(
                             setup.ys[i][theta_which_mat[i][j]],
                             pred_curr[i][t][theta_which_mat[i][j]],
                             marg_lik_cov_curr[i][t][j],
@@ -2266,23 +1378,23 @@ def calibHier_v2(setup):
                                 itl_mat_s2[i][t]
                                 * (setup.ny_s2[i] / 2 + setup.ig_a[i] + 1)
                                 - 1
-                            ).astype("float64"),
+                            ),
                             (
                                 1
                                 / (
                                     itl_mat_s2[i][t]
                                     * (setup.ig_b[i] + dev_sq[t].flatten() / 2)
                                 )
-                            ).astype("float64"),
-                        ).astype("float64")
+                            ),
+                        )
                     )
                     s2_is_valid = (
                         log_s2[i][m][t] >= np.log(setup.sd_lower[i] ** 2)
                     ) * (log_s2[i][m][t] <= np.log(setup.sd_upper[i] ** 2))
 
                     ct = 0
-                    while np.any(~s2_is_valid):
-                        sub = np.where(~s2_is_valid)
+                    while np.any(np.logical_not(s2_is_valid)):
+                        sub = np.where(np.logical_not(s2_is_valid))
                         log_s2[i][m][t][sub] = np.log(
                             1
                             / np.random.gamma(
@@ -2294,7 +1406,7 @@ def calibHier_v2(setup):
                                         + 1
                                     )
                                     - 1
-                                ).astype("float64"),
+                                ),
                                 (
                                     1
                                     / (
@@ -2304,8 +1416,8 @@ def calibHier_v2(setup):
                                             + dev_sq[t].flatten()[sub] / 2
                                         )
                                     )
-                                ).astype("float64"),
-                            ).astype("float64")
+                                ),
+                            )
                         )
                         s2_is_valid = (
                             log_s2[i][m][t] >= np.log(setup.sd_lower[i] ** 2)
@@ -2334,12 +1446,12 @@ def calibHier_v2(setup):
                     for j in range(setup.ntheta[i]):
                         marg_lik_cov_curr[i][t][j] = setup.models[
                             i
-                        ].lik_cov_inv_v2(
+                        ].lik_cov_inv(
                             np.exp(s2_stretched[theta_which_mat[i][j]]),
                             wt_mat[i][theta_which_mat[i][j]],
                             s2_which_mat[i][j],
                         )
-                        llik_curr[i][t][j] = setup.models[i].llik_v2(
+                        llik_curr[i][t][j] = setup.models[i].llik(
                             setup.ys[i][theta_which_mat[i][j]],
                             pred_curr[i][t][theta_which_mat[i][j]],
                             marg_lik_cov_curr[i][t][j],
@@ -2375,16 +1487,14 @@ def calibHier_v2(setup):
                 for t in range(setup.ntemps):
                     marg_lik_cov_candi[t] = [None] * setup.ntheta[i]
                     for j in range(setup.ntheta[i]):
-                        marg_lik_cov_candi[t][j] = setup.models[
-                            i
-                        ].lik_cov_inv_v2(
+                        marg_lik_cov_candi[t][j] = setup.models[i].lik_cov_inv(
                             np.exp(ls2_candi[t, setup.s2_ind[i]])[
                                 setup.s2_ind[i] == j
                             ],
                             wt_mat[i][theta_which_mat[i][j]],
                             s2_which_mat[i][j],
                         )  # s2[i][0, t, setup.s2_ind[i]])
-                        llik_candi[t][j] = setup.models[i].llik_v2(
+                        llik_candi[t][j] = setup.models[i].llik(
                             setup.ys[i][setup.theta_ind[i] == j],
                             pred_curr[i][t][setup.theta_ind[i] == j],
                             marg_lik_cov_candi[t][j],
@@ -2478,8 +1588,7 @@ def calibHier_v2(setup):
                 good_values_theta0 = setup.checkConstraints(
                     tran_unif(
                         theta0_cand, setup.bounds_mat, setup.bounds.keys()
-                    ),
-                    setup.bounds,
+                    )
                 )
                 for i in range(setup.nexp):
                     # Find new candidate values for theta
@@ -2497,8 +1606,7 @@ def calibHier_v2(setup):
                             theta_cand_mat[i],
                             setup.bounds_mat,
                             setup.bounds.keys(),
-                        ),
-                        setup.bounds,
+                        )
                     )
                     # Generate predictions at "good" candidate values
                     theta_eval_mat[i][good_values_mat[i]] = theta_cand_mat[i][
@@ -2520,7 +1628,7 @@ def calibHier_v2(setup):
                     )  # .reshape(setup.ntemps, setup.ntheta[i], setup.y_lens[i])
                     for t in range(setup.ntemps):
                         for j in range(setup.ntheta[i]):
-                            llik_cand[i][t][j] = setup.models[i].llik_v2(
+                            llik_cand[i][t][j] = setup.models[i].llik(
                                 setup.ys[i][theta_which_mat[i][j]],
                                 pred_cand[i][t][theta_which_mat[i][j]],
                                 marg_lik_cov_curr[i][t][j],
@@ -2714,484 +1822,6 @@ def calibHier_v2(setup):
 
 # @profile
 def calibPool(setup):
-    """Perform pooled calibration"""
-    t0 = time.time()
-    theta = np.empty([setup.nmcmc, setup.ntemps, setup.p])
-    np.sum(setup.ns2)
-    log_s2 = [
-        np.ones([setup.nmcmc, setup.ntemps, setup.ns2[i]])
-        for i in range(setup.nexp)
-    ]
-    # s2_vec_curr = [s2[i][0,:,setup.s2_ind[i]] for i in range(setup.nexp)]
-    s2_ind_mat = [
-        (setup.s2_ind[i][:, None] == range(setup.ns2[i]))
-        for i in range(setup.nexp)
-    ]
-    theta_start0 = initfunc_unif(size=[setup.ntemps, setup.p])
-    good = setup.checkConstraints(
-        tran_unif(theta_start0, setup.bounds_mat, setup.bounds.keys())
-    )
-    while np.any(np.logical_not(good)):
-        theta_start0[np.where(np.logical_not(good))] = initfunc_unif(
-            size=[(np.logical_not(good)).sum(), setup.p]
-        )
-        good[np.where(np.logical_not(good))] = setup.checkConstraints(
-            tran_unif(
-                theta_start0[np.where(np.logical_not(good))],
-                setup.bounds_mat,
-                setup.bounds.keys(),
-            )
-        )
-    theta[0] = theta_start0
-
-    itl_mat = [  # matrix of temperatures for use with alpha calculation--to skip nested for loops.
-        (np.ones((setup.ns2[i], setup.ntemps)) * setup.itl).T
-        for i in range(setup.nexp)
-    ]
-
-    pred_curr = [None] * setup.nexp
-    # sse_curr = np.empty([setup.ntemps, setup.nexp])
-    llik_curr = np.empty([setup.nexp, setup.ntemps])
-    # dev_sq = [np.empty((setup.ntemps, setup.ns2[i])) for i in range(setup.nexp)]
-    marg_lik_cov_curr = [None] * setup.nexp
-    for i in range(setup.nexp):
-        marg_lik_cov_curr[i] = [None] * setup.ntemps
-        for t in range(setup.ntemps):
-            marg_lik_cov_curr[i][t] = setup.models[i].lik_cov_inv(
-                np.exp(log_s2[i][0, t, setup.s2_ind[i]])[setup.s2_ind[i]]
-            )
-            # ask around: is list of lists lookup slow?? ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-    llik_curr[:] = 0.0
-    for i in range(setup.nexp):
-        pred_curr[i] = setup.models[i].eval(
-            tran_unif(theta[0], setup.bounds_mat, setup.bounds.keys()),
-            pool=True,
-        )
-        # sse_curr[:, i] = np.sum((pred_curr[i] - setup.ys[i]) ** 2 / s2_vec_curr[i].T, 1)
-        # ((pred_curr[i] - setup.ys[i])**2 @ s2_ind_mat[i] / s2[i][0]).sum(axis = 1)
-        for t in range(setup.ntemps):
-            llik_curr[i, t] = setup.models[i].llik(
-                setup.ys[i], pred_curr[i][t], marg_lik_cov_curr[i][t]
-            )
-
-    # current log-prior for theta at each temperature (zeros if no prior set)
-    lpr_curr = theta_log_prior(setup, theta[0])
-    lpr_cand = lpr_curr.copy()
-
-    # eps  = 1.0e-13
-    # tau  = np.repeat(-4.0, setup.ntemps)
-    # AM_const   = 2.4**2/setup.p
-    # S    = np.empty([setup.ntemps, setup.p, setup.p])
-    # S[:] = np.eye(setup.p)*1e-6
-    # cov  = np.empty([setup.ntemps, setup.p, setup.p])
-    # mu   = np.empty([setup.ntemps, setup.p])
-
-    cov_theta_cand = AMcov_pool(
-        ntemps=setup.ntemps,
-        p=setup.p,
-        start_var=setup.start_var_theta,
-        tau_start=setup.start_tau_theta,
-        start_adapt_iter=setup.start_adapt_iter,
-    )
-    cov_ls2_cand = [
-        AMcov_pool(
-            ntemps=setup.ntemps,
-            p=setup.ns2[i],
-            start_var=setup.start_var_ls2,
-            tau_start=setup.start_tau_ls2,
-            start_adapt_iter=setup.start_adapt_iter,
-        )
-        for i in range(setup.nexp)
-    ]
-
-    count = np.zeros([setup.ntemps, setup.ntemps], dtype=int)
-    count_s2 = np.zeros([setup.nexp, setup.ntemps], dtype=int)
-    count_decor = np.zeros([setup.p, setup.ntemps], dtype=int)
-    # count_100 = np.zeros(setup.ntemps, dtype = int)
-
-    pred_cand = [_.copy() for _ in pred_curr]
-    discrep_curr = [_ * 0.0 for _ in pred_curr]
-    discrep_vars = [
-        np.zeros([setup.nmcmc, setup.ntemps, setup.models[i].nd])
-        for i in range(setup.nexp)
-    ]
-
-    llik_cand = llik_curr.copy()
-
-    alpha = np.ones(setup.ntemps) * (-np.inf)
-    alpha_s2 = np.ones([setup.nexp, setup.ntemps]) * (-np.inf)
-    sw_alpha = np.zeros(setup.nswap_per)
-
-    llik = np.empty(setup.nmcmc)
-
-    ## start MCMC
-    for m in pbar(range(1, setup.nmcmc)):
-        theta[m] = theta[
-            m - 1
-        ].copy()  # current set to previous, will change if accepted
-        for i in range(setup.nexp):
-            log_s2[i][m] = log_s2[i][m - 1].copy()
-            if setup.models[i].nd > 0:  # update discrepancy
-                for t in range(setup.ntemps):
-                    discrep_vars[i][m][t] = setup.models[i].discrep_sample(
-                        setup.ys[i],
-                        pred_curr[i][t],
-                        marg_lik_cov_curr[i][t],
-                        setup.itl[t],
-                    )
-                    discrep_curr[i][t] = (
-                        setup.models[i].D @ discrep_vars[i][m][t]
-                    )
-
-            setup.models[i].step()
-            if setup.models[i].stochastic:  # update emulator
-                pred_curr[i] = setup.models[i].eval(
-                    tran_unif(theta[m], setup.bounds_mat, setup.bounds.keys()),
-                    pool=True,
-                )
-            if setup.models[i].nd > 0 or setup.models[i].stochastic:
-                for t in range(setup.ntemps):
-                    llik_curr[i, t] = setup.models[i].llik(
-                        setup.ys[i] - discrep_curr[i][t],
-                        pred_curr[i][t],
-                        marg_lik_cov_curr[i][t],
-                    )
-
-        # ----------------------------------------------------------
-        ## adaptive Metropolis for each temperature
-
-        cov_theta_cand.update(theta, m)
-
-        # if m > 300:
-        #     mu += (theta[m-1] - mu) / m
-        #     cov = (
-        #         + (m - 1) / m * cov
-        #         + (m - 1) / m**2 * np.einsum('ti,tj->tij', theta[m-1] - mu, theta[m-1] - mu)
-        #         )
-        #     if m>10000:
-        #         1+1
-        # S   = AM_const * np.einsum('ijk,i->ijk', cov + np.eye(setup.p) * eps, np.exp(tau))
-        # S   = cc * np.einsum('ijk,i->ijk', cov_3d_pcm(theta[:m], theta[:m].mean(axis = 0)) + np.eye(setup.p) * eps, np.exp(tau))
-
-        # elif m == 300:
-        #     mu  = theta[:m].mean(axis = 0)
-        #     cov = cov_3d_pcm(theta[:m], mu)
-        # S   = AM_const * np.einsum('ijk,i->ijk', cov + np.eye(setup.p) * eps, np.exp(tau))
-
-        # else:
-        #     pass
-
-        # ------------------------------------------------------------------------------------------
-        # generate proposal
-        theta_cand = cov_theta_cand.gen_cand(theta, m)
-        # theta_cand  = (
-        #     + theta[m-1]
-        #     + np.einsum('ijk,ik->ij', cholesky(cov_theta_cand.S), normal(size = (setup.ntemps, setup.p)))
-        #     )
-        good_values = setup.checkConstraints(
-            tran_unif(theta_cand, setup.bounds_mat, setup.bounds.keys())
-        )
-        # ------------------------------------------------------------------------------------------
-        # get predictions and SSE
-        pred_cand = [_.copy() for _ in pred_curr]
-        llik_cand[:] = llik_curr.copy()
-        lpr_cand = theta_log_prior(setup, theta_cand)
-        if np.any(good_values):
-            llik_cand[:, good_values] = 0.0
-            for i in range(setup.nexp):
-                pred_cand[i][good_values] = setup.models[i].eval(
-                    tran_unif(
-                        theta_cand[
-                            good_values
-                        ],  # .repeat(setup.ns2[i], axis = 0),
-                        setup.bounds_mat,
-                        setup.bounds.keys(),
-                    ),
-                    pool=True,
-                )
-                for t in range(setup.ntemps):
-                    llik_cand[i, t] = setup.models[i].llik(
-                        setup.ys[i] - discrep_curr[i][t],
-                        pred_cand[i][t],
-                        marg_lik_cov_curr[i][t],
-                    )  # (((pred_cand[i] - setup.ys[i])**2 @ s2_ind_mat[i]) / s2[i][m-1]).sum(axis = 1)
-
-        # tsq_diff = 0.#((theta_cand * theta_cand).sum(axis = 1) - (theta[m-1] * theta[m-1]).sum(axis = 1))[good_values]
-        llik_diff = (
-            (llik_cand.sum(axis=0) + lpr_cand)
-            - (llik_curr.sum(axis=0) + lpr_curr)
-        )[good_values]  # sum over experiments
-        # ------------------------------------------------------------------------------------------
-        # for each temperature, accept or reject
-        alpha[:] = -np.inf
-        alpha[good_values] = setup.itl[good_values] * (llik_diff)
-        for t in np.where(np.log(uniform(size=setup.ntemps)) < alpha)[0]:
-            theta[m, t] = theta_cand[t].copy()
-            lpr_curr[t] = lpr_cand[t]
-            count[t, t] += 1
-            for i in range(setup.nexp):
-                llik_curr[i, t] = llik_cand[i, t].copy()
-                pred_curr[i][t] = pred_cand[i][t].copy()
-            cov_theta_cand.count_100[t] += 1
-        # ------------------------------------------------------------------------------------------
-        # diminishing adaptation based on acceptance rate for each temperature
-        # if m>2000:
-        #    print('a')
-
-        cov_theta_cand.update_tau(m)
-
-        # if (m % 100 == 0) and (m > 300):
-        #     delta = min(0.1, 5 / sqrt(m + 1))
-        #     tau[np.where(count_100 < 23)] = tau[np.where(count_100 < 23)] - delta
-        #     tau[np.where(count_100 > 23)] = tau[np.where(count_100 > 23)] + delta
-        #     count_100 *= 0
-        # ------------------------------------------------------------------------------------------
-        # decorrelation step
-        if m % setup.decor == 0:
-            for k in range(setup.p):
-                theta_cand = theta[m].copy()
-                theta_cand[:, k] = initfunc_unif(
-                    size=setup.ntemps
-                )  # independence proposal, will vectorize of columns
-                good_values = setup.checkConstraints(
-                    tran_unif(theta_cand, setup.bounds_mat, setup.bounds.keys())
-                )
-                pred_cand = [_.copy() for _ in pred_curr]
-                llik_cand[:] = llik_curr.copy()
-                lpr_cand = theta_log_prior(setup, theta_cand)
-
-                if np.any(good_values):
-                    llik_cand[:, good_values] = 0.0
-                    for i in range(setup.nexp):
-                        pred_cand[i][good_values] = setup.models[i].eval(
-                            tran_unif(
-                                theta_cand[
-                                    good_values
-                                ],  # .repeat(setup.ns2[i], axis = 0),
-                                setup.bounds_mat,
-                                setup.bounds.keys(),
-                            ),
-                            pool=True,
-                        )
-                        for t in range(setup.ntemps):
-                            llik_cand[i, t] = setup.models[i].llik(
-                                setup.ys[i] - discrep_curr[i][t],
-                                pred_cand[i][t],
-                                marg_lik_cov_curr[i][t],
-                            )  # (((pred_cand[i] - setup.ys[i])**2 @ s2_ind_mat[i]) / s2[i][m-1]).sum(axis = 1)
-
-                alpha[:] = -np.inf
-                # tsq_diff = 0.#((theta_cand * theta_cand).sum(axis = 1) - (theta[m] * theta[m]).sum(axis = 1))[good_values]
-                llik_diff = (
-                    (llik_cand.sum(axis=0) + lpr_cand)
-                    - (llik_curr.sum(axis=0) + lpr_curr)
-                )[good_values]
-                alpha[good_values] = (
-                    setup.itl[good_values] * (llik_diff)
-                )  # + tsq_diff) + 0.5 * tsq_diff # last is for proposal, since this is an independence sampler step
-                for t in np.where(np.log(uniform(size=setup.ntemps)) < alpha)[
-                    0
-                ]:
-                    theta[m, t, k] = theta_cand[t, k].copy()
-                    lpr_curr[t] = lpr_cand[t]
-                    count_decor[k, t] += 1
-                    for i in range(setup.nexp):
-                        pred_curr[i][t] = pred_cand[i][t].copy()
-                        llik_curr[i, t] = llik_cand[i, t].copy()
-
-        # ------------------------------------------------------------------------------------------
-        ## update s2
-        for i in range(setup.nexp):
-            if setup.models[i].s2 == "gibbs":
-                ## gibbs update s2
-
-                dev_sq = (pred_curr[i] - setup.ys[i]) ** 2 @ s2_ind_mat[
-                    i
-                ]  # squared deviations
-                log_s2[i][m] = np.log(
-                    1
-                    / np.random.gamma(
-                        itl_mat[i] * (setup.ny_s2[i] / 2 + setup.ig_a[i] + 1)
-                        - 1,
-                        1 / (itl_mat[i] * (setup.ig_b[i] + dev_sq / 2)),
-                    )
-                )
-                for t in range(setup.ntemps):
-                    marg_lik_cov_curr[i][t] = setup.models[i].lik_cov_inv(
-                        np.exp(log_s2[i][m][t])[setup.s2_ind[i]]
-                    )
-                    llik_curr[i, t] = setup.models[i].llik(
-                        setup.ys[i] - discrep_curr[i][t],
-                        pred_curr[i][t],
-                        marg_lik_cov_curr[i][t],
-                    )
-
-            elif setup.models[i].s2 == "fix":
-                log_s2[i][m] = np.log(setup.sd_est[i] ** 2)
-
-            else:
-                ## M-H update s2
-                # NOTE: there is something wrong with this...with no tempering, 10 kolski experiments,
-                # reasonable priors, s2 can diverge for some experiments (not a random walk, has weird patterns).
-                # This seems to be because of the joint update, but is strange.  Could be that individual updates
-                # would make it go away, but it shouldn't be there anyway.
-
-                cov_ls2_cand[i].update(log_s2[i], m)
-                ls2_candi = cov_ls2_cand[i].gen_cand(log_s2[i], m)
-
-                llik_candi = np.zeros(setup.ntemps)
-                marg_lik_cov_candi = [None] * setup.ntemps
-                for t in range(setup.ntemps):
-                    marg_lik_cov_candi[t] = setup.models[i].lik_cov_inv(
-                        np.exp(ls2_candi[t])[setup.s2_ind[i]]
-                    )  # s2[i][0, t, setup.s2_ind[i]])
-                    llik_candi[t] = setup.models[i].llik(
-                        setup.ys[i] - discrep_curr[i][t],
-                        pred_curr[i][t],
-                        marg_lik_cov_candi[t],
-                    )
-
-                llik_diffi = llik_candi - llik_curr[i]
-                alpha_s2 = setup.itl * (llik_diffi)
-                alpha_s2 += (
-                    setup.itl
-                    * setup.s2_prior_kern[i](
-                        np.exp(ls2_candi), setup.ig_a[i], setup.ig_b[i]
-                    ).sum(axis=1)
-                )  # ldhc_kern(np.exp(ls2_cand[i])).sum(axis=1)#ldig_kern(np.exp(ls2_cand[i]),setup.ig_a[i],setup.ig_b[i]).sum(axis=1)
-                alpha_s2 += setup.itl * ls2_candi.sum(axis=1)
-                alpha_s2 -= (
-                    setup.itl
-                    * setup.s2_prior_kern[i](
-                        np.exp(log_s2[i][m - 1]), setup.ig_a[i], setup.ig_b[i]
-                    ).sum(axis=1)
-                )  # ldhc_kern(np.exp(log_s2[i][m-1])).sum(axis=1)#ldig_kern(np.exp(log_s2[i][m-1]),setup.ig_a[i],setup.ig_b[i]).sum(axis=1)
-                alpha_s2 -= setup.itl * log_s2[i][m - 1].sum(axis=1)
-
-                runif = np.log(uniform(size=setup.ntemps))
-                for t in np.where(runif < alpha_s2)[0]:
-                    count_s2[i, t] += 1
-                    llik_curr[i, t] = llik_candi[t].copy()
-                    log_s2[i][m][t] = ls2_candi[t].copy()
-                    marg_lik_cov_curr[i][t] = marg_lik_cov_candi[t].copy()
-                    cov_ls2_cand[i].count_100[t] += 1
-
-                cov_ls2_cand[i].update_tau(m)
-
-        ## tempering swaps
-        if m > setup.start_temper and setup.ntemps > 1:
-            for _ in range(setup.nswap):
-                sw = np.random.choice(
-                    setup.ntemps, 2 * setup.nswap_per, replace=False
-                ).reshape(-1, 2)
-                sw_alpha[:] = 0.0  # Log Probability of Swap
-                sw_alpha += (setup.itl[sw.T[1]] - setup.itl[sw.T[0]]) * (
-                    llik_curr[:, sw.T[0]].sum(axis=0)
-                    - llik_curr[:, sw.T[1]].sum(axis=0)
-                )
-                sw_alpha += (setup.itl[sw.T[1]] - setup.itl[sw.T[0]]) * (
-                    lpr_curr[sw.T[0]] - lpr_curr[sw.T[1]]
-                )
-                for i in range(setup.nexp):
-                    sw_alpha += (setup.itl[sw.T[1]] - setup.itl[sw.T[0]]) * (
-                        setup.s2_prior_kern[i](
-                            np.exp(log_s2[i][m][sw.T[0]]),
-                            setup.ig_a[i],
-                            setup.ig_b[i],
-                        ).sum(axis=1)
-                        - setup.s2_prior_kern[i](
-                            np.exp(log_s2[i][m][sw.T[1]]),
-                            setup.ig_a[i],
-                            setup.ig_b[i],
-                        ).sum(axis=1)
-                    )
-                    if setup.models[i].nd > 0:
-                        sw_alpha += (
-                            setup.itl[sw.T[1]] - setup.itl[sw.T[0]]
-                        ) * (
-                            -0.5
-                            * (discrep_vars[i][m][sw.T[0]] ** 2).sum(axis=1)
-                            / setup.models[i].discrep_tau
-                            + 0.5
-                            * (discrep_vars[i][m][sw.T[1]] ** 2).sum(axis=1)
-                            / setup.models[i].discrep_tau
-                        )
-                for tt in sw[
-                    np.where(np.log(uniform(size=setup.nswap_per)) < sw_alpha)[
-                        0
-                    ]
-                ]:
-                    for i in range(setup.nexp):
-                        log_s2[i][m][tt[0]], log_s2[i][m][tt[1]] = (
-                            log_s2[i][m][tt[1]].copy(),
-                            log_s2[i][m][tt[0]].copy(),
-                        )
-                        (
-                            marg_lik_cov_curr[i][tt[0]],
-                            marg_lik_cov_curr[i][tt[1]],
-                        ) = (
-                            marg_lik_cov_curr[i][tt[1]].copy(),
-                            marg_lik_cov_curr[i][tt[0]].copy(),
-                        )
-                        pred_curr[i][tt[0]], pred_curr[i][tt[1]] = (
-                            pred_curr[i][tt[1]].copy(),
-                            pred_curr[i][tt[0]].copy(),
-                        )
-                        discrep_curr[i][tt[0]], discrep_curr[i][tt[1]] = (
-                            discrep_curr[i][tt[1]].copy(),
-                            discrep_curr[i][tt[0]].copy(),
-                        )
-                        discrep_vars[i][m][tt[0]], discrep_vars[i][m][tt[1]] = (
-                            discrep_vars[i][m][tt[1]].copy(),
-                            discrep_vars[i][m][tt[0]].copy(),
-                        )
-                        llik_curr[i, tt[0]], llik_curr[i, tt[1]] = (
-                            llik_curr[i, tt[1]].copy(),
-                            llik_curr[i, tt[0]].copy(),
-                        )
-                        # if np.any(np.exp(log_s2[i][m][0]) > 10*np.exp(log_s2[i][m-1][0])):
-                        #    print('bummer2')
-                    count[tt[0], tt[1]] += 1
-                    theta[m][tt[0]], theta[m][tt[1]] = (
-                        theta[m][tt[1]].copy(),
-                        theta[m][tt[0]].copy(),
-                    )
-                    lpr_curr[tt[0]], lpr_curr[tt[1]] = (
-                        lpr_curr[tt[1]],
-                        lpr_curr[tt[0]],
-                    )
-
-        llik[m] = llik_curr[:, 0].sum()
-        # print('\rCalibration MCMC {:.01%} Complete'.format(m / setup.nmcmc), end='')
-
-    s2 = log_s2.copy()
-    for i in range(setup.nexp):
-        s2[i] = np.exp(log_s2[i])
-
-    theta_native = tran_unif(theta[:, 0], setup.bounds_mat, setup.bounds.keys())
-
-    t1 = time.time()
-    print(f"\rCalibration MCMC Complete. Time: {t1 - t0:f} seconds.")
-    count = count + count.T - np.diag(np.diag(count))
-    out = OutCalibPool(
-        theta,
-        s2,
-        count,
-        count_s2,
-        count_decor,
-        cov_theta_cand,
-        cov_ls2_cand,
-        pred_curr,
-        discrep_vars,
-        llik,
-        theta_native,
-    )
-    return out
-
-
-# @profile
-def calibPool_v2(setup):
     """
     Perform pooled calibration with expanded capabilities, still undergoing testing
     Some changes include:, allowing weights, allowing custom initializations, adding truncated gibbs sampling for measurement errors
@@ -3256,7 +1886,7 @@ def calibPool_v2(setup):
                 ])
             )
             != 1
-        ) and ("gibbs" in setup.models[i].s2):
+        ) and (setup.models[i].s2 == "gibbs"):
             setup.models[i].s2 = "fix"
             print(
                 "Gibbs sampling for s2 only valid if weights are the same for all observations with same s2. Reverting to fixed s2. "
@@ -3272,7 +1902,7 @@ def calibPool_v2(setup):
     pred_curr = [None] * setup.nexp
     # sse_curr = np.empty([setup.ntemps, setup.nexp])
     # llik = log-likelyhood:
-    llik_curr = np.empty([setup.nexp, setup.ntemps])
+    llik_curr = np.zeros([setup.nexp, setup.ntemps])
     # dev_sq = [np.empty((setup.ntemps, setup.ns2[i])) for i in range(setup.nexp)]
     # current marginal log-likelyhood covariance:
     marg_lik_cov_curr = [None] * setup.nexp
@@ -3280,14 +1910,13 @@ def calibPool_v2(setup):
         marg_lik_cov_curr[i] = [None] * setup.ntemps
         # lik_cov_inv = inverse of covariance matrix
         for t in range(setup.ntemps):
-            marg_lik_cov_curr[i][t] = setup.models[i].lik_cov_inv_v2(
+            marg_lik_cov_curr[i][t] = setup.models[i].lik_cov_inv(
                 np.exp(log_s2[i][0, t, setup.s2_ind[i]])[setup.s2_ind[i]],
                 wt_mat[i],
                 setup.s2_ind[i],
             )
             # ask around: is list of lists lookup slow?? ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    llik_curr[:] = 0.0
     for i in range(setup.nexp):
         # theta[0] is a matrix (number of temperatures times number of parameters)
         # tran_unif() transforms it from 0-1 scale to its native scale
@@ -3298,7 +1927,7 @@ def calibPool_v2(setup):
         # sse_curr[:, i] = np.sum((pred_curr[i] - setup.ys[i]) ** 2 / s2_vec_curr[i].T, 1)
         # ((pred_curr[i] - setup.ys[i])**2 @ s2_ind_mat[i] / s2[i][0]).sum(axis = 1)
         for t in range(setup.ntemps):
-            llik_curr[i, t] = setup.models[i].llik_v2(
+            llik_curr[i, t] = setup.models[i].llik(
                 setup.ys[i], pred_curr[i][t], marg_lik_cov_curr[i][t], wt_mat[i]
             )
 
@@ -3365,7 +1994,7 @@ def calibPool_v2(setup):
             log_s2[i][m] = log_s2[i][m - 1].copy()
             if setup.models[i].nd > 0:  # update discrepancy
                 for t in range(setup.ntemps):
-                    discrep_vars[i][m][t] = setup.models[i].discrep_sample_v2(
+                    discrep_vars[i][m][t] = setup.models[i].discrep_sample(
                         setup.ys[i],
                         pred_curr[i][t],
                         marg_lik_cov_curr[i][t],
@@ -3384,7 +2013,7 @@ def calibPool_v2(setup):
                 )
             if setup.models[i].nd > 0 or setup.models[i].stochastic:
                 for t in range(setup.ntemps):
-                    llik_curr[i, t] = setup.models[i].llik_v2(
+                    llik_curr[i, t] = setup.models[i].llik(
                         setup.ys[i] - discrep_curr[i][t],
                         pred_curr[i][t],
                         marg_lik_cov_curr[i][t],
@@ -3420,7 +2049,7 @@ def calibPool_v2(setup):
                     pool=True,
                 )
                 for t in range(setup.ntemps):
-                    llik_cand[i, t] = setup.models[i].llik_v2(
+                    llik_cand[i, t] = setup.models[i].llik(
                         setup.ys[i] - discrep_curr[i][t],
                         pred_cand[i][t],
                         marg_lik_cov_curr[i][t],
@@ -3480,7 +2109,7 @@ def calibPool_v2(setup):
                             pool=True,
                         )
                         for t in range(setup.ntemps):
-                            llik_cand[i, t] = setup.models[i].llik_v2(
+                            llik_cand[i, t] = setup.models[i].llik(
                                 setup.ys[i] - discrep_curr[i][t],
                                 pred_cand[i][t],
                                 marg_lik_cov_curr[i][t],
@@ -3524,22 +2153,22 @@ def calibPool_v2(setup):
                                 itl_mat[i][t]
                                 * (setup.ny_s2[i] / 2 + setup.ig_a[i] + 1)
                                 - 1
-                            ).astype("float64"),
+                            ),
                             (
                                 1
                                 / (
                                     itl_mat[i][t]
                                     * (setup.ig_b[i] + dev_sq[t].flatten() / 2)
                                 )
-                            ).astype("float64"),
-                        ).astype("float64")
+                            ),
+                        )
                     )
-                    marg_lik_cov_curr[i][t] = setup.models[i].lik_cov_inv_v2(
+                    marg_lik_cov_curr[i][t] = setup.models[i].lik_cov_inv(
                         np.exp(log_s2[i][m][t])[setup.s2_ind[i]],
                         wt_mat[i],
                         setup.s2_ind[i],
                     )
-                    llik_curr[i, t] = setup.models[i].llik_v2(
+                    llik_curr[i, t] = setup.models[i].llik(
                         setup.ys[i] - discrep_curr[i][t],
                         pred_curr[i][t],
                         marg_lik_cov_curr[i][t],
@@ -3558,22 +2187,22 @@ def calibPool_v2(setup):
                                 itl_mat[i][t]
                                 * (setup.ny_s2[i] / 2 + setup.ig_a[i] + 1)
                                 - 1
-                            ).astype("float64"),
+                            ),
                             (
                                 1
                                 / (
                                     itl_mat[i][t]
                                     * (setup.ig_b[i] + dev_sq[t].flatten() / 2)
                                 )
-                            ).astype("float64"),
-                        ).astype("float64")
+                            ),
+                        )
                     )
                     s2_is_valid = (
                         log_s2[i][m][t] >= np.log(setup.sd_lower[i] ** 2)
                     ) * (log_s2[i][m][t] <= np.log(setup.sd_upper[i] ** 2))
                     ct = 0
-                    while np.any(~s2_is_valid):
-                        sub = np.where(~s2_is_valid)
+                    while np.any(np.logical_not(s2_is_valid)):
+                        sub = np.where(np.logical_not(s2_is_valid))
                         log_s2[i][m][t][sub] = np.log(
                             1
                             / np.random.gamma(
@@ -3585,7 +2214,7 @@ def calibPool_v2(setup):
                                         + 1
                                     )
                                     - 1
-                                ).astype("float64"),
+                                ),
                                 (
                                     1
                                     / (
@@ -3595,8 +2224,8 @@ def calibPool_v2(setup):
                                             + dev_sq[t].flatten()[sub] / 2
                                         )
                                     )
-                                ).astype("float64"),
-                            ).astype("float64")
+                                ),
+                            )
                         )
                         s2_is_valid = (
                             log_s2[i][m][t] >= np.log(setup.sd_lower[i] ** 2)
@@ -3621,12 +2250,12 @@ def calibPool_v2(setup):
                                 <= np.log(setup.sd_upper[i] ** 2)
                             )
 
-                    marg_lik_cov_curr[i][t] = setup.models[i].lik_cov_inv_v2(
+                    marg_lik_cov_curr[i][t] = setup.models[i].lik_cov_inv(
                         np.exp(log_s2[i][m][t])[setup.s2_ind[i]],
                         wt_mat[i],
                         setup.s2_ind[i],
                     )
-                    llik_curr[i, t] = setup.models[i].llik_v2(
+                    llik_curr[i, t] = setup.models[i].llik(
                         setup.ys[i] - discrep_curr[i][t],
                         pred_curr[i][t],
                         marg_lik_cov_curr[i][t],
@@ -3649,12 +2278,12 @@ def calibPool_v2(setup):
                 llik_candi = np.zeros(setup.ntemps)
                 marg_lik_cov_candi = [None] * setup.ntemps
                 for t in range(setup.ntemps):
-                    marg_lik_cov_candi[t] = setup.models[i].lik_cov_inv_v2(
+                    marg_lik_cov_candi[t] = setup.models[i].lik_cov_inv(
                         np.exp(ls2_candi[t])[setup.s2_ind[i]],
                         wt_mat[i],
                         setup.s2_ind[i],
                     )
-                    llik_candi[t] = setup.models[i].llik_v2(
+                    llik_candi[t] = setup.models[i].llik(
                         setup.ys[i] - discrep_curr[i][t],
                         pred_curr[i][t],
                         marg_lik_cov_candi[t],

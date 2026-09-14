@@ -111,7 +111,7 @@ settings:
     start_temper: 2000
 
   mcmc:
-    nmcmc: 10000
+    nmcmc: 40000
     nburn: 500
     thin: 1
     decor: 100
