@@ -37,7 +37,7 @@ def test_no_prior_is_zero_and_default_empty():
     theta = np.random.rand(5, 2)
     lp = theta_log_prior(setup, theta)
     assert lp.shape == (5,)
-    assert np.all(np.abs(lp) < 1e-15)
+    assert np.allclose(lp, 0, atol=1e-15)
 
 
 def test_independent_priors_match_scipy():
