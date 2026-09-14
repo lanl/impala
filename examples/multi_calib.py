@@ -20,7 +20,6 @@ Behavior:
 - If --pooled-overlay-dir is supplied in hierarchical mode, overlays the pooled
   best-SSE curve on each experiment_*.png plot.
 - Use --seed to set random seed for both numpy and random. eg. --seed 42 will set np.random.seed(42) and random.seed(42).
-- Registers Cu_BGP_PW_Shear_Modulus, a legacy Cu BGP/PW shear variant with a 0.001 lower floor.
 """
 
 import argparse
@@ -63,54 +62,6 @@ PLOT_ERRORS = (
     pickle.PickleError,
 )
 
-
-def register_cu_bgp_shear_floor() -> None:
-    """
-    Register the Cu-specific BGP/PW shear model used by the old Cu scripts.
-
-    Difference from the generic BGP_PW_Shear_Modulus:
-    negative shear values are floored at 0.001 instead of 0.0.
-    """
-
-    class Cu_BGP_PW_Shear_Modulus(impala.physics.BaseModel):
-        """
-        BGP/PW shear modulus variant used by the legacy Cu examples.
-
-        The generic BGP_PW_Shear_Modulus floors negative shear values to 0.0.
-        The legacy Cu scripts used 0.001, which helps keep the Cu calibration
-        from getting stuck when proposed parameter values produce invalid shear values.
-        """
-
-        def __init__(self, parent):
-            impala.physics.BaseModel.__init__(self, parent)
-            self.consts = ["G0", "rho_0", "gamma_1", "gamma_2", "q2", "alpha"]
-
-        def value(self, *args):
-            mp = self.parent.parameters
-            rho = self.parent.state.rho
-            temp = self.parent.state.T
-            tmelt = self.parent.state.Tmelt
-
-            cold_shear = mp.G0 * np.exp(
-                6.0
-                * mp.gamma_1
-                * (np.power(mp.rho_0, -1.0 / 3.0) - np.power(rho, -1.0 / 3.0))
-                + 2.0
-                * mp.gamma_2
-                / mp.q2
-                * (np.power(mp.rho_0, -mp.q2) - np.power(rho, -mp.q2))
-            )
-
-            gnow = cold_shear * (1.0 - mp.alpha * (temp / tmelt))
-            gnow[temp > tmelt] = (cold_shear * (1.0 - mp.alpha))[temp > tmelt]
-            gnow[np.where(gnow < 0)] = 0.001
-
-            return gnow
-
-    impala.physics.Cu_BGP_PW_Shear_Modulus = Cu_BGP_PW_Shear_Modulus
-
-
-register_cu_bgp_shear_floor()
 
 np.seterr(under="ignore", over="ignore", divide="ignore", invalid="ignore")
 
@@ -754,6 +705,7 @@ def build_main_model(cfg, dat_all, temps, edots, pooled: bool, model_cfg):
         temps=np.array(temps, dtype=float),
         edots=np.array(edots, dtype=float) * 1e-6,
         consts=cfg["consts_ptw"],
+        options=cfg["options"],
         strain_histories=[
             strain_hist_list[j][inds[j]] for j, _ in enumerate(dat_all)
         ],
@@ -1096,19 +1048,20 @@ def save_best_from_native_draws(native_draws, setup, cfg, results_dir: Path):
     cols = list(setup.bounds.keys())
     rows = []
 
-    rows.append({
-        **dict(zip(cols, median_theta.flatten())),
-        "method": "parent_median",
-        "sse": float(sse_by_draw(median_preds, setup)[0]),
-        "mape": mape_one_theta(median_preds, setup),
-    })
-
-    rows.append({
-        **dict(zip(cols, native_draws[best_idx])),
-        "method": "parent_minsse",
-        "sse": float(sse[best_idx]),
-        "mape": mape_one_theta(best_preds, setup),
-    })
+    rows.extend([
+        {
+            **dict(zip(cols, median_theta.flatten())),
+            "method": "parent_median",
+            "sse": float(sse_by_draw(median_preds, setup)[0]),
+            "mape": mape_one_theta(median_preds, setup),
+        },
+        {
+            **dict(zip(cols, native_draws[best_idx])),
+            "method": "parent_minsse",
+            "sse": float(sse[best_idx]),
+            "mape": mape_one_theta(best_preds, setup),
+        },
+    ])
 
     best_internal = pd.DataFrame(rows)
     best_internal.to_csv(results_dir / "best_internal.csv", index=False)
@@ -1785,6 +1738,13 @@ def main(args=None):
 
     with open(args.config, "r", encoding="utf-8") as fh:
         cfg = yaml.safe_load(fh)
+    if cfg.get("options") is None:
+        cfg["options"] = None
+    else:
+        for k,v in cfg["options"].items():
+            if v == 'None':
+                cfg["options"][k] = None
+    print(f"{cfg["options"] = }")
 
     unsupported_groups = warn_unsupported_groups(cfg)
 

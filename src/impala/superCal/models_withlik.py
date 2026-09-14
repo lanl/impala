@@ -1068,6 +1068,7 @@ class ModelMaterialStrength(AbstractModel):
         density_model,
         pool=True,
         s2="gibbs",
+        options=None,
     ):
         """
         temps               : list of temperatures indexed by experiment (units = Kelvin)
@@ -1081,6 +1082,7 @@ class ModelMaterialStrength(AbstractModel):
         density_model       : options provided by getoptions_ModelMaterialStrength()['density_model']
         pool                : False if fitting hierarchical model, True if fitting pooled model
         s2                  : method for handling experiment-specific noise s2; options are 'MH' (Metropolis-Hastings Sampling), 'fix' (fixed at s2_est from addVecExperiments call)
+        options             : dictionary of optional constants for the physics models; these have default values and can be omitted
         """
         self.meas_strain_histories = strain_histories
         self.meas_strain_max = np.array([v.max() for v in strain_histories])
@@ -1101,6 +1103,7 @@ class ModelMaterialStrength(AbstractModel):
             density_model,
         ]
         self.constants = consts
+        self.options = options
         self.temps = temps
         self.edots = edots
         self.nexp = len(strain_histories)
@@ -1141,7 +1144,7 @@ class ModelMaterialStrength(AbstractModel):
         )  # 1d vector, nexp * temper_temps
         ntot = edots.shape[0]  # nexp * temper_temps
         self.model.set_history_variables(strain_maxs, edots, self.Nhist)
-        self.model.initialize(parmat_big, self.constants)
+        self.model.initialize(parmat_big, self.constants, self.options)
         self.model.initialize_state(
             T=temps, stress=np.zeros(ntot), strain=np.zeros(ntot)
         )
