@@ -44,6 +44,7 @@ default-tag = "0.0.1"
 dev = [
     "pre-commit>=4.4.0",
     "pytest>=9.0.1",
+    "pytest-xdist>=3.8.0",
     "ruff==0.16.4",
 ]
 
