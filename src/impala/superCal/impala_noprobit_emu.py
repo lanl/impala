@@ -534,6 +534,31 @@ class CalibSetup:
         self.eta_prior_shape = eta_prior_shape
         self.eta_prior_rate = eta_prior_rate
 
+    def chol_sample_nper_constraints(self, means, covs, n=1, maxiter=1000000):
+        """Sample with constraints.  If fail constraints, resample."""
+        if n==1:
+            return chol_sample_1per_constraints(
+                means=means,
+                covs=covs,
+                cf=self.checkConstraints,
+                bounds_mat=self.bounds_mat,
+                bounds_keys=self.bounds.keys(),
+                bounds=self.bounds,
+                consts=self.constants,
+                maxiter=maxiter,
+            )
+        return chol_sample_nper_constraints(
+            means=means,
+            covs=covs,
+            n=n,
+            cf=self.checkConstraints,
+            bounds_mat=self.bounds_mat,
+            bounds_keys=self.bounds.keys(),
+            bounds=self.bounds,
+            consts=self.constants,
+            maxiter=maxiter,
+        )
+
 
 ########################
 ### Helper Functions ###

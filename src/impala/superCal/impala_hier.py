@@ -19,8 +19,6 @@ from scipy.stats import invwishart
 
 from .impala_noprobit_emu import (
     chol_sample_1per,
-    chol_sample_1per_constraints,
-    chol_sample_nper_constraints,
     cov_4d_pcm,
     initfunc_unif,
     invwishart_logpdf,
@@ -228,15 +226,10 @@ def calibHier(setup):
     marg_lik_cov_curr = [None] * setup.nexp
 
     for i in range(setup.nexp):
-        theta[i][0] = chol_sample_nper_constraints(
+        theta[i][0] = setup.chol_sample_nper_constraints(
             theta0[0],
             Sigma0[0],
             setup.ntheta[i],
-            setup.checkConstraints,
-            setup.bounds_mat,
-            setup.bounds.keys(),
-            setup.bounds,
-            setup.constants,
         )
         pred_curr[i] = setup.models[i].eval(
             tran_unif(
@@ -685,14 +678,10 @@ def calibHier(setup):
             setup.itl,
             np.einsum("tlk,tk->tl", ntheta * Sigma0_inv_curr, tbar),
         ) + np.dot(theta0_prior_prec, theta0_prior_mean)
-        theta0[m][:] = chol_sample_1per_constraints(
+        theta0[m][:] = setup.chol_sample_nper_constraints(
             np.einsum("tlk,tk->tl", cc, dd),
             cc,
-            setup.checkConstraints,
-            setup.bounds_mat,
-            setup.bounds.keys(),
-            setup.bounds,
-            setup.constants,
+            n=1,
         )
 
         ###########################

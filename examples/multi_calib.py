@@ -1143,14 +1143,10 @@ def save_draws_hier(
     theta0 = pd.DataFrame(out.theta0[:, 0, :], columns=setup.bounds.keys())
     theta0.to_csv(results_dir / "theta0_draws.csv", index=False)
 
-    parent_raw = sc.chol_sample_1per_constraints(
+    parent_raw = setup.chol_sample_nper_constraints(
         out.theta0[:, 0],
         out.Sigma0[:, 0],
-        setup.checkConstraints,
-        setup.bounds_mat,
-        setup.bounds.keys(),
-        setup.bounds,
-        setup.models[0].constants,
+        n=1,
     )
 
     parent = pd.DataFrame(parent_raw, columns=setup.bounds.keys())

@@ -14,8 +14,6 @@ from scipy.stats import invwishart
 
 from .impala_noprobit_emu import (
     chol_sample_1per,
-    chol_sample_1per_constraints,
-    chol_sample_nper_constraints,
     cov_4d_pcm,
     gamma_logpdf,
     initfunc_unif,
@@ -467,15 +465,10 @@ def calibClust(setup):
 
     ### Added ability to specify initial value
     if setup.theta_start is None:
-        theta[0] = chol_sample_nper_constraints(
+        theta[0] = setup.chol_sample_nper_constraints(
             theta0[0],
             Sigma0[0],
             setup.nclustmax,
-            setup.checkConstraints,
-            setup.bounds_mat,
-            setup.bounds.keys(),
-            setup.bounds,
-            setup.constants,
         )
     else:
         theta[0] = setup.theta_start
@@ -972,14 +965,10 @@ def calibClust(setup):
             setup.itl,
             np.einsum("t,tlk,tk->tl", ntheta, Sigma0_inv_curr, tbar),
         ) + np.dot(theta0_prior_prec, theta0_prior_mean)
-        theta0[m][:] = chol_sample_1per_constraints(
+        theta0[m][:] = setup.chol_sample_nper_constraints(
             np.einsum("tlk,tk->tl", cc, dd),
             cc,
-            setup.checkConstraints,
-            setup.bounds_mat,
-            setup.bounds.keys(),
-            setup.bounds,
-            setup.constants,
+            n=1,
         )
 
         ###########################
@@ -1010,15 +999,10 @@ def calibClust(setup):
         ###############################################
         ### Gibbs Update for Theta (Not in Cluster) ###
         ###############################################
-        theta_cand[:] = chol_sample_nper_constraints(
+        theta_cand[:] = setup.chol_sample_nper_constraints(
             theta0[m],
             Sigma0[m],
             setup.nclustmax,
-            setup.checkConstraints,
-            setup.bounds_mat,
-            setup.bounds.keys(),
-            setup.bounds,
-            setup.constants,
         )
         theta[m, ~theta_ext] = theta_cand[~theta_ext]
         # don't need to update theta_hist or pred_theta b/c these are non-used clusters. Moved pred_curr_delta update below here!
