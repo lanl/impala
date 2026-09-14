@@ -170,7 +170,7 @@ def test_hier():
         pool=False,
     )
     s2_ind = np.hstack([
-        [j] * len(np.array(dat_all[j])) for j in range(len(dat_all))
+        [j] * len(np.array(xj)) for j,xj in enumerate(dat_all)
     ])  # this is a vector of length len(yobs) with values (0, 1, 2) indicating which experiment corresponds to which part of yobs.
     setup = sc.CalibSetup(bounds_ptw, sc.constraints_ptw)
     setup.addVecExperiments(
