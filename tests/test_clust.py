@@ -226,11 +226,7 @@ def test_clust():
         pool=True,
     )
 
-    pred_sse = np.sum(
-        (pred - np.repeat(setup.ys[0].reshape(1, -1), len(mcmc_use), axis=0))
-        ** 2,
-        axis=1,
-    )
+    pred_sse = np.square(pred - setup.ys[0]).sum(1)
     theta_minsse = mat[np.where(pred_sse == pred_sse.min())[0][0], :]
     theta_minsse_baseline = np.array([
         0.12128295,
