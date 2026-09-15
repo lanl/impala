@@ -169,7 +169,7 @@ def calibHier(setup):
         good = setup.checkConstraints(
             tran_unif(theta0_start, setup.bounds_mat, setup.bounds.keys())
         )
-        maxiter = 1000000
+        maxiter = 10000
         j = 0
         while np.any(np.logical_not(good)):
             if j >= maxiter:

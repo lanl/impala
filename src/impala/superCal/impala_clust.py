@@ -377,7 +377,7 @@ def calibClust(setup):
         good = setup.checkConstraints(
             tran_unif(theta0_start, setup.bounds_mat, setup.bounds.keys())
         )
-        maxiter = 1000000
+        maxiter = 10000
         for j in range(maxiter):
             if np.all(good):
                 break

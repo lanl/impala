@@ -534,9 +534,9 @@ class CalibSetup:
         self.eta_prior_shape = eta_prior_shape
         self.eta_prior_rate = eta_prior_rate
 
-    def chol_sample_nper_constraints(self, means, covs, n=1, maxiter=1000000):
+    def chol_sample_nper_constraints(self, means, covs, n=1, maxiter=10000):
         """Sample with constraints.  If fail constraints, resample."""
-        if n==1:
+        if n == 1:
             return chol_sample_1per_constraints(
                 means=means,
                 covs=covs,
@@ -662,19 +662,44 @@ def chol_sample_nper(means, covs, n):
     )
 
 
+def sample_pooled(size, cf, bounds, maxiter=10000):
+    cand = initfunc_unif(size=size)
+    # ntemps = size[0]
+    p = size[-1]
+    bounds_mat = np.array(list(bounds.values()))
+    bounds_keys = bounds.keys()
+    good = cf(tran_unif(cand, bounds_mat, bounds_keys))
+
+    for j in range(maxiter):
+        if np.all(good):
+            break
+        cand[np.where(np.logical_not(good))] = initfunc_unif(
+            size=[(np.logical_not(good)).sum(), p]
+        )
+        good[np.where(np.logical_not(good))] = cf(
+            tran_unif(
+                cand[np.where(np.logical_not(good))],
+                bounds_mat,
+                bounds_keys,
+            )
+        )
+    if j + 1 == maxiter:
+        raise ValueError(
+            f"Failed to find samples that fulfill the constraints after {maxiter} iterations."
+        )
+    return cand
+
+
 def chol_sample_1per_constraints(
-    means, covs, cf, bounds_mat, bounds_keys, bounds, consts, maxiter=1000000
+    means, covs, cf, bounds_mat, bounds_keys, bounds, consts, maxiter=10000
 ):
     """Sample with constraints.  If fail constraints, resample."""
     chols = cholesky(covs)
     cand = means + np.einsum("ijk,ik->ij", chols, normal(size=means.shape))
     good = cf(tran_unif(cand, bounds_mat, bounds_keys), bounds, consts)
-    j = 0
-    while np.any(np.logical_not(good)):
-        if j >= maxiter:
-            raise ValueError(
-                f"Failed to find samples that fulfill the constraints after {maxiter} iterations."
-            )
+    for j in range(maxiter):
+        if np.all(good):
+            break
         cand[np.where(np.logical_not(good))] = means[
             np.logical_not(good)
         ] + np.einsum(
@@ -686,12 +711,15 @@ def chol_sample_1per_constraints(
             tran_unif(cand[np.logical_not(good)], bounds_mat, bounds_keys),
             bounds,
         )
-        j += 1
+    if j + 1 == maxiter:
+        raise ValueError(
+            f"Failed to find samples that fulfill the constraints after {maxiter} iterations."
+        )
     return cand
 
 
 def chol_sample_nper_constraints(
-    means, covs, n, cf, bounds_mat, bounds_keys, bounds, consts, maxiter=1000000
+    means, covs, n, cf, bounds_mat, bounds_keys, bounds, consts, maxiter=10000
 ):
     """Sample with constraints.  If fail constraints, resample."""
     chols = cholesky(covs)
@@ -700,12 +728,9 @@ def chol_sample_nper_constraints(
     )
     for i in range(cand.shape[0]):
         goodi = cf(tran_unif(cand[i], bounds_mat, bounds_keys), bounds, consts)
-        j = 0
-        while np.any(np.logical_not(goodi)):
-            if j >= maxiter:
-                raise ValueError(
-                    f"Failed to find samples that fulfill the constraints after {maxiter} iterations."
-                )
+        for j in range(maxiter):
+            if np.all(goodi):
+                break
             cand[i, np.where(np.logical_not(goodi))[0]] = means[i] + np.einsum(
                 "ik,nk->ni",
                 chols[i],
@@ -719,7 +744,10 @@ def chol_sample_nper_constraints(
                 ),
                 bounds,
             )
-            j += 1
+            if j + 1 == maxiter:
+                raise ValueError(
+                    f"Failed to find samples that fulfill the constraints after {maxiter} iterations."
+                )
     return cand
 
 

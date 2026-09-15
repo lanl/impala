@@ -1744,7 +1744,7 @@ def main(args=None):
         for k,v in cfg["options"].items():
             if v == 'None':
                 cfg["options"][k] = None
-    print(f"{cfg["options"] = }")
+    print(f'{cfg["options"] = }')
 
     unsupported_groups = warn_unsupported_groups(cfg)
 

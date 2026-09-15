@@ -514,7 +514,7 @@ class Stein_Shear_Modulus(BaseModel):
     def __init__(self, parent):
         BaseModel.__init__(self, parent)
         self.consts = ["G0", "sgB"]
-        self.eta = 1.0 # do we need eta?
+        self.eta = 1.0  # do we need eta?
 
     def value(self, *args):
         return functions.Stein_Shear_Modulus(
@@ -675,6 +675,7 @@ class ModelParameters:
     """
     Collects all calibration parameters and constants and their current values
     """
+
     def update_parameters(self, x):
         """updates the current values of parameters"""
         if isinstance(x, np.ndarray):
