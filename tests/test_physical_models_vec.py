@@ -5,6 +5,7 @@ import pandas as pd
 
 import impala.physics.physical_models_vec as physics
 from impala import superCal as sc
+from impala.superCal import plots
 
 
 def test_physics():
@@ -169,11 +170,20 @@ def test_constparams():
         out.theta[uu[mle_idx], 0, :],
         out.theta[uu, 0, :].mean(0),
     ))
+    fname = data_dir / "test_ptw_pairplot.png"
+    fname.unlink(missing_ok=True)
     sc.post_process.pairs(
         setup=setup_pool_ptw,
         mat_st=mat,
-        path=str(data_dir / "test_ptw_pairplot.png"),
+        path=str(fname),
     )
+    assert fname.is_file()
+    
+    pool_plots = plots.PTW_Plotter(setup_pool_ptw,out)
+    fname = data_dir / "test_ptw_pairplot2.pdf"
+    fname.unlink(missing_ok=True)
+    pool_plots.pairwise_theta_plot(path=fname)
+    assert fname.is_file()
 
     for k, v in out.theta_native.items():
         bestval = np.min(np.abs(v / params[k] - 1))
