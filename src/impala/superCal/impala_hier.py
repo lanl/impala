@@ -676,7 +676,7 @@ def calibHier(setup):
             np.einsum("t,tpq->tpq", ntheta * setup.itl, Sigma0_inv_curr)
             + theta0_prior_prec,
         )
-        tbar *= 0.0
+        tbar = 0.0
         for i in range(setup.nexp):
             tbar += theta[i][m].sum(axis=1)
         tbar /= ntheta
