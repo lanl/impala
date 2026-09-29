@@ -719,6 +719,7 @@ class MaterialModel:
         shear_modulus_model=Constant_Shear_Modulus,
         melt_model=Constant_Melt_Temperature,
         density_model=Constant_Density,
+        history_backend="python",
     ):
         """
         Initialization routine for Material Model.  All of the arguments
@@ -729,6 +730,7 @@ class MaterialModel:
         declared at instantiation.  then the model.value() function can reach
         into the parent class to find whatever it needs.
         """
+        self.history_backend = history_backend
         self.parameters = parameters(self)
         self.state = initial_state(self)
 
@@ -881,6 +883,13 @@ class MaterialModel:
     def compute_state_history(self, strain_history=None):
         if strain_history is None:
             strain_history = self.strain_history
+        backend = getattr(self, "history_backend", "python")
+        if backend == "numba":
+            from .compiled_history import compute_cu_history
+
+            return compute_cu_history(self, strain_history)
+        if backend != "python":
+            raise ValueError(f"Unknown history backend: {backend!r}")
         strains = strain_history["strains"]
         times = strain_history["times"]
         strain_rate = strain_history["strain_rate"]

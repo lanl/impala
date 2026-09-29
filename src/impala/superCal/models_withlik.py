@@ -1069,8 +1069,10 @@ class ModelMaterialStrength(AbstractModel):
         density_model,
         pool=True,
         s2="gibbs",
+        history_backend="python",
     ):
         """
+        history_backend     : "python" (default) or optional "numba" Cu PTW history driver
         temps               : list of temperatures indexed by experiment (units = Kelvin)
         edots               : edots: list of strain rates indexed by experiment (units = NEED TO ADD)
         consts              : dictionary of constants for PTW model. Use showdef_ModelMaterialStrength(str_func_name) to figure out the needed constants
@@ -1093,6 +1095,7 @@ class ModelMaterialStrength(AbstractModel):
             specific_heat_model=getattr(pm_vec, specific_heat_model),
             melt_model=getattr(pm_vec, melt_model),
             density_model=getattr(pm_vec, density_model),
+            history_backend=history_backend,
         )
         self.model_info = [
             flow_stress_model,

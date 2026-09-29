@@ -47,3 +47,16 @@
 - See `results/step1-results.json`, `results/step1-manifest.json` and
   `results/step1.tex`; full traces and PDF are in external
   `benchmark/changes/step1-final/`. Baseline fixtures remain unchanged.
+
+## Step 2 — compile the Cu history loop — 2026-09-29
+
+- Branch: `perf/compile-material-history`, based on `perf-step1-20260929`.
+- Post-cache profile: history driver consumed 0.889/1.023 seconds (87%) for
+  200 batch-50 evaluations.
+- Added an opt-in Numba history driver for the copper PTW model combination,
+  reusing existing numerical functions and preserving float64 arithmetic.
+- Added a constructor/configuration setting; Python remains the default.
+- Added history/state, edge-case and independent-fixture regressions, plus a
+  subprocess benchmark against an untouched original checkout. Full measurements
+  and validation will be recorded in a separate results checkpoint.
+- See [STEP2.md](STEP2.md) for scope, limitations, enabling and reproduction.

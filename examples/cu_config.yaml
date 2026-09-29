@@ -97,6 +97,9 @@ bounds_ptw:
   y2: [0.281, 5.0]
 
 settings:
+  # Optional compiled Cu history driver; requires the numba extra.
+  # Set to numba to enable; python preserves the general model driver.
+  history_backend: python
   nsamp: 50
   gamma_log_base: exp
 

@@ -120,3 +120,9 @@ benchmark, use a new artifact directory, and commit its results and manifest.
 If arithmetic changes break exact trajectory equality, require predeclared
 numerical tolerances and independent multi-seed posterior/predictive comparisons,
 including R-hat, ESS, and ESS per second, before calling the change successful.
+
+## Step 2: compiled history driver
+
+The next experiment is on branch `perf/compile-material-history`. See
+[STEP2.md](STEP2.md) for the optional Cu backend, its accuracy gates, and the
+independent original-checkout benchmark. Step-1 artifacts remain unchanged.

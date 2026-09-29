@@ -764,6 +764,7 @@ def build_main_model(cfg, dat_all, temps, edots, pooled: bool, model_cfg):
         density_model=model_cfg["density_model"],
         pool=pooled,
         s2="gibbs",
+        history_backend=cfg["settings"].get("history_backend", "python"),
     )
 
     return model, inds
