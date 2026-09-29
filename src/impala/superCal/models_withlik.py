@@ -10,6 +10,7 @@
 import abc
 import inspect
 import re
+from collections import OrderedDict
 from itertools import cycle
 
 import numpy as np
@@ -1110,6 +1111,7 @@ class ModelMaterialStrength(AbstractModel):
         self.yobs = None
         self.nd = 0
         self.s2 = s2
+        self._experiment_cache = OrderedDict()
 
         # self.meas_error_cor = np.diag(self.basis.shape[0])
 
@@ -1130,47 +1132,36 @@ class ModelMaterialStrength(AbstractModel):
             )  # number of temper temps
             parmat_big = parmat
 
-        edots = np.kron(
-            np.ones(nrep), self.edots
-        )  # 1d vector, nexp * temper_temps
-        temps = np.kron(
-            np.ones(nrep), self.temps
-        )  # 1d vector, nexp * temper_temps
-        strain_maxs = np.kron(
-            np.ones(nrep), self.meas_strain_max
-        )  # 1d vector, nexp * temper_temps
-        ntot = edots.shape[0]  # nexp * temper_temps
-        self.model.set_history_variables(strain_maxs, edots, self.Nhist)
+        prepared = self._prepare_experiments(nrep)
+        edots, temps, strain_maxs = prepared["conditions"]
+        ntot = edots.size
+        # Give the mutable physics model fresh arrays, not the private cache.
+        self.model.emax = strain_maxs.copy()
+        self.model.edot = edots.copy()
+        self.model.Nhist = self.Nhist
+        self.model.strain_history = {
+            name: value.copy() for name, value in prepared["history"].items()
+        }
         self.model.initialize(parmat_big, self.constants)
         self.model.initialize_state(
-            T=temps, stress=np.zeros(ntot), strain=np.zeros(ntot)
+            T=temps.copy(), stress=np.zeros(ntot), strain=np.zeros(ntot)
         )
         sim_state_histories = self.model.compute_state_history()
-        sim_strains = sim_state_histories[:, 1].T  # 2d array: ntot, Nhist
-        sim_stresses = sim_state_histories[:, 2].T  # 2d array: ntot, Nhist
+        sim_strains = sim_state_histories[:, 1].T
+        sim_stresses = sim_state_histories[:, 2].T
 
-        # Expand/Flatten Simulated strains to single vector--ensure no overlap.
-        strain_ends = np.hstack((
-            0.0,
-            np.cumsum(strain_maxs + epsilon)[:-1],
-        ))  # 1d vector, ntot
-        flattened_sim_strain = np.hstack(  # 1d vector: ntot * Nhist
-            [x + y for x, y in zip(sim_strains, strain_ends)]
-        )
-        # Expand/flatten simulated stress to single vector
+        # Check actual simulated coordinates: custom model behavior must not
+        # silently reuse interpolation coordinates from a previous evaluation.
+        if "sim_strains" not in prepared or not np.array_equal(
+            prepared["sim_strains"], sim_strains
+        ):
+            prepared["sim_strains"] = sim_strains.copy()
+            prepared["flattened_sim_strain"] = np.hstack([
+                x + y for x, y in zip(sim_strains, prepared["strain_ends"])
+            ])
+        flattened_sim_strain = prepared["flattened_sim_strain"]
         flattened_sim_stress = np.hstack(sim_stresses)
-        # Expand/flatten measured strain to single vector, for each parameter.  Use same
-        #  Computed strain ends to ensure no overlap
-        flattened_strain = (
-            np.hstack(  # cycle will repeat through measured strain histories
-                [
-                    x + y
-                    for x, y in zip(
-                        cycle(self.meas_strain_histories), strain_ends
-                    )
-                ]
-            )
-        )
+        flattened_strain = prepared["flattened_strain"]
         ifunc = interp1d(  # Generate the interpolation function.
             flattened_sim_strain,
             flattened_sim_stress,
@@ -1181,6 +1172,57 @@ class ModelMaterialStrength(AbstractModel):
             nrep, -1
         )  # Interpolate, and output.
         return ypred
+
+    def _prepare_experiments(self, nrep):
+        """Cache at most four batch geometries, invalidating on input changes.
+
+        Keys contain values rather than object identities so in-place edits of
+        public experiment arrays also invalidate cached preparation. Parameter
+        values and material constants are never cached here.
+        """
+
+        def signature(value):
+            arr = np.asarray(value)
+            return arr.shape, arr.dtype.str, arr.tobytes()
+
+        key = (
+            nrep,
+            self.nexp,
+            self.Nhist,
+            epsilon,
+            signature(self.edots),
+            signature(self.temps),
+            signature(self.meas_strain_max),
+            tuple(signature(x) for x in self.meas_strain_histories),
+        )
+        # getattr also permits instances unpickled from before this cache existed.
+        if not hasattr(self, "_experiment_cache"):
+            self._experiment_cache = OrderedDict()
+        if key in self._experiment_cache:
+            self._experiment_cache.move_to_end(key)
+            return self._experiment_cache[key]
+
+        edots = np.kron(np.ones(nrep), self.edots)
+        temps = np.kron(np.ones(nrep), self.temps)
+        strain_maxs = np.kron(np.ones(nrep), self.meas_strain_max)
+        self.model.set_history_variables(strain_maxs, edots, self.Nhist)
+        strain_ends = np.hstack((0.0, np.cumsum(strain_maxs + epsilon)[:-1]))
+        prepared = {
+            "conditions": (edots, temps, strain_maxs),
+            "history": {
+                name: value.copy()
+                for name, value in self.model.strain_history.items()
+            },
+            "strain_ends": strain_ends,
+            "flattened_strain": np.hstack([
+                x + y
+                for x, y in zip(cycle(self.meas_strain_histories), strain_ends)
+            ]),
+        }
+        self._experiment_cache[key] = prepared
+        if len(self._experiment_cache) > 4:
+            self._experiment_cache.popitem(last=False)
+        return prepared
 
 
 def interpolate_experiment(args):
