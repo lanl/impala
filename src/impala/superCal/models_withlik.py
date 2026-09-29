@@ -1140,7 +1140,8 @@ class ModelMaterialStrength(AbstractModel):
         self.model.edot = edots.copy()
         self.model.Nhist = self.Nhist
         self.model.strain_history = {
-            name: value.copy() for name, value in prepared["history"].items()
+            name: value.copy(order="K")
+            for name, value in prepared["history"].items()
         }
         self.model.initialize(parmat_big, self.constants)
         self.model.initialize_state(
@@ -1210,7 +1211,7 @@ class ModelMaterialStrength(AbstractModel):
         prepared = {
             "conditions": (edots, temps, strain_maxs),
             "history": {
-                name: value.copy()
+                name: value.copy(order="K")
                 for name, value in self.model.strain_history.items()
             },
             "strain_ends": strain_ends,

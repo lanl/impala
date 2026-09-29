@@ -67,6 +67,15 @@ def assert_original(model, params, pool=None):
     actual = model.eval(params, pool=pool)
     # Stronger than a tolerance comparison: caching must preserve arithmetic.
     np.testing.assert_array_equal(actual, expected)
+    for key in model.model.strain_history:
+        actual_grid = model.model.strain_history[key]
+        original_grid = old.model.strain_history[key]
+        assert (
+            actual_grid.flags.c_contiguous == original_grid.flags.c_contiguous
+        )
+        assert (
+            actual_grid.flags.f_contiguous == original_grid.flags.f_contiguous
+        )
     variance = np.full(actual.shape[1], 1e-6)
     weights = np.ones(actual.shape[1])
     cov = model.lik_cov_inv(variance, weights)

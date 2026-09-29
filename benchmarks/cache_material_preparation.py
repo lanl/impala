@@ -94,6 +94,7 @@ def main():
         "samplers": [],
     }
     with np.load(ROOT / "tests/data/material_preparation_baseline.npz") as f:
+        golden = {key: f[key] for key in f.files}
         normalized, bounds, names = (
             f["normalized_parameters"],
             f["bounds"],
@@ -101,9 +102,37 @@ def main():
         )
     baseline = setup_for("pooled", original=True).models[0]
     candidate = setup_for("pooled").models[0]
+    predictions = candidate.eval(mc.sc.tran_unif(normalized, bounds, names))
+    covariance = candidate.lik_cov_inv(golden["variance"], golden["weights"])
+    likelihoods = np.array([
+        candidate.llik(golden["observed"], row, covariance, golden["weights"])
+        for row in predictions
+    ])
+    np.testing.assert_allclose(
+        predictions, golden["predictions"], rtol=1e-8, atol=1e-10
+    )
+    np.testing.assert_allclose(
+        likelihoods, golden["log_likelihood"], rtol=0, atol=1e-6
+    )
+    result["fixture_accuracy"] = {
+        "cases": len(normalized),
+        "max_absolute_prediction_error": float(
+            np.max(np.abs(predictions - golden["predictions"]))
+        ),
+        "max_absolute_log_likelihood_error": float(
+            np.max(np.abs(likelihoods - golden["log_likelihood"]))
+        ),
+        "predictions_exactly_equal": bool(
+            np.array_equal(predictions, golden["predictions"])
+        ),
+        "log_likelihoods_exactly_equal": bool(
+            np.array_equal(likelihoods, golden["log_likelihood"])
+        ),
+    }
     for batch in (1, 4, 50, 200):
         params = mc.sc.tran_unif(normalized[:batch], bounds, names)
         expected = baseline.eval(params)  # JIT compilation excluded.
+        np.testing.assert_array_equal(candidate.eval(params), expected)
         candidate._experiment_cache.clear()
         start = time.perf_counter()
         actual = candidate.eval(params)

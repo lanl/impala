@@ -22,3 +22,15 @@
   `results/step1-pytest.txt`. Lint and whitespace checks passed.
 - Paired sampler/timing measurements will be attached in the results checkpoint.
   No performance claim is made by the code checkpoint.
+
+### Array-layout refinement
+
+- Initial implementation checkpoint: `7ac9310`.
+- Preserved original C/Fortran memory layout when copying history arrays, avoiding
+  an unnecessary additional compiled specialization. Regression tests now check
+  layout as well as numerical output.
+- Warm the evaluator before measuring preparation-cache misses so compilation
+  time is excluded. Record independent golden-fixture errors in benchmark JSON.
+- Repeated full suite: **66 passed in 100.93 seconds**; see
+  `results/step1-final-pytest.txt`. Initial measurements remain in external
+  `benchmark/changes/step1/`; final measurements use a separate directory.
