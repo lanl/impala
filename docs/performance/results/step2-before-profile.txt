@@ -1,0 +1,31 @@
+loaded 6 QS_SHPB experiments
+         691601 function calls in 1.023 seconds
+
+   Ordered by: cumulative time
+   List reduced from 100 to 22 due to restriction <22>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+      200    0.006    0.000    1.023    0.005 models_withlik.py:1118(eval)
+      200    0.033    0.000    0.889    0.004 physical_models_vec.py:881(compute_state_history)
+    20000    0.087    0.000    0.834    0.000 physical_models_vec.py:789(update_state)
+    20000    0.470    0.000    0.511    0.000 physical_models_vec.py:597(value)
+    20000    0.180    0.000    0.182    0.000 physical_models_vec.py:487(value)
+     2000    0.013    0.000    0.044    0.000 _shape_base_impl.py:1080(kron)
+    20000    0.007    0.000    0.034    0.000 fromnumeric.py:2436(any)
+    20000    0.012    0.000    0.027    0.000 fromnumeric.py:86(_wrapreduction_any_all)
+    22400    0.027    0.000    0.027    0.000 {built-in method numpy.array}
+      200    0.009    0.000    0.026    0.000 shape_base.py:293(hstack)
+     8000    0.010    0.000    0.025    0.000 _shape_base_impl.py:515(expand_dims)
+      200    0.000    0.000    0.024    0.000 _polyint.py:64(__call__)
+      200    0.001    0.000    0.022    0.000 _interpolate.py:548(_evaluate)
+    20000    0.017    0.000    0.020    0.000 physical_models_vec.py:105(value)
+      200    0.000    0.000    0.019    0.000 _interpolate.py:475(_call_linear_np)
+      200    0.000    0.000    0.019    0.000 _function_base_impl.py:1538(interp)
+      200    0.019    0.000    0.019    0.000 {built-in method numpy._core._multiarray_umath.interp}
+    20000    0.015    0.000    0.018    0.000 physical_models_vec.py:325(value)
+    20000    0.015    0.000    0.017    0.000 physical_models_vec.py:248(value)
+      200    0.010    0.000    0.016    0.000 shape_base.py:19(atleast_1d)
+    20600    0.014    0.000    0.014    0.000 {method 'reduce' of 'numpy.ufunc' objects}
+   120000    0.014    0.000    0.014    0.000 serialize.py:30(_numba_unpickle)
+
+

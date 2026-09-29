@@ -57,6 +57,21 @@
   reusing existing numerical functions and preserving float64 arithmetic.
 - Added a constructor/configuration setting; Python remains the default.
 - Added history/state, edge-case and independent-fixture regressions, plus a
-  subprocess benchmark against an untouched original checkout. Full measurements
-  and validation will be recorded in a separate results checkpoint.
+  subprocess benchmark against an untouched original checkout. Final measurements
+  and validation are recorded below.
 - See [STEP2.md](STEP2.md) for scope, limitations, enabling and reproduction.
+
+### Step-2 results
+
+- Measured implementation: `ac87663`; results checkpoint: `perf-step2-20260929`.
+- Full suite: **83 passed in 114.72 seconds** (17 new compiled-driver tests).
+- Independent original-checkout comparisons: all 256 fixture predictions and
+  likelihoods matched exactly (zero error); all four seeded sampler runs per
+  candidate matched the original arrays and counters exactly.
+- Model speedups versus cached Python (batches 1/4/50/200): 3.63x, 2.85x, 1.34x, 1.13x.
+- Sampler speedups versus cached Python: pooled seed 42: 1.98x, pooled seed 123: 1.97x, hier seed 42: 1.51x, hier seed 123: 1.55x.
+- Python remains the default; enable the Cu backend explicitly. These are warmed
+  timings on this machine, not a convergence study or a universal speedup claim.
+- See `results/step2-results.json`, `results/step2-manifest.json`,
+  `results/step2-pytest.txt`, and `results/step2.tex`. Full artifacts and PDF:
+  workspace `benchmark/changes/step2/`.

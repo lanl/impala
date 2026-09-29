@@ -1,0 +1,105 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.8in]{geometry}
+\usepackage{booktabs,hyperref}
+\hypersetup{colorlinks=true,urlcolor=blue}
+\title{Impala performance experiment: Step 2}
+\author{Compiled copper material-history driver}
+\date{September 29, 2026}
+\begin{document}\maketitle
+\section*{Outcome and scope}
+The new optional Numba backend compiles the outer material-history driver for
+the copper PTW model combination. The post-cache profile attributed 0.889 of
+1.023 seconds (87\%) to this driver in 200 batch-50 evaluations. Individual
+physics functions already used Numba; the change removes Python coordination
+at each of 100 integration steps and checks invariant PTW parameter constraints
+once per history call.
+
+The kernel reuses the existing numerical functions, equations, precision and
+integration resolution. It uses no fast-math, parallel execution or GPU. The
+Python driver remains the default. Supported submodels are PTW stress,
+quadratic specific heat, linear density, linear melt temperature and BGP/PW
+shear modulus. Other combinations and overridden classes/methods are rejected
+explicitly when requesting the compiled backend. All final material-state
+fields are restored after the compiled call.
+\section*{Accuracy checks}
+All 83 tests passed in 114.72 seconds, including 17 new compiled-driver tests.
+These cover pooled and hierarchical batches, changing parameters and constants,
+modified conditions and integration resolution, supplied nonuniform histories,
+continued nonzero states, small-p branches and strain-rate thresholds.
+Predictions and all final state fields match the Python control exactly in
+these comparisons. Unsupported inputs and invalid parameters are also tested.
+
+A separate benchmark launched isolated processes importing either an untouched
+original checkout, the cached Python version, or the compiled version. Each
+matched all 256 original-fixture predictions and weighted log likelihoods
+exactly, with maximum absolute error zero. For each variant, seeds 42 and 123
+were run in pooled and hierarchical modes: 3,000 stored states, eight
+temperatures, six copper experiments and 327 observations. All recorded
+parameter/noise arrays and acceptance counters matched the original exactly;
+hierarchical means, covariances and swap counters also matched. This independent
+reference shares no modified physics modules with the candidate.
+
+These are short-chain regression checks, not a new convergence study. No
+long-run ESS-per-second experiment was repeated. The previously identified
+hierarchical mixing issue remains unresolved.
+\section*{Measured performance}
+Each process recorded 60 warmed evaluations per batch size. The table reports
+the mean of the two process medians in milliseconds. Variant order was reversed
+for the second seed. Speedup here is relative to the cached Python version,
+so it isolates step 2 from the earlier caching change.
+\begin{center}\begin{tabular}{rrrrr}\toprule
+Batch & Original (ms) & Cached (ms) & Compiled (ms) & Speedup\\\midrule
+1 & 1.582 & 1.514 & 0.418 & 3.63\\
+4 & 1.852 & 1.748 & 0.613 & 2.85\\
+50 & 5.364 & 4.844 & 3.611 & 1.34\\
+200 & 15.809 & 14.546 & 12.912 & 1.13\\
+\bottomrule\end{tabular}\end{center}
+Complete sampler runs were warmed before timing; the following times are seconds.
+\begin{center}\begin{tabular}{lrrrrr}\toprule
+Mode & Seed & Original & Cached & Compiled & Speedup\\\midrule
+pooled & 42 & 7.623 & 7.457 & 3.775 & 1.98\\
+pooled & 123 & 7.849 & 7.756 & 3.936 & 1.97\\
+hier & 42 & 11.806 & 11.566 & 7.684 & 1.51\\
+hier & 123 & 11.909 & 11.602 & 7.492 & 1.55\\
+\bottomrule\end{tabular}\end{center}
+Two seeds and sequential process timings do not establish a precise universal
+speedup. Hardware load, startup, batch size and model combination affect results.
+First use compiles the kernel; cold first-evaluation timings are recorded
+separately in the JSON metadata. The steady-state tables exclude compilation.
+\section*{Usage and limitations}
+With the project's optional Numba dependency installed, set
+\texttt{settings.history\_backend: numba} in a copy of the copper YAML
+configuration. Keep other settings unchanged. The main multi-calibration model
+forwards this setting; separate Z blocks are unchanged. The constructor also
+accepts the following option:
+\begin{verbatim}
+ModelMaterialStrength(..., history_backend="numba")
+\end{verbatim}
+
+The compiled driver requires finite float64 histories/state arrays, scalar
+constants, and parameters broadcastable to one value per history. It checks
+parameter validity and rejects nonfinite outputs. It does not promise identical
+NumPy warnings, underflow exceptions, or partially updated state on invalid
+inputs. Use the Python driver for custom models or unsupported inputs.
+\section*{Tracking and reproduction}
+Measured implementation: \texttt{ac87663}. Original commit: \texttt{6ccd5a1}.\\
+Branch: \texttt{perf/compile-material-history}.\\
+Step-1 checkpoint: \texttt{perf-step1-20260929}.\\
+Step-2 results checkpoint: \texttt{perf-step2-20260929}.\\
+All are local; nothing is published upstream.
+
+Versioned documentation includes \texttt{docs/performance/STEP2.md}, the change
+log, test log, compact results, profiles, artifact hashes, and this LaTeX source.
+Full traces and raw timings are preserved in workspace
+\texttt{benchmark/changes/step2/}. Previous artifacts and baseline fixtures
+remain unchanged. The original checkout is in \texttt{impala-original/}.
+\begin{verbatim}
+.venv/bin/python benchmarks/compiled_material_history.py \
+  --reference-root ../impala-original \
+  --output ../benchmark/changes/step2-rerun
+\end{verbatim}
+Use a new output directory for every run. The benchmark fails on any exact
+trajectory mismatch; it does not silently relax accuracy gates. Future changes
+that alter arithmetic require numerical tolerances and multi-seed posterior,
+predictive, R-hat and ESS-per-second comparisons before acceptance.
+\end{document}

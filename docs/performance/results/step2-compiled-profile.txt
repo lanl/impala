@@ -1,0 +1,38 @@
+         409601 function calls in 0.819 seconds
+
+   Ordered by: cumulative time
+   List reduced from 119 to 30 due to restriction <30>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+      200    0.007    0.000    0.819    0.004 models_withlik.py:1121(eval)
+      200    0.001    0.000    0.675    0.003 physical_models_vec.py:883(compute_state_history)
+      200    0.635    0.003    0.674    0.003 compiled_history.py:77(compute_cu_history)
+     2000    0.014    0.000    0.048    0.000 _shape_base_impl.py:1080(kron)
+      200    0.009    0.000    0.027    0.000 shape_base.py:293(hstack)
+     8000    0.011    0.000    0.027    0.000 _shape_base_impl.py:515(expand_dims)
+      200    0.000    0.000    0.026    0.000 _polyint.py:64(__call__)
+      200    0.001    0.000    0.024    0.000 _interpolate.py:548(_evaluate)
+      200    0.000    0.000    0.021    0.000 _interpolate.py:475(_call_linear_np)
+      200    0.000    0.000    0.021    0.000 _function_base_impl.py:1538(interp)
+      200    0.020    0.000    0.020    0.000 {built-in method numpy._core._multiarray_umath.interp}
+      200    0.011    0.000    0.018    0.000 shape_base.py:19(atleast_1d)
+      400    0.001    0.000    0.015    0.000 {built-in method builtins.all}
+      200    0.001    0.000    0.013    0.000 _interpolate.py:286(__init__)
+     8400    0.008    0.000    0.012    0.000 numeric.py:1431(normalize_axis_tuple)
+     2400    0.002    0.000    0.012    0.000 compiled_history.py:136(<genexpr>)
+     5200    0.002    0.000    0.010    0.000 fromnumeric.py:2548(all)
+     1800    0.006    0.000    0.009    0.000 compiled_history.py:181(<genexpr>)
+     2200    0.001    0.000    0.008    0.000 _stride_tricks_impl.py:400(broadcast_to)
+     5200    0.003    0.000    0.008    0.000 fromnumeric.py:86(_wrapreduction_any_all)
+     2200    0.005    0.000    0.008    0.000 _stride_tricks_impl.py:373(_broadcast_to)
+     3000    0.002    0.000    0.007    0.000 {built-in method builtins.any}
+     3400    0.007    0.000    0.007    0.000 {method 'copy' of 'numpy.ndarray' objects}
+     4600    0.006    0.000    0.006    0.000 {built-in method numpy.array}
+     2400    0.002    0.000    0.005    0.000 compiled_history.py:164(<genexpr>)
+     5800    0.005    0.000    0.005    0.000 {method 'reduce' of 'numpy.ufunc' objects}
+    12600    0.005    0.000    0.005    0.000 {method 'reshape' of 'numpy.ndarray' objects}
+     3400    0.003    0.000    0.005    0.000 compiled_history.py:159(<genexpr>)
+      200    0.004    0.000    0.004    0.000 numeric.py:2535(array_equal)
+    60000    0.004    0.000    0.004    0.000 {method 'append' of 'list' objects}
+
+

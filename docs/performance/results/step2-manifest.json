@@ -1,0 +1,290 @@
+{
+  "path_base": "workspace root (parent of impala checkout)",
+  "artifacts": [
+    {
+      "path": "benchmark/changes/step2/cached_123/fixture.npz",
+      "bytes": 630970,
+      "sha256": "62fc0c324d8f8dfc9fa60e442fe590af23eea9781d2b8c4faa5f2ec2b83d3fa4"
+    },
+    {
+      "path": "benchmark/changes/step2/cached_123/hier.npz",
+      "bytes": 20718769,
+      "sha256": "e3faa9d5ef7a5058aca90ced5d24f4ba57381f0201acb34f9c6cda36328ca0e1"
+    },
+    {
+      "path": "benchmark/changes/step2/cached_123/metadata.json",
+      "bytes": 10125,
+      "sha256": "0a6c67f0691270ce68cc73e31d5351d786566a971e60f609dd76774acb413177"
+    },
+    {
+      "path": "benchmark/changes/step2/cached_123/pooled.npz",
+      "bytes": 1890559,
+      "sha256": "7e6d1d8edde1235a5e87914dfe1a1db447cb1d9763b6d065195d3743d6c09467"
+    },
+    {
+      "path": "benchmark/changes/step2/cached_123.log",
+      "bytes": 8719,
+      "sha256": "43c66b88e47237b5ec895b51383acafd4b846f9f4eeb54a009b2c89c5faf7eb3"
+    },
+    {
+      "path": "benchmark/changes/step2/cached_42/evaluation.prof",
+      "bytes": 14480,
+      "sha256": "b868261f5a44f0633cb579c43be00ce081e3e67dae4c43d8d96242d941745006"
+    },
+    {
+      "path": "benchmark/changes/step2/cached_42/fixture.npz",
+      "bytes": 630970,
+      "sha256": "62fc0c324d8f8dfc9fa60e442fe590af23eea9781d2b8c4faa5f2ec2b83d3fa4"
+    },
+    {
+      "path": "benchmark/changes/step2/cached_42/hier.npz",
+      "bytes": 20423362,
+      "sha256": "acc4c5a9a44d5939a686fb7b52ce45b7e713f6f4ed77cd1d4185a5405532827e"
+    },
+    {
+      "path": "benchmark/changes/step2/cached_42/metadata.json",
+      "bytes": 10134,
+      "sha256": "4adf8a69a3802df7889d626e12c778b81617abc8f34a13f8fa3bd88310bf2360"
+    },
+    {
+      "path": "benchmark/changes/step2/cached_42/pooled.npz",
+      "bytes": 1687067,
+      "sha256": "415aa537300ad8f63489628d4ce9880110f27cf2615ebd8f620bc266519fcdc7"
+    },
+    {
+      "path": "benchmark/changes/step2/cached_42/profile.txt",
+      "bytes": 2656,
+      "sha256": "2522ca94c0b5fe4084de99798a19516a06ef7079d54b0b90251fb1a609706bbb"
+    },
+    {
+      "path": "benchmark/changes/step2/cached_42.log",
+      "bytes": 8469,
+      "sha256": "21c734adb7cef5e8d2e8ee8990bd3e9cbc13db9c10aaa94a7a17eec9a89c84d3"
+    },
+    {
+      "path": "benchmark/changes/step2/compiled_123/fixture.npz",
+      "bytes": 630970,
+      "sha256": "62fc0c324d8f8dfc9fa60e442fe590af23eea9781d2b8c4faa5f2ec2b83d3fa4"
+    },
+    {
+      "path": "benchmark/changes/step2/compiled_123/hier.npz",
+      "bytes": 20718769,
+      "sha256": "e3faa9d5ef7a5058aca90ced5d24f4ba57381f0201acb34f9c6cda36328ca0e1"
+    },
+    {
+      "path": "benchmark/changes/step2/compiled_123/metadata.json",
+      "bytes": 10208,
+      "sha256": "7fddd84cc2e5aad02184159f6470331e24e4c69b2e45da4c9a1c4b25baae6213"
+    },
+    {
+      "path": "benchmark/changes/step2/compiled_123/pooled.npz",
+      "bytes": 1890559,
+      "sha256": "7e6d1d8edde1235a5e87914dfe1a1db447cb1d9763b6d065195d3743d6c09467"
+    },
+    {
+      "path": "benchmark/changes/step2/compiled_123.log",
+      "bytes": 5378,
+      "sha256": "87fbef8b1b4dda0fe8706e7263df1a94786e5882dfc2a671bfb9f74485fdd32c"
+    },
+    {
+      "path": "benchmark/changes/step2/compiled_42/evaluation.prof",
+      "bytes": 17012,
+      "sha256": "b0a8b0b0bd207eb1c441e05893c1aac09e5b605c16f464be663a734b0f5787c6"
+    },
+    {
+      "path": "benchmark/changes/step2/compiled_42/fixture.npz",
+      "bytes": 630970,
+      "sha256": "62fc0c324d8f8dfc9fa60e442fe590af23eea9781d2b8c4faa5f2ec2b83d3fa4"
+    },
+    {
+      "path": "benchmark/changes/step2/compiled_42/hier.npz",
+      "bytes": 20423362,
+      "sha256": "acc4c5a9a44d5939a686fb7b52ce45b7e713f6f4ed77cd1d4185a5405532827e"
+    },
+    {
+      "path": "benchmark/changes/step2/compiled_42/metadata.json",
+      "bytes": 10215,
+      "sha256": "f5a3c42f1c62462b6b7c8923b4912a5a44786138131838c036fbe695f4484b35"
+    },
+    {
+      "path": "benchmark/changes/step2/compiled_42/pooled.npz",
+      "bytes": 1687067,
+      "sha256": "415aa537300ad8f63489628d4ce9880110f27cf2615ebd8f620bc266519fcdc7"
+    },
+    {
+      "path": "benchmark/changes/step2/compiled_42/profile.txt",
+      "bytes": 2666,
+      "sha256": "44d38dedc6c261d8979822938345e92af0787b3313830b31c47c15164c3102c9"
+    },
+    {
+      "path": "benchmark/changes/step2/compiled_42.log",
+      "bytes": 5461,
+      "sha256": "3e0d1db6c6f19082991c217452c0277b318d249d07c019c84634e888cc9ba955"
+    },
+    {
+      "path": "benchmark/changes/step2/environment.json",
+      "bytes": 252,
+      "sha256": "8bd2eeee89ffa434140bfb9319a75dc1d0c253cc2307136ddd88e89c61feb358"
+    },
+    {
+      "path": "benchmark/changes/step2/original_123/fixture.npz",
+      "bytes": 630970,
+      "sha256": "62fc0c324d8f8dfc9fa60e442fe590af23eea9781d2b8c4faa5f2ec2b83d3fa4"
+    },
+    {
+      "path": "benchmark/changes/step2/original_123/hier.npz",
+      "bytes": 20718769,
+      "sha256": "e3faa9d5ef7a5058aca90ced5d24f4ba57381f0201acb34f9c6cda36328ca0e1"
+    },
+    {
+      "path": "benchmark/changes/step2/original_123/metadata.json",
+      "bytes": 10023,
+      "sha256": "418f70e133ea30ae5647a30c058444083d09dbd06070795bf1f5cf4f4e309a30"
+    },
+    {
+      "path": "benchmark/changes/step2/original_123/pooled.npz",
+      "bytes": 1890559,
+      "sha256": "7e6d1d8edde1235a5e87914dfe1a1db447cb1d9763b6d065195d3743d6c09467"
+    },
+    {
+      "path": "benchmark/changes/step2/original_123.log",
+      "bytes": 8803,
+      "sha256": "b64b1e232cc65a78d8da9bfa85ee86b101474728e194d8af042a9de465412edb"
+    },
+    {
+      "path": "benchmark/changes/step2/original_42/evaluation.prof",
+      "bytes": 15595,
+      "sha256": "89880ae847c92c04fc6311e5797a38c673fd071067450d50bed832a9a8e7bd8e"
+    },
+    {
+      "path": "benchmark/changes/step2/original_42/fixture.npz",
+      "bytes": 630970,
+      "sha256": "62fc0c324d8f8dfc9fa60e442fe590af23eea9781d2b8c4faa5f2ec2b83d3fa4"
+    },
+    {
+      "path": "benchmark/changes/step2/original_42/hier.npz",
+      "bytes": 20423362,
+      "sha256": "acc4c5a9a44d5939a686fb7b52ce45b7e713f6f4ed77cd1d4185a5405532827e"
+    },
+    {
+      "path": "benchmark/changes/step2/original_42/metadata.json",
+      "bytes": 10018,
+      "sha256": "a5631c2f713e45c5aa2f0537115b3c409449101fb6552da9e0687225ccd42184"
+    },
+    {
+      "path": "benchmark/changes/step2/original_42/pooled.npz",
+      "bytes": 1687067,
+      "sha256": "415aa537300ad8f63489628d4ce9880110f27cf2615ebd8f620bc266519fcdc7"
+    },
+    {
+      "path": "benchmark/changes/step2/original_42/profile.txt",
+      "bytes": 2665,
+      "sha256": "52eb3a8db71a1ad52735dc97901aeb06db81dc84bd81020ce742268cb2480a64"
+    },
+    {
+      "path": "benchmark/changes/step2/original_42.log",
+      "bytes": 8719,
+      "sha256": "e2272a12984e2b0b3ade20766c08b91165f27adac5a9bfde6bf794792aa8b57c"
+    },
+    {
+      "path": "benchmark/changes/step2/results.json",
+      "bytes": 20280,
+      "sha256": "fef4ede00e17e96d2b30fd9771d5aa1fe53ed997fba1c10e3151580a6d8b08cd"
+    },
+    {
+      "path": "benchmark/changes/step2/step2.log",
+      "bytes": 9738,
+      "sha256": "96ed0e510acc0763ac52c63bfe2b0fe67bb7872f08690aeb247e1224a64a1a4b"
+    },
+    {
+      "path": "benchmark/changes/step2/step2.pdf",
+      "bytes": 31478,
+      "sha256": "c140d2dd350ae237ca88b3090ca9e2514ce2314e72edf8b22e9d93f05a779c64"
+    },
+    {
+      "path": "benchmark/changes/step2-profile/cached.prof",
+      "bytes": 14445,
+      "sha256": "a76f1fdaa5ece3e100a5a048125be87cb306f0c1091a61cd07555f0a0c820468"
+    },
+    {
+      "path": "benchmark/changes/step2-run.log",
+      "bytes": 235,
+      "sha256": "c7400d8d791b84cb96eac7838afac7754110b1cc323437bb19957cb04df0fde8"
+    },
+    {
+      "path": "benchmark/numerical_fixture.npz",
+      "bytes": 674077,
+      "sha256": "bd6cc44045dc67b4febb63cbacae44141a954c7dc03d2e7a30e0d40bcaf973ef"
+    },
+    {
+      "path": "impala/benchmarks/compiled_material_history.py",
+      "bytes": 9151,
+      "sha256": "35c76d5b8853af0a7554607beb27eed134afd3c0dc2b93914c040afbed47a0c2"
+    },
+    {
+      "path": "impala/docs/performance/results/step2-before-profile.txt",
+      "bytes": 2021,
+      "sha256": "c66992a521977f2b8f063e0db42c901016f4ea411728702aa05051423610b46d"
+    },
+    {
+      "path": "impala/docs/performance/results/step2-cached-profile.txt",
+      "bytes": 2656,
+      "sha256": "2522ca94c0b5fe4084de99798a19516a06ef7079d54b0b90251fb1a609706bbb"
+    },
+    {
+      "path": "impala/docs/performance/results/step2-compiled-profile.txt",
+      "bytes": 2666,
+      "sha256": "44d38dedc6c261d8979822938345e92af0787b3313830b31c47c15164c3102c9"
+    },
+    {
+      "path": "impala/docs/performance/results/step2-pytest.txt",
+      "bytes": 907,
+      "sha256": "d3959d2bd02b31f5eed888016aa1d6ee6fc04211b712d93e0e6c0e88629511fd"
+    },
+    {
+      "path": "impala/docs/performance/results/step2-results.json",
+      "bytes": 22564,
+      "sha256": "d2f2fccbbec7dd4f77261747563cc435891b46db6bd492bc6bb8e05d281f06b1"
+    },
+    {
+      "path": "impala/docs/performance/results/step2.tex",
+      "bytes": 5919,
+      "sha256": "d658c3c41fe0887036a7ad5b932e587c8be815085ff7a6b3b238e9772d71c221"
+    },
+    {
+      "path": "impala/examples/cu_config.yaml",
+      "bytes": 2848,
+      "sha256": "6f544c1dc98655d3ebacfe99cb06856ad6ff830aa35599787bf17135d8c0d643"
+    },
+    {
+      "path": "impala/examples/multi_calib.py",
+      "bytes": 60056,
+      "sha256": "cb81059220316467435b3f30f324f5ff76c2101ebb1fe7df5688e61817d77680"
+    },
+    {
+      "path": "impala/src/impala/physics/compiled_history.py",
+      "bytes": 5532,
+      "sha256": "45ef2c69675eab9ed819b071394a3c98f51576db391f36284a4132cf19c25cca"
+    },
+    {
+      "path": "impala/src/impala/physics/physical_models_vec.py",
+      "bytes": 27209,
+      "sha256": "fcf51aa3d14bdb2b81816c2ff0187eba962c91eaba6b2f1d9331d72f7c8d89f4"
+    },
+    {
+      "path": "impala/src/impala/superCal/models_withlik.py",
+      "bytes": 48418,
+      "sha256": "c2db02e78b6bf32c2596bc4e5af44844b1853a2f7328de00b5f0c7880bffa6d1"
+    },
+    {
+      "path": "impala/tests/data/material_preparation_baseline.npz",
+      "bytes": 674077,
+      "sha256": "bd6cc44045dc67b4febb63cbacae44141a954c7dc03d2e7a30e0d40bcaf973ef"
+    },
+    {
+      "path": "impala/uv.lock",
+      "bytes": 408209,
+      "sha256": "5bbce0c9aaf5fe7c1bfb8579d3666fe3f4ce216b1968eff5a9d1355f9f1b492d"
+    }
+  ]
+}

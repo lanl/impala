@@ -1,0 +1,643 @@
+{
+  "baseline_commit": "6ccd5a1ce8ea4b79755ad4387cf43605b4f5aa0e",
+  "workers": [
+    {
+      "variant": "original",
+      "seed": 42,
+      "source_root": "/home/biswas/Work/codex_workspace/impala_work/impala-original",
+      "commit": "6ccd5a1ce8ea4b79755ad4387cf43605b4f5aa0e",
+      "source_sha256": {
+        "src/impala/__init__.py": "a494ac8fc44703e2f70801b3854cd5b304cd4403eac0e1907f48d75849a7f150",
+        "src/impala/physics/__init__.py": "577217403715eba5fb76cb12349876775f1c3fdd98cd84f5ba5bc0f5295e8636",
+        "src/impala/physics/physical_models_functions.py": "d15ff8445d989f78c95929690de8d19b063ddbd5d231db0970357054b7629fcf",
+        "src/impala/physics/physical_models_vec.py": "99e75c6fcf55ac923e126150707af089fd3454f5cb5357de40a2899230595adb",
+        "src/impala/superCal/__init__.py": "4ef20c9e2d43f9c8332b03d34bf4e58eaf8d6b5cdb7c5e6cefee6a829ce15c3f",
+        "src/impala/superCal/impala_clust.py": "b4e0d8731d09aab0f3e6279296e897c432bd1f4d705d9bd392a6c019125041f3",
+        "src/impala/superCal/impala_hier.py": "6c796c98c4eb8dc4c0273d1cfeabd7695726cb43538e575dc2128d2748d37ec0",
+        "src/impala/superCal/impala_noprobit_emu.py": "a2ee27747ee7ef6f82bcd033f596b8824b39c53ae632fd0a5eedc6fdebfa7782",
+        "src/impala/superCal/impala_pool.py": "eae51ce503073aa229dabb7372781f8b6d3e94237d238da704aa5dce8d15b1af",
+        "src/impala/superCal/map.py": "751b43f6e5c1ccb48d71a79d2585185c0523f777e4a56475f514870b012ed18b",
+        "src/impala/superCal/models_withlik.py": "35665b715e246ebe41b426140b15b405c6e755e2cfc8050425e56b7280338497",
+        "src/impala/superCal/pbar.py": "27cf13e23649df5447b4eaf7416067b507559e47ec253f4cb022f4b84b25bda7",
+        "src/impala/superCal/plots.py": "bc78d0b774626643c3c9bc6b8bd825d59e4de3b4508a526deba957669d731999",
+        "src/impala/superCal/post_process.py": "ac56dcd59ed1a71b87c2bfb9e18a23b894ac69902e792fef92a2722069a728d0"
+      },
+      "micro": [
+        {
+          "batch": 1,
+          "median_ms": 1.589784398674965
+        },
+        {
+          "batch": 4,
+          "median_ms": 1.8235617317259312
+        },
+        {
+          "batch": 50,
+          "median_ms": 5.255748983472586
+        },
+        {
+          "batch": 200,
+          "median_ms": 15.71377133950591
+        }
+      ],
+      "samplers": {
+        "pooled": {
+          "seconds": 7.623412656597793,
+          "states": 3000,
+          "temperatures": 8,
+          "arrays": [
+            "s2",
+            "count",
+            "theta"
+          ]
+        },
+        "hier": {
+          "seconds": 11.805706636048853,
+          "states": 3000,
+          "temperatures": 8,
+          "arrays": [
+            "s2",
+            "count",
+            "theta",
+            "theta0",
+            "Sigma0",
+            "count_temper"
+          ]
+        }
+      },
+      "first_evaluation_seconds": 2.5498406989499927,
+      "fixture": {
+        "cases": 256,
+        "max_prediction_error": 0.0,
+        "max_likelihood_error": 0.0
+      }
+    },
+    {
+      "variant": "cached",
+      "seed": 42,
+      "source_root": "/home/biswas/Work/codex_workspace/impala_work/impala",
+      "commit": "ac87663e294e8c46e4b78070bd9e1a3d702b6b83",
+      "source_sha256": {
+        "src/impala/__init__.py": "a494ac8fc44703e2f70801b3854cd5b304cd4403eac0e1907f48d75849a7f150",
+        "src/impala/physics/__init__.py": "577217403715eba5fb76cb12349876775f1c3fdd98cd84f5ba5bc0f5295e8636",
+        "src/impala/physics/physical_models_functions.py": "d15ff8445d989f78c95929690de8d19b063ddbd5d231db0970357054b7629fcf",
+        "src/impala/physics/physical_models_vec.py": "fcf51aa3d14bdb2b81816c2ff0187eba962c91eaba6b2f1d9331d72f7c8d89f4",
+        "src/impala/physics/compiled_history.py": "45ef2c69675eab9ed819b071394a3c98f51576db391f36284a4132cf19c25cca",
+        "src/impala/superCal/__init__.py": "4ef20c9e2d43f9c8332b03d34bf4e58eaf8d6b5cdb7c5e6cefee6a829ce15c3f",
+        "src/impala/superCal/impala_clust.py": "b4e0d8731d09aab0f3e6279296e897c432bd1f4d705d9bd392a6c019125041f3",
+        "src/impala/superCal/impala_hier.py": "6c796c98c4eb8dc4c0273d1cfeabd7695726cb43538e575dc2128d2748d37ec0",
+        "src/impala/superCal/impala_noprobit_emu.py": "a2ee27747ee7ef6f82bcd033f596b8824b39c53ae632fd0a5eedc6fdebfa7782",
+        "src/impala/superCal/impala_pool.py": "eae51ce503073aa229dabb7372781f8b6d3e94237d238da704aa5dce8d15b1af",
+        "src/impala/superCal/map.py": "751b43f6e5c1ccb48d71a79d2585185c0523f777e4a56475f514870b012ed18b",
+        "src/impala/superCal/models_withlik.py": "c2db02e78b6bf32c2596bc4e5af44844b1853a2f7328de00b5f0c7880bffa6d1",
+        "src/impala/superCal/pbar.py": "27cf13e23649df5447b4eaf7416067b507559e47ec253f4cb022f4b84b25bda7",
+        "src/impala/superCal/plots.py": "bc78d0b774626643c3c9bc6b8bd825d59e4de3b4508a526deba957669d731999",
+        "src/impala/superCal/post_process.py": "ac56dcd59ed1a71b87c2bfb9e18a23b894ac69902e792fef92a2722069a728d0"
+      },
+      "micro": [
+        {
+          "batch": 1,
+          "median_ms": 1.5156096778810024
+        },
+        {
+          "batch": 4,
+          "median_ms": 1.7546541057527065
+        },
+        {
+          "batch": 50,
+          "median_ms": 4.86172316595912
+        },
+        {
+          "batch": 200,
+          "median_ms": 14.59508016705513
+        }
+      ],
+      "samplers": {
+        "pooled": {
+          "seconds": 7.4573400327935815,
+          "states": 3000,
+          "temperatures": 8,
+          "arrays": [
+            "s2",
+            "count",
+            "theta"
+          ]
+        },
+        "hier": {
+          "seconds": 11.565919674932957,
+          "states": 3000,
+          "temperatures": 8,
+          "arrays": [
+            "s2",
+            "count",
+            "theta",
+            "theta0",
+            "Sigma0",
+            "count_temper"
+          ]
+        }
+      },
+      "first_evaluation_seconds": 2.5653094965964556,
+      "fixture": {
+        "cases": 256,
+        "max_prediction_error": 0.0,
+        "max_likelihood_error": 0.0
+      }
+    },
+    {
+      "variant": "compiled",
+      "seed": 42,
+      "source_root": "/home/biswas/Work/codex_workspace/impala_work/impala",
+      "commit": "ac87663e294e8c46e4b78070bd9e1a3d702b6b83",
+      "source_sha256": {
+        "src/impala/__init__.py": "a494ac8fc44703e2f70801b3854cd5b304cd4403eac0e1907f48d75849a7f150",
+        "src/impala/physics/__init__.py": "577217403715eba5fb76cb12349876775f1c3fdd98cd84f5ba5bc0f5295e8636",
+        "src/impala/physics/physical_models_functions.py": "d15ff8445d989f78c95929690de8d19b063ddbd5d231db0970357054b7629fcf",
+        "src/impala/physics/physical_models_vec.py": "fcf51aa3d14bdb2b81816c2ff0187eba962c91eaba6b2f1d9331d72f7c8d89f4",
+        "src/impala/physics/compiled_history.py": "45ef2c69675eab9ed819b071394a3c98f51576db391f36284a4132cf19c25cca",
+        "src/impala/superCal/__init__.py": "4ef20c9e2d43f9c8332b03d34bf4e58eaf8d6b5cdb7c5e6cefee6a829ce15c3f",
+        "src/impala/superCal/impala_clust.py": "b4e0d8731d09aab0f3e6279296e897c432bd1f4d705d9bd392a6c019125041f3",
+        "src/impala/superCal/impala_hier.py": "6c796c98c4eb8dc4c0273d1cfeabd7695726cb43538e575dc2128d2748d37ec0",
+        "src/impala/superCal/impala_noprobit_emu.py": "a2ee27747ee7ef6f82bcd033f596b8824b39c53ae632fd0a5eedc6fdebfa7782",
+        "src/impala/superCal/impala_pool.py": "eae51ce503073aa229dabb7372781f8b6d3e94237d238da704aa5dce8d15b1af",
+        "src/impala/superCal/map.py": "751b43f6e5c1ccb48d71a79d2585185c0523f777e4a56475f514870b012ed18b",
+        "src/impala/superCal/models_withlik.py": "c2db02e78b6bf32c2596bc4e5af44844b1853a2f7328de00b5f0c7880bffa6d1",
+        "src/impala/superCal/pbar.py": "27cf13e23649df5447b4eaf7416067b507559e47ec253f4cb022f4b84b25bda7",
+        "src/impala/superCal/plots.py": "bc78d0b774626643c3c9bc6b8bd825d59e4de3b4508a526deba957669d731999",
+        "src/impala/superCal/post_process.py": "ac56dcd59ed1a71b87c2bfb9e18a23b894ac69902e792fef92a2722069a728d0"
+      },
+      "micro": [
+        {
+          "batch": 1,
+          "median_ms": 0.4192329943180084
+        },
+        {
+          "batch": 4,
+          "median_ms": 0.6227372214198112
+        },
+        {
+          "batch": 50,
+          "median_ms": 3.663345705717802
+        },
+        {
+          "batch": 200,
+          "median_ms": 12.964805122464895
+        }
+      ],
+      "samplers": {
+        "pooled": {
+          "seconds": 3.774586198851466,
+          "states": 3000,
+          "temperatures": 8,
+          "arrays": [
+            "s2",
+            "count",
+            "theta"
+          ]
+        },
+        "hier": {
+          "seconds": 7.683716959320009,
+          "states": 3000,
+          "temperatures": 8,
+          "arrays": [
+            "s2",
+            "count",
+            "theta",
+            "theta0",
+            "Sigma0",
+            "count_temper"
+          ]
+        }
+      },
+      "first_evaluation_seconds": 3.730423511005938,
+      "fixture": {
+        "cases": 256,
+        "max_prediction_error": 0.0,
+        "max_likelihood_error": 0.0
+      }
+    },
+    {
+      "variant": "compiled",
+      "seed": 123,
+      "source_root": "/home/biswas/Work/codex_workspace/impala_work/impala",
+      "commit": "ac87663e294e8c46e4b78070bd9e1a3d702b6b83",
+      "source_sha256": {
+        "src/impala/__init__.py": "a494ac8fc44703e2f70801b3854cd5b304cd4403eac0e1907f48d75849a7f150",
+        "src/impala/physics/__init__.py": "577217403715eba5fb76cb12349876775f1c3fdd98cd84f5ba5bc0f5295e8636",
+        "src/impala/physics/physical_models_functions.py": "d15ff8445d989f78c95929690de8d19b063ddbd5d231db0970357054b7629fcf",
+        "src/impala/physics/physical_models_vec.py": "fcf51aa3d14bdb2b81816c2ff0187eba962c91eaba6b2f1d9331d72f7c8d89f4",
+        "src/impala/physics/compiled_history.py": "45ef2c69675eab9ed819b071394a3c98f51576db391f36284a4132cf19c25cca",
+        "src/impala/superCal/__init__.py": "4ef20c9e2d43f9c8332b03d34bf4e58eaf8d6b5cdb7c5e6cefee6a829ce15c3f",
+        "src/impala/superCal/impala_clust.py": "b4e0d8731d09aab0f3e6279296e897c432bd1f4d705d9bd392a6c019125041f3",
+        "src/impala/superCal/impala_hier.py": "6c796c98c4eb8dc4c0273d1cfeabd7695726cb43538e575dc2128d2748d37ec0",
+        "src/impala/superCal/impala_noprobit_emu.py": "a2ee27747ee7ef6f82bcd033f596b8824b39c53ae632fd0a5eedc6fdebfa7782",
+        "src/impala/superCal/impala_pool.py": "eae51ce503073aa229dabb7372781f8b6d3e94237d238da704aa5dce8d15b1af",
+        "src/impala/superCal/map.py": "751b43f6e5c1ccb48d71a79d2585185c0523f777e4a56475f514870b012ed18b",
+        "src/impala/superCal/models_withlik.py": "c2db02e78b6bf32c2596bc4e5af44844b1853a2f7328de00b5f0c7880bffa6d1",
+        "src/impala/superCal/pbar.py": "27cf13e23649df5447b4eaf7416067b507559e47ec253f4cb022f4b84b25bda7",
+        "src/impala/superCal/plots.py": "bc78d0b774626643c3c9bc6b8bd825d59e4de3b4508a526deba957669d731999",
+        "src/impala/superCal/post_process.py": "ac56dcd59ed1a71b87c2bfb9e18a23b894ac69902e792fef92a2722069a728d0"
+      },
+      "micro": [
+        {
+          "batch": 1,
+          "median_ms": 0.4161940887570381
+        },
+        {
+          "batch": 4,
+          "median_ms": 0.604050699621439
+        },
+        {
+          "batch": 50,
+          "median_ms": 3.5591027699410915
+        },
+        {
+          "batch": 200,
+          "median_ms": 12.858376372605562
+        }
+      ],
+      "samplers": {
+        "pooled": {
+          "seconds": 3.9362916303798556,
+          "states": 3000,
+          "temperatures": 8,
+          "arrays": [
+            "s2",
+            "count",
+            "theta"
+          ]
+        },
+        "hier": {
+          "seconds": 7.491502562537789,
+          "states": 3000,
+          "temperatures": 8,
+          "arrays": [
+            "s2",
+            "count",
+            "theta",
+            "theta0",
+            "Sigma0",
+            "count_temper"
+          ]
+        }
+      },
+      "first_evaluation_seconds": 3.6802447009831667,
+      "fixture": {
+        "cases": 256,
+        "max_prediction_error": 0.0,
+        "max_likelihood_error": 0.0
+      }
+    },
+    {
+      "variant": "cached",
+      "seed": 123,
+      "source_root": "/home/biswas/Work/codex_workspace/impala_work/impala",
+      "commit": "ac87663e294e8c46e4b78070bd9e1a3d702b6b83",
+      "source_sha256": {
+        "src/impala/__init__.py": "a494ac8fc44703e2f70801b3854cd5b304cd4403eac0e1907f48d75849a7f150",
+        "src/impala/physics/__init__.py": "577217403715eba5fb76cb12349876775f1c3fdd98cd84f5ba5bc0f5295e8636",
+        "src/impala/physics/physical_models_functions.py": "d15ff8445d989f78c95929690de8d19b063ddbd5d231db0970357054b7629fcf",
+        "src/impala/physics/physical_models_vec.py": "fcf51aa3d14bdb2b81816c2ff0187eba962c91eaba6b2f1d9331d72f7c8d89f4",
+        "src/impala/physics/compiled_history.py": "45ef2c69675eab9ed819b071394a3c98f51576db391f36284a4132cf19c25cca",
+        "src/impala/superCal/__init__.py": "4ef20c9e2d43f9c8332b03d34bf4e58eaf8d6b5cdb7c5e6cefee6a829ce15c3f",
+        "src/impala/superCal/impala_clust.py": "b4e0d8731d09aab0f3e6279296e897c432bd1f4d705d9bd392a6c019125041f3",
+        "src/impala/superCal/impala_hier.py": "6c796c98c4eb8dc4c0273d1cfeabd7695726cb43538e575dc2128d2748d37ec0",
+        "src/impala/superCal/impala_noprobit_emu.py": "a2ee27747ee7ef6f82bcd033f596b8824b39c53ae632fd0a5eedc6fdebfa7782",
+        "src/impala/superCal/impala_pool.py": "eae51ce503073aa229dabb7372781f8b6d3e94237d238da704aa5dce8d15b1af",
+        "src/impala/superCal/map.py": "751b43f6e5c1ccb48d71a79d2585185c0523f777e4a56475f514870b012ed18b",
+        "src/impala/superCal/models_withlik.py": "c2db02e78b6bf32c2596bc4e5af44844b1853a2f7328de00b5f0c7880bffa6d1",
+        "src/impala/superCal/pbar.py": "27cf13e23649df5447b4eaf7416067b507559e47ec253f4cb022f4b84b25bda7",
+        "src/impala/superCal/plots.py": "bc78d0b774626643c3c9bc6b8bd825d59e4de3b4508a526deba957669d731999",
+        "src/impala/superCal/post_process.py": "ac56dcd59ed1a71b87c2bfb9e18a23b894ac69902e792fef92a2722069a728d0"
+      },
+      "micro": [
+        {
+          "batch": 1,
+          "median_ms": 1.5133703127503395
+        },
+        {
+          "batch": 4,
+          "median_ms": 1.741758082062006
+        },
+        {
+          "batch": 50,
+          "median_ms": 4.825908690690994
+        },
+        {
+          "batch": 200,
+          "median_ms": 14.496161602437496
+        }
+      ],
+      "samplers": {
+        "pooled": {
+          "seconds": 7.756385835818946,
+          "states": 3000,
+          "temperatures": 8,
+          "arrays": [
+            "s2",
+            "count",
+            "theta"
+          ]
+        },
+        "hier": {
+          "seconds": 11.602358523756266,
+          "states": 3000,
+          "temperatures": 8,
+          "arrays": [
+            "s2",
+            "count",
+            "theta",
+            "theta0",
+            "Sigma0",
+            "count_temper"
+          ]
+        }
+      },
+      "first_evaluation_seconds": 2.5584159968420863,
+      "fixture": {
+        "cases": 256,
+        "max_prediction_error": 0.0,
+        "max_likelihood_error": 0.0
+      }
+    },
+    {
+      "variant": "original",
+      "seed": 123,
+      "source_root": "/home/biswas/Work/codex_workspace/impala_work/impala-original",
+      "commit": "6ccd5a1ce8ea4b79755ad4387cf43605b4f5aa0e",
+      "source_sha256": {
+        "src/impala/__init__.py": "a494ac8fc44703e2f70801b3854cd5b304cd4403eac0e1907f48d75849a7f150",
+        "src/impala/physics/__init__.py": "577217403715eba5fb76cb12349876775f1c3fdd98cd84f5ba5bc0f5295e8636",
+        "src/impala/physics/physical_models_functions.py": "d15ff8445d989f78c95929690de8d19b063ddbd5d231db0970357054b7629fcf",
+        "src/impala/physics/physical_models_vec.py": "99e75c6fcf55ac923e126150707af089fd3454f5cb5357de40a2899230595adb",
+        "src/impala/superCal/__init__.py": "4ef20c9e2d43f9c8332b03d34bf4e58eaf8d6b5cdb7c5e6cefee6a829ce15c3f",
+        "src/impala/superCal/impala_clust.py": "b4e0d8731d09aab0f3e6279296e897c432bd1f4d705d9bd392a6c019125041f3",
+        "src/impala/superCal/impala_hier.py": "6c796c98c4eb8dc4c0273d1cfeabd7695726cb43538e575dc2128d2748d37ec0",
+        "src/impala/superCal/impala_noprobit_emu.py": "a2ee27747ee7ef6f82bcd033f596b8824b39c53ae632fd0a5eedc6fdebfa7782",
+        "src/impala/superCal/impala_pool.py": "eae51ce503073aa229dabb7372781f8b6d3e94237d238da704aa5dce8d15b1af",
+        "src/impala/superCal/map.py": "751b43f6e5c1ccb48d71a79d2585185c0523f777e4a56475f514870b012ed18b",
+        "src/impala/superCal/models_withlik.py": "35665b715e246ebe41b426140b15b405c6e755e2cfc8050425e56b7280338497",
+        "src/impala/superCal/pbar.py": "27cf13e23649df5447b4eaf7416067b507559e47ec253f4cb022f4b84b25bda7",
+        "src/impala/superCal/plots.py": "bc78d0b774626643c3c9bc6b8bd825d59e4de3b4508a526deba957669d731999",
+        "src/impala/superCal/post_process.py": "ac56dcd59ed1a71b87c2bfb9e18a23b894ac69902e792fef92a2722069a728d0"
+      },
+      "micro": [
+        {
+          "batch": 1,
+          "median_ms": 1.5747910365462303
+        },
+        {
+          "batch": 4,
+          "median_ms": 1.8810736946761608
+        },
+        {
+          "batch": 50,
+          "median_ms": 5.471884272992611
+        },
+        {
+          "batch": 200,
+          "median_ms": 15.905067324638367
+        }
+      ],
+      "samplers": {
+        "pooled": {
+          "seconds": 7.849364840425551,
+          "states": 3000,
+          "temperatures": 8,
+          "arrays": [
+            "s2",
+            "count",
+            "theta"
+          ]
+        },
+        "hier": {
+          "seconds": 11.908564236015081,
+          "states": 3000,
+          "temperatures": 8,
+          "arrays": [
+            "s2",
+            "count",
+            "theta",
+            "theta0",
+            "Sigma0",
+            "count_temper"
+          ]
+        }
+      },
+      "first_evaluation_seconds": 2.556183551438153,
+      "fixture": {
+        "cases": 256,
+        "max_prediction_error": 0.0,
+        "max_likelihood_error": 0.0
+      }
+    }
+  ],
+  "comparisons": [
+    {
+      "variant": "cached",
+      "seed": 42,
+      "output": "fixture",
+      "exactly_equal_arrays": [
+        "predictions",
+        "likelihood"
+      ]
+    },
+    {
+      "variant": "cached",
+      "seed": 42,
+      "output": "pooled",
+      "exactly_equal_arrays": [
+        "s2",
+        "count",
+        "theta"
+      ]
+    },
+    {
+      "variant": "cached",
+      "seed": 42,
+      "output": "hier",
+      "exactly_equal_arrays": [
+        "s2",
+        "count",
+        "theta",
+        "theta0",
+        "Sigma0",
+        "count_temper"
+      ]
+    },
+    {
+      "variant": "compiled",
+      "seed": 42,
+      "output": "fixture",
+      "exactly_equal_arrays": [
+        "predictions",
+        "likelihood"
+      ]
+    },
+    {
+      "variant": "compiled",
+      "seed": 42,
+      "output": "pooled",
+      "exactly_equal_arrays": [
+        "s2",
+        "count",
+        "theta"
+      ]
+    },
+    {
+      "variant": "compiled",
+      "seed": 42,
+      "output": "hier",
+      "exactly_equal_arrays": [
+        "s2",
+        "count",
+        "theta",
+        "theta0",
+        "Sigma0",
+        "count_temper"
+      ]
+    },
+    {
+      "variant": "cached",
+      "seed": 123,
+      "output": "fixture",
+      "exactly_equal_arrays": [
+        "predictions",
+        "likelihood"
+      ]
+    },
+    {
+      "variant": "cached",
+      "seed": 123,
+      "output": "pooled",
+      "exactly_equal_arrays": [
+        "s2",
+        "count",
+        "theta"
+      ]
+    },
+    {
+      "variant": "cached",
+      "seed": 123,
+      "output": "hier",
+      "exactly_equal_arrays": [
+        "s2",
+        "count",
+        "theta",
+        "theta0",
+        "Sigma0",
+        "count_temper"
+      ]
+    },
+    {
+      "variant": "compiled",
+      "seed": 123,
+      "output": "fixture",
+      "exactly_equal_arrays": [
+        "predictions",
+        "likelihood"
+      ]
+    },
+    {
+      "variant": "compiled",
+      "seed": 123,
+      "output": "pooled",
+      "exactly_equal_arrays": [
+        "s2",
+        "count",
+        "theta"
+      ]
+    },
+    {
+      "variant": "compiled",
+      "seed": 123,
+      "output": "hier",
+      "exactly_equal_arrays": [
+        "s2",
+        "count",
+        "theta",
+        "theta0",
+        "Sigma0",
+        "count_temper"
+      ]
+    }
+  ],
+  "timing_summary": {
+    "micro_ms_mean_of_two_medians": [
+      {
+        "batch": 1,
+        "original": 1.5822877176105976,
+        "cached": 1.514489995315671,
+        "compiled": 0.41771354153752327,
+        "speedup_vs_cached": 3.6256665027930968,
+        "speedup_vs_original": 3.7879732406723052
+      },
+      {
+        "batch": 4,
+        "original": 1.852317713201046,
+        "cached": 1.7482060939073563,
+        "compiled": 0.6133939605206251,
+        "speedup_vs_cached": 2.8500542985841375,
+        "speedup_vs_original": 3.0197847263264057
+      },
+      {
+        "batch": 50,
+        "original": 5.363816628232598,
+        "cached": 4.843815928325057,
+        "compiled": 3.611224237829447,
+        "speedup_vs_cached": 1.3413223907791638,
+        "speedup_vs_original": 1.485318073589515
+      },
+      {
+        "batch": 200,
+        "original": 15.809419332072139,
+        "cached": 14.545620884746313,
+        "compiled": 12.911590747535229,
+        "speedup_vs_cached": 1.1265552919978519,
+        "speedup_vs_original": 1.2244362171322767
+      }
+    ],
+    "sampler_seconds": [
+      {
+        "mode": "pooled",
+        "seed": 42,
+        "original": 7.623412656597793,
+        "cached": 7.4573400327935815,
+        "compiled": 3.774586198851466,
+        "speedup_vs_cached": 1.9756708788536095,
+        "speedup_vs_original": 2.0196684497276682
+      },
+      {
+        "mode": "pooled",
+        "seed": 123,
+        "original": 7.849364840425551,
+        "cached": 7.756385835818946,
+        "compiled": 3.9362916303798556,
+        "speedup_vs_cached": 1.970480483700962,
+        "speedup_vs_original": 1.9941014481358639
+      },
+      {
+        "mode": "hier",
+        "seed": 42,
+        "original": 11.805706636048853,
+        "cached": 11.565919674932957,
+        "compiled": 7.683716959320009,
+        "speedup_vs_cached": 1.5052506145354572,
+        "speedup_vs_original": 1.5364577714863707
+      },
+      {
+        "mode": "hier",
+        "seed": 123,
+        "original": 11.908564236015081,
+        "cached": 11.602358523756266,
+        "compiled": 7.491502562537789,
+        "speedup_vs_cached": 1.5487358412950873,
+        "speedup_vs_original": 1.5896095792004892
+      }
+    ]
+  },
+  "tests": {
+    "passed": 83,
+    "seconds": 114.72
+  }
+}

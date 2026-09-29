@@ -1,0 +1,38 @@
+         691801 function calls in 1.129 seconds
+
+   Ordered by: cumulative time
+   List reduced from 100 to 30 due to restriction <30>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+      200    0.007    0.000    1.129    0.006 models_withlik.py:1121(eval)
+      200    0.038    0.000    0.985    0.005 physical_models_vec.py:883(compute_state_history)
+    20000    0.099    0.000    0.922    0.000 physical_models_vec.py:791(update_state)
+    20000    0.518    0.000    0.565    0.000 physical_models_vec.py:597(value)
+    20000    0.196    0.000    0.198    0.000 physical_models_vec.py:487(value)
+     2000    0.014    0.000    0.048    0.000 _shape_base_impl.py:1080(kron)
+    20000    0.008    0.000    0.039    0.000 fromnumeric.py:2436(any)
+    20000    0.013    0.000    0.031    0.000 fromnumeric.py:86(_wrapreduction_any_all)
+    22400    0.031    0.000    0.031    0.000 {built-in method numpy.array}
+      200    0.009    0.000    0.027    0.000 shape_base.py:293(hstack)
+     8000    0.011    0.000    0.027    0.000 _shape_base_impl.py:515(expand_dims)
+      200    0.000    0.000    0.026    0.000 _polyint.py:64(__call__)
+      200    0.001    0.000    0.024    0.000 _interpolate.py:548(_evaluate)
+    20000    0.019    0.000    0.022    0.000 physical_models_vec.py:105(value)
+      200    0.000    0.000    0.021    0.000 _interpolate.py:475(_call_linear_np)
+      200    0.000    0.000    0.021    0.000 _function_base_impl.py:1538(interp)
+      200    0.020    0.000    0.020    0.000 {built-in method numpy._core._multiarray_umath.interp}
+    20000    0.017    0.000    0.020    0.000 physical_models_vec.py:325(value)
+    20000    0.017    0.000    0.019    0.000 physical_models_vec.py:248(value)
+      200    0.011    0.000    0.018    0.000 shape_base.py:19(atleast_1d)
+    20600    0.016    0.000    0.016    0.000 {method 'reduce' of 'numpy.ufunc' objects}
+   120000    0.015    0.000    0.015    0.000 serialize.py:30(_numba_unpickle)
+      200    0.001    0.000    0.013    0.000 _interpolate.py:286(__init__)
+     8400    0.008    0.000    0.012    0.000 numeric.py:1431(normalize_axis_tuple)
+     1200    0.006    0.000    0.006    0.000 {method 'copy' of 'numpy.ndarray' objects}
+    12600    0.005    0.000    0.005    0.000 {method 'reshape' of 'numpy.ndarray' objects}
+      200    0.004    0.000    0.005    0.000 numeric.py:2535(array_equal)
+    60000    0.004    0.000    0.004    0.000 {method 'append' of 'list' objects}
+    70200    0.004    0.000    0.004    0.000 {built-in method numpy.asanyarray}
+      200    0.000    0.000    0.004    0.000 shape_base.py:214(_vhstack_dispatcher)
+
+

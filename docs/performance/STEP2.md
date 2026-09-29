@@ -94,3 +94,21 @@ the external artifact directory. Compact results, tests, manifest, profile and
 LaTeX report source are versioned here. Timings across variants are sequential,
 not simultaneous, and are observations on this machine. Exact short trajectories
 do not establish convergence; the known hierarchical mixing issue remains.
+
+## Recorded result — 2026-09-29
+
+Measured code: `ac87663`; final results tag: `perf-step2-20260929`.
+All **83 tests passed**, and all independent original-checkout fixture and
+short-chain comparisons matched exactly. The original 256-case fixture had zero
+prediction and likelihood error. Both candidates (cached and compiled) matched
+the four original sampler runs, including the recorded arrays and counters.
+
+Relative to cached Python, the compiled backend measured **1.97–1.98x** faster
+for pooled sampling and **1.51–1.55x** for hierarchical sampling. Model evaluation
+speedups at batch sizes 1/4/50/200 were **3.63x / 2.85x / 1.34x / 1.13x**.
+The full sampler comparisons used eight temperatures; do not assume these gains
+apply unchanged to the earlier 50-temperature workload.
+
+See `results/step2-results.json`, `results/step2-pytest.txt`, the before/after
+profiles, and `results/step2-manifest.json`. The two-page PDF is in workspace
+`benchmark/changes/step2/step2.pdf`; its source is `results/step2.tex`.
