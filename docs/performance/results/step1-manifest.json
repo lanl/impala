@@ -1,0 +1,120 @@
+{
+  "path_base": "workspace root (parent of impala checkout)",
+  "artifacts": [
+    {
+      "path": "benchmark/changes/step1/results.json",
+      "bytes": 18779,
+      "sha256": "32a6d225785c5543254a7dce05281a9d00345cd1221c75a9273cff04af105026"
+    },
+    {
+      "path": "benchmark/changes/step1-final/hier_123_cached.npz",
+      "bytes": 20718769,
+      "sha256": "e3faa9d5ef7a5058aca90ced5d24f4ba57381f0201acb34f9c6cda36328ca0e1"
+    },
+    {
+      "path": "benchmark/changes/step1-final/hier_123_original.npz",
+      "bytes": 20718769,
+      "sha256": "e3faa9d5ef7a5058aca90ced5d24f4ba57381f0201acb34f9c6cda36328ca0e1"
+    },
+    {
+      "path": "benchmark/changes/step1-final/hier_42_cached.npz",
+      "bytes": 20423362,
+      "sha256": "acc4c5a9a44d5939a686fb7b52ce45b7e713f6f4ed77cd1d4185a5405532827e"
+    },
+    {
+      "path": "benchmark/changes/step1-final/hier_42_original.npz",
+      "bytes": 20423362,
+      "sha256": "acc4c5a9a44d5939a686fb7b52ce45b7e713f6f4ed77cd1d4185a5405532827e"
+    },
+    {
+      "path": "benchmark/changes/step1-final/pooled_123_cached.npz",
+      "bytes": 1890559,
+      "sha256": "7e6d1d8edde1235a5e87914dfe1a1db447cb1d9763b6d065195d3743d6c09467"
+    },
+    {
+      "path": "benchmark/changes/step1-final/pooled_123_original.npz",
+      "bytes": 1890559,
+      "sha256": "7e6d1d8edde1235a5e87914dfe1a1db447cb1d9763b6d065195d3743d6c09467"
+    },
+    {
+      "path": "benchmark/changes/step1-final/pooled_42_cached.npz",
+      "bytes": 1687067,
+      "sha256": "415aa537300ad8f63489628d4ce9880110f27cf2615ebd8f620bc266519fcdc7"
+    },
+    {
+      "path": "benchmark/changes/step1-final/pooled_42_original.npz",
+      "bytes": 1687067,
+      "sha256": "415aa537300ad8f63489628d4ce9880110f27cf2615ebd8f620bc266519fcdc7"
+    },
+    {
+      "path": "benchmark/changes/step1-final/results.json",
+      "bytes": 18998,
+      "sha256": "67b3d076260559867335518900b8e31ff9103f32ecad82ae9876c91a77de25f7"
+    },
+    {
+      "path": "benchmark/changes/step1-final/step1.log",
+      "bytes": 9738,
+      "sha256": "bb44a3233f1a23f552163c95012918bdfd461370fa7219426bd370b0119e3270"
+    },
+    {
+      "path": "benchmark/changes/step1-final/step1.pdf",
+      "bytes": 28681,
+      "sha256": "2d1ae3215bcd256ceca28548fc81a3ffd3126177c82933bc9e710fcabf46dd3a"
+    },
+    {
+      "path": "benchmark/changes/step1-final-run.log",
+      "bytes": 31409,
+      "sha256": "1dba86f55997950393e88d472133c31e67f740bff2d4e84db363258fb88c6af9"
+    },
+    {
+      "path": "benchmark/changes/step1-run.log",
+      "bytes": 33667,
+      "sha256": "a235320db8666fd3acf820e979752bdae04cde31a5489240e37135f3bee71b41"
+    },
+    {
+      "path": "benchmark/numerical_fixture.npz",
+      "bytes": 674077,
+      "sha256": "bd6cc44045dc67b4febb63cbacae44141a954c7dc03d2e7a30e0d40bcaf973ef"
+    },
+    {
+      "path": "impala/benchmarks/cache_material_preparation.py",
+      "bytes": 7732,
+      "sha256": "9cc30c542c0bff731bd5acc81530577ad33464e6734f17ec7006f48f18c25c8d"
+    },
+    {
+      "path": "impala/docs/performance/results/step1-final-pytest.txt",
+      "bytes": 827,
+      "sha256": "3ff1fd19e4d6e70a05ba78fe5b05c7ca2b123fdb4edecf30db23af60a2aa9d76"
+    },
+    {
+      "path": "impala/docs/performance/results/step1-results.json",
+      "bytes": 3307,
+      "sha256": "8e8dd0fb509131c95e4dc18ab3cd7f3119415678dd99b5a3151853c01ae6be54"
+    },
+    {
+      "path": "impala/docs/performance/results/step1.tex",
+      "bytes": 4838,
+      "sha256": "fce21d2319dce9d8f37dab9bedffb6b366ee9ded3cc82b211ca3b76f2849a61c"
+    },
+    {
+      "path": "impala/src/impala/superCal/models_withlik.py",
+      "bytes": 48248,
+      "sha256": "e5342501bc8baaeef1bbd219b498d5e19e223d746e3d4435e652a6ade05e7835"
+    },
+    {
+      "path": "impala/tests/data/material_preparation_baseline.npz",
+      "bytes": 674077,
+      "sha256": "bd6cc44045dc67b4febb63cbacae44141a954c7dc03d2e7a30e0d40bcaf973ef"
+    },
+    {
+      "path": "impala/tests/reference/material_eval.py",
+      "bytes": 2871,
+      "sha256": "ff022c1ad93b392db5b9c9f1c603382bebd084f5797e84c86bc3adb6b68dcdf0"
+    },
+    {
+      "path": "impala/uv.lock",
+      "bytes": 408209,
+      "sha256": "5bbce0c9aaf5fe7c1bfb8579d3666fe3f4ce216b1968eff5a9d1355f9f1b492d"
+    }
+  ]
+}

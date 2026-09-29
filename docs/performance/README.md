@@ -18,6 +18,7 @@ Its key includes the batch size, history resolution, padding constant, experimen
 count, and the shapes/dtypes/contents of experimental arrays. In-place input edits
 therefore invalidate the cache. Material parameters and constants are evaluated
 fresh every time, and model state is reinitialized with fresh mutable arrays.
+Copies preserve the original memory layout to avoid extra compiled specializations.
 
 Actual simulated strain coordinates are compared before reusing flattened
 interpolation coordinates. The existing `interp1d` operation, floating-point
@@ -66,7 +67,7 @@ There are two independent controls:
 
 ```bash
 .venv/bin/python benchmarks/cache_material_preparation.py \
-  --output ../benchmark/changes/step1
+  --output ../benchmark/changes/step1-rerun
 ```
 
 Choose a new output directory for a rerun; the script refuses to overwrite one.
@@ -89,7 +90,7 @@ saved numerical fixture.
 Results record the code commit and source SHA-256. Compact results and test logs
 are committed under `docs/performance/results/`; full traces and raw timings stay
 in the specified external output directory. Record their hashes in the versioned
-manifest. Timings are observations on this laptop, not universal speedup promises.
+manifest. Timings are observations on this machine, not universal speedup promises.
 
 Useful history commands:
 
@@ -101,3 +102,21 @@ git diff perf-baseline-20260929..perf/cache-material-preparation -- src tests be
 Use a separate worktree for side-by-side baseline work rather than overwriting
 uncommitted development files. A future optimization should start from a named
 checkpoint and repeat these accuracy gates before comparing performance.
+
+## Recorded step-1 checkpoint
+
+Final measured code: `5c5cb01` (initial implementation: `7ac9310`).
+The final documentation/results checkpoint is tagged `perf-step1-20260929`.
+See `results/step1-results.json`, `results/step1-manifest.json`, and
+`results/step1-final-pytest.txt`. The LaTeX report source is `results/step1.tex`;
+its PDF and full paired traces are in workspace `benchmark/changes/step1-final/`.
+The earlier baseline report remains at `benchmark/report/report.pdf`.
+
+The new regression tests are collected by ordinary `pytest` and the existing
+pull-request test workflow. Long paired timing runs remain an explicit benchmark
+command, since shared CI hardware is unsuitable for precise speed comparisons.
+Before accepting each future optimization, rerun the accuracy tests and paired
+benchmark, use a new artifact directory, and commit its results and manifest.
+If arithmetic changes break exact trajectory equality, require predeclared
+numerical tolerances and independent multi-seed posterior/predictive comparisons,
+including R-hat, ESS, and ESS per second, before calling the change successful.

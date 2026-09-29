@@ -20,8 +20,7 @@
   focused regression tests, and a paired accuracy/timing benchmark.
 - Full test suite: **66 passed** (including 14 new regression tests); see
   `results/step1-pytest.txt`. Lint and whitespace checks passed.
-- Paired sampler/timing measurements will be attached in the results checkpoint.
-  No performance claim is made by the code checkpoint.
+- Final paired measurements and accuracy evidence are recorded below.
 
 ### Array-layout refinement
 
@@ -34,3 +33,17 @@
 - Repeated full suite: **66 passed in 100.93 seconds**; see
   `results/step1-final-pytest.txt`. Initial measurements remain in external
   `benchmark/changes/step1/`; final measurements use a separate directory.
+
+### Final paired results
+
+- Measured code: `5c5cb01`; final checkpoint tag: `perf-step1-20260929`.
+- All 256 original-fixture predictions and likelihoods matched exactly (zero error).
+- All four 3,000-state, eight-temperature original/cached sampler comparisons
+  matched exactly, including recorded parameter/noise and acceptance arrays.
+- Model speedups (batches 1/4/50/200): 1.029x, 1.041x, 1.090x, 1.107x.
+- Full sampler speedups: pooled seed 42: 1.026x, pooled seed 123: 1.043x, hier seed 42: 1.134x, hier seed 123: 1.039x.
+- These are small paired timing measurements, not a long-run ESS/s or convergence
+  study. Hierarchical mixing remains unresolved. No GPU work was included.
+- See `results/step1-results.json`, `results/step1-manifest.json` and
+  `results/step1.tex`; full traces and PDF are in external
+  `benchmark/changes/step1-final/`. Baseline fixtures remain unchanged.

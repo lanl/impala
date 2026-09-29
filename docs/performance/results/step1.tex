@@ -1,0 +1,85 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.85in]{geometry}
+\usepackage{booktabs,hyperref}
+\hypersetup{colorlinks=true,urlcolor=blue}
+\title{Impala performance experiment: Step 1}
+\author{Cache fixed material-model preparation}
+\date{September 29, 2026}
+\begin{document}\maketitle
+\section*{Change and scope}
+The material evaluator now reuses fixed experimental conditions, integration
+histories, strain offsets, and interpolation coordinates. A four-entry least
+recently used cache checks array contents, batch size, and history resolution.
+In-place edits invalidate the cache. Copies protect cached arrays from mutable
+physics state and preserve the original memory layout. Actual simulated strain
+coordinates are checked before reuse.
+
+Material parameters and constants are evaluated fresh. Physical equations,
+parameter validation, SciPy linear interpolation, 100-step histories, floating
+point precision, and MCMC algorithms are unchanged. This is a CPU preparation
+optimization; no GPU kernel is introduced. The normal material-model grid setter
+is assumed; externally stateful custom grid setters are outside this cache's
+supported inputs. A model instance remains mutable and is not thread safe.
+\section*{Accuracy evidence}
+All 66 tests passed in 100.93 seconds, including 14 new regressions for cache
+invalidation, array mutation, batch changes, old instances, exceptional inputs,
+and numerical agreement. The independent original fixture contains 256 parameter
+sets: 128 feasible prior inputs and 128 sampled inputs. Predictions and weighted
+log likelihoods matched exactly, with maximum absolute error zero.
+
+Four paired sampler experiments (pooled and hierarchical, seeds 42 and 123)
+each used 3,000 stored states, eight temperatures, six copper experiments and
+327 observations. Original and cached versions produced exactly equal parameter,
+noise, and acceptance arrays at every temperature. Hierarchical means,
+covariances and swap counters also matched exactly. These tests compare the
+frozen original evaluator against the optimized evaluator with shared physics
+and samplers; future physics changes require a separate original checkout too.
+\section*{Measured speed}
+Model timings are medians of 60 paired repetitions, alternating execution order.
+Compilation is warmed before measurement. Speedup is original time divided by
+cached time. These measurements are specific to this machine and workload.
+\begin{center}\begin{tabular}{rrrr}\toprule
+Batch & Original (ms) & Cached (ms) & Speedup\\\midrule
+1 & 1.545 & 1.501 & 1.029\\
+4 & 1.798 & 1.727 & 1.041\\
+50 & 5.247 & 4.816 & 1.090\\
+200 & 15.889 & 14.359 & 1.107\\
+\bottomrule\end{tabular}\end{center}
+Complete sampler timings include the same inference work on both sides; execution
+order is reversed for seed 123.
+\begin{center}\begin{tabular}{lrrrr}\toprule
+Mode & Seed & Original (s) & Cached (s) & Speedup\\\midrule
+pooled & 42 & 7.721 & 7.527 & 1.026\\
+pooled & 123 & 8.092 & 7.762 & 1.043\\
+hier & 42 & 11.700 & 10.319 & 1.134\\
+hier & 123 & 10.787 & 10.381 & 1.039\\
+\bottomrule\end{tabular}\end{center}
+The improvement is modest; the main physics history loop still dominates.
+Two seeds per mode are insufficient to establish a precise general speedup.
+Short-chain equality is a strong regression check, not a convergence claim.
+No long-run ESS-per-second study was repeated for this patch. The previously
+observed hierarchical mixing problem remains unresolved.
+\section*{Tracking and reproduction}
+Original baseline: \texttt{6ccd5a1}, tagged \texttt{perf-baseline-20260929}.\\
+Initial implementation: \texttt{7ac9310}. Final measured code: \texttt{5c5cb01}.\\
+Branch: \texttt{perf/cache-material-preparation}.\\
+Final results checkpoint: \texttt{perf-step1-20260929} (local tag).
+
+Versioned documentation is under \texttt{docs/performance/}: the change log,
+accuracy gates, compact results, test logs, artifact hashes, and this LaTeX
+source. Full traces and raw timings are preserved outside the checkout in
+\texttt{benchmark/changes/step1-final/}. Earlier measurements remain in a separate
+\texttt{step1/} directory. The original baseline PDF is preserved.
+
+Run ordinary \texttt{pytest} for regression coverage; the existing pull-request
+workflow collects these tests. Run the paired benchmark explicitly:
+\begin{verbatim}
+.venv/bin/python benchmarks/cache_material_preparation.py \
+  --output ../benchmark/changes/step1-rerun
+\end{verbatim}
+Choose a new output directory each time. Never regenerate original fixtures
+using optimized code. Every later optimization should have its own commit,
+accuracy results, measured timings, and change-log entry. If arithmetic changes
+prevent exact trajectories, assess numerical tolerances and multi-seed posterior
+and predictive agreement, R-hat, ESS, and ESS per second before accepting it.
+\end{document}
