@@ -1,8 +1,8 @@
 {
-  "reason": "Correct optimization commit author and committer to Ayan Biswas <ayan@lanl.gov>.",
+  "reason": "Correct optimization commit author and committer to Ayan Biswas <ayanju04@gmail.com>.",
   "original_upstream_commit": "6ccd5a1ce8ea4b79755ad4387cf43605b4f5aa0e",
   "original_branch_head": "06a88fc7eb0a3fc75d19f2368687f50fd73fe976",
-  "rewritten_branch_head": "b95e9d5d6cc2d708a417cfe953ea04840203f5a7",
+  "rewritten_branch_head": "629f436f4ee624aa402000361b2a8aa18026ecef",
   "unchanged_commit_trees": true,
   "preserved": "Original author/committer timestamps, commit messages, source/results trees and upstream history.",
   "provenance": "Benchmark metadata and report commit IDs intentionally retain measured original IDs; use this mapping to locate their rewritten equivalents. Existing artifact hashes remain valid.",
@@ -20,17 +20,33 @@
     "refs/tags/perf-step5-20260930"
   ],
   "commit_mapping": {
-    "7ac9310c695c8f32587eba452e245c1ad273b2b5": "3d65dffcf699f08f51830def493ca9d1b5ce4c4e",
-    "5c5cb017b162f922c2d00b02577bea15d0b6918e": "9b2248d98296971f0a1490cb3581ad148986e427",
-    "7ba4cc37b0213d31c179e1909fa2fb0d2ccc145b": "54cdd97b2e38fe70f668f5650f840d39e950e833",
-    "ac87663e294e8c46e4b78070bd9e1a3d702b6b83": "e92b272764b0eb7e24a59546f729884f883c6202",
-    "225cc37fe554e642cb2823b741158e0f005834af": "c15d9936f12bca37d034ff16f16f389b02a863d6",
-    "7817d9a4f839faf7fc76b2208995dc79442728e8": "40af451637407dfeec1fb496a2af02cf613969e5",
-    "dce1d8a87dd2339d912d7f071937bfe7918e1a99": "0cc2f435dfa96cc0aff9d739f7ebd7061bfcf4bb",
-    "55885705e1b78169c393d31fe058513764851c06": "b73f3f98578b7cf452d1adfb15649d8a3b4766d8",
-    "3e1ad43b778fbb3c60e657fca1086bc92f619420": "3aa61657e6d8ef6f95a67e2b5b2c4592cf901d65",
-    "c6ad078c9c729e6d981b58d21126bc6c0aa5de8f": "5a53cf9c47e8027450a0e41912d91114eb38961c",
-    "ac3392f5b9a1f5d90fb7de4aada682891c2b7f6a": "9ebb5f96908962de3dbd55f240206cfbbde24494",
-    "06a88fc7eb0a3fc75d19f2368687f50fd73fe976": "b95e9d5d6cc2d708a417cfe953ea04840203f5a7"
-  }
+    "7ac9310c695c8f32587eba452e245c1ad273b2b5": "c979373c3063c6fe786003bfea3ca2fefaa860be",
+    "5c5cb017b162f922c2d00b02577bea15d0b6918e": "12d440bbda32a4c7a1aa7b5cd4e73f42d30b8e04",
+    "7ba4cc37b0213d31c179e1909fa2fb0d2ccc145b": "90f2ef63004ff6488adaa0bd25deeb44fd43f2f9",
+    "ac87663e294e8c46e4b78070bd9e1a3d702b6b83": "2fb516329edc65acef6e2d26b5870feac4d3bd9c",
+    "225cc37fe554e642cb2823b741158e0f005834af": "7e75f602a24a1667c7b6f94a872506a4466d9025",
+    "7817d9a4f839faf7fc76b2208995dc79442728e8": "5a43349752ac296e29797177fca285dad65ab834",
+    "dce1d8a87dd2339d912d7f071937bfe7918e1a99": "aec5d30468d58c5d308802bf59633620557172dd",
+    "55885705e1b78169c393d31fe058513764851c06": "77b9fa09fb2b67110e02186e657bb2656e3dfe58",
+    "3e1ad43b778fbb3c60e657fca1086bc92f619420": "67e53c4274923b3dff3311e93e48e4f577a82b80",
+    "c6ad078c9c729e6d981b58d21126bc6c0aa5de8f": "758623abbac8b7a491f0d68e77784d06f64a4452",
+    "ac3392f5b9a1f5d90fb7de4aada682891c2b7f6a": "ff80e579001313a496c7762593096f4c59e5ffcf",
+    "06a88fc7eb0a3fc75d19f2368687f50fd73fe976": "629f436f4ee624aa402000361b2a8aa18026ecef"
+  },
+  "previous_email_correction_mapping": {
+    "3d65dffcf699f08f51830def493ca9d1b5ce4c4e": "c979373c3063c6fe786003bfea3ca2fefaa860be",
+    "9b2248d98296971f0a1490cb3581ad148986e427": "12d440bbda32a4c7a1aa7b5cd4e73f42d30b8e04",
+    "54cdd97b2e38fe70f668f5650f840d39e950e833": "90f2ef63004ff6488adaa0bd25deeb44fd43f2f9",
+    "e92b272764b0eb7e24a59546f729884f883c6202": "2fb516329edc65acef6e2d26b5870feac4d3bd9c",
+    "c15d9936f12bca37d034ff16f16f389b02a863d6": "7e75f602a24a1667c7b6f94a872506a4466d9025",
+    "40af451637407dfeec1fb496a2af02cf613969e5": "5a43349752ac296e29797177fca285dad65ab834",
+    "0cc2f435dfa96cc0aff9d739f7ebd7061bfcf4bb": "aec5d30468d58c5d308802bf59633620557172dd",
+    "b73f3f98578b7cf452d1adfb15649d8a3b4766d8": "77b9fa09fb2b67110e02186e657bb2656e3dfe58",
+    "3aa61657e6d8ef6f95a67e2b5b2c4592cf901d65": "67e53c4274923b3dff3311e93e48e4f577a82b80",
+    "5a53cf9c47e8027450a0e41912d91114eb38961c": "758623abbac8b7a491f0d68e77784d06f64a4452",
+    "9ebb5f96908962de3dbd55f240206cfbbde24494": "ff80e579001313a496c7762593096f4c59e5ffcf",
+    "b95e9d5d6cc2d708a417cfe953ea04840203f5a7": "629f436f4ee624aa402000361b2a8aa18026ecef",
+    "e67569d2f7ca2b9438c009ce439cc32b6ad6faed": "82d39bc55b35417e1eded75953545822fb691d84"
+  },
+  "email_correction_backup_refs_prefix": "refs/backup/email-correction-20260930/"
 }
