@@ -5,6 +5,7 @@ Uses the same history equations; only stress histories stay on device. Fixed
 geometry and interpolation indices are cached; parameters/constants stay live.
 """
 
+import time
 from collections import OrderedDict
 from pathlib import Path
 
@@ -25,7 +26,14 @@ extern "C" __global__ void interpolate(
 
 
 class GpuCuPredictions:
-    def __init__(self, model, cache_bytes=256 * 1024**2):
+    def __init__(
+        self,
+        model,
+        cache_bytes=256 * 1024**2,
+        block_size=128,
+        timing=False,
+        hoist=False,
+    ):
         from impala.superCal.models_withlik import ModelMaterialStrength
 
         if type(model) is not ModelMaterialStrength or not model.pool:
@@ -34,12 +42,18 @@ class GpuCuPredictions:
             )
         # Reuse the strict physics-combination validation of the history adapter.
         validated = GpuCuHistory(model.model)
+        if block_size not in (32, 64, 128, 256):
+            raise ValueError("History block size must be 32, 64, 128 or 256")
+        self.block_size = block_size
+        self.timing = timing
+        self.stage_samples = []
         self.cp = validated.cp
         self.model = model
         self.kernel = self.cp.RawKernel(
             Path(__file__).with_name("cu_history.cu").read_text(),
             "cu_history",
-            options=("--std=c++11", "--fmad=false", "-DPREDICTION_ONLY"),
+            options=("--std=c++11", "--fmad=false", "-DPREDICTION_ONLY")
+            + (("-DHOIST_CONSTANTS",) if hoist else ()),
         )
         self.interpolate = self.cp.RawKernel(
             INTERPOLATE, "interpolate", options=("--fmad=false",)
@@ -141,6 +155,10 @@ class GpuCuPredictions:
     def __call__(self, params, pool=None, nugget=False):
         from impala.physics import ConstraintError, functions
 
+        measured = {} if self.timing else None
+        if measured is not None:
+            started = boundary = time.perf_counter()
+
         if pool is False or nugget:
             raise ValueError(
                 "Resident evaluator supports plain pooled predictions"
@@ -178,17 +196,39 @@ class GpuCuPredictions:
         ):
             raise ConstraintError("PTW bad val")
         cp = self.cp
+        if measured is not None:
+            measured["validation_s"] = time.perf_counter() - boundary
+            boundary = time.perf_counter()
+            misses = self.misses
         geometry, n, nh, m, _ = self._geometry(p.shape[1])
+        if measured is not None:
+            cp.cuda.get_current_stream().synchronize()
+            measured["geometry_host_and_upload_s"] = (
+                time.perf_counter() - boundary
+            )
+            measured["geometry_miss"] = self.misses != misses
+            boundary = time.perf_counter()
         times, rates, initial, lo, hi, dx, delta = geometry
         expanded = np.repeat(p, self.model.nexp, axis=1)
         device_params, constants = cp.asarray(expanded), cp.asarray(c)
         self.input_bytes += expanded.nbytes + c.nbytes
+        if measured is not None:
+            cp.cuda.get_current_stream().synchronize()
+            measured["parameter_expand_and_upload_s"] = (
+                time.perf_counter() - boundary
+            )
+            boundary = time.perf_counter()
         stress = cp.empty((nh, n), dtype=cp.float64)
         aux = cp.empty((2, n), dtype=cp.float64)
         output = cp.empty(m, dtype=cp.float64)
+        if measured is not None:
+            measured["allocation_s"] = time.perf_counter() - boundary
+            boundary = time.perf_counter()
+            start_event, stop_event = cp.cuda.Event(), cp.cuda.Event()
+            start_event.record()
         self.kernel(
-            ((n + 127) // 128,),
-            (128,),
+            ((n + self.block_size - 1) // self.block_size,),
+            (self.block_size,),
             (
                 times,
                 rates,
@@ -202,6 +242,15 @@ class GpuCuPredictions:
                 aux,
             ),
         )
+        if measured is not None:
+            stop_event.record()
+            stop_event.synchronize()
+            measured["history_device_s"] = (
+                cp.cuda.get_elapsed_time(start_event, stop_event) / 1000
+            )
+            measured["history_launch_wait_s"] = time.perf_counter() - boundary
+            boundary = time.perf_counter()
+            start_event.record()
         self.interpolate(
             ((m + 127) // 128,),
             (128,),
@@ -215,10 +264,30 @@ class GpuCuPredictions:
                 output,
             ),
         )
+        if measured is not None:
+            stop_event.record()
+            stop_event.synchronize()
+            measured["interpolation_device_s"] = (
+                cp.cuda.get_elapsed_time(start_event, stop_event) / 1000
+            )
+            measured["interpolation_launch_wait_s"] = (
+                time.perf_counter() - boundary
+            )
+            boundary = time.perf_counter()
         result = cp.asnumpy(output).reshape(p.shape[1], -1)
+        if measured is not None:
+            measured["download_and_host_allocation_s"] = (
+                time.perf_counter() - boundary
+            )
+            boundary = time.perf_counter()
         self.output_bytes += result.nbytes
         if not np.isfinite(result).all():
             raise FloatingPointError("Nonfinite GPU predictions")
+        if measured is not None:
+            measured["output_validation_s"] = time.perf_counter() - boundary
+            measured["total_s"] = time.perf_counter() - started
+            measured["batch"] = p.shape[1]
+            self.stage_samples.append(measured)
         return result
 
     def statistics(self):
@@ -235,7 +304,7 @@ class GpuCuPredictions:
         }
 
 
-def attach(model):
-    adapter = GpuCuPredictions(model)
+def attach(model, **kwargs):
+    adapter = GpuCuPredictions(model, **kwargs)
     model.eval = adapter
     return adapter

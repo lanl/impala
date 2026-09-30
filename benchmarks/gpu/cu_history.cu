@@ -13,6 +13,13 @@ extern "C" __global__ void cu_history(
     const double y1=params[9*n+j], y2=params[10*n+j];
     double T=initial[j], eps=initial[n+j], stress=initial[2*n+j];
     double Cv=0.0, tm=0.0;
+#ifdef HOIST_CONSTANTS
+    // Identical subexpressions, evaluated once per independent history.
+    const double ref_root=cbrt(c[9]);
+    const double ref_power=pow(c[9],-c[12]);
+    const double afact=(4.0/3.0)*3.141592653589793*c[14]/c[15];
+    const double half_afact_root=0.5*cbrt(afact);
+#endif
     for (int i=0; i<nh; ++i) {
         const int prev = i == 0 ? 0 : i-1;
         const double rate=rates[prev*n+j];
@@ -23,13 +30,23 @@ extern "C" __global__ void cu_history(
         eps=eps+rate*dt;
         tm=c[6]+c[7]*rho;
         const double cold=c[8]*pow(rho/c[9],4.0/3.0)*exp(
+#ifdef HOIST_CONSTANTS
+            6.0*c[10]*(1.0/ref_root-1.0/cbrt(rho))
+            +2.0*c[11]/c[12]*(ref_power-pow(rho,-c[12])));
+#else
             6.0*c[10]*(1.0/cbrt(c[9])-1.0/cbrt(rho))
             +2.0*c[11]/c[12]*(pow(c[9],-c[12])-pow(rho,-c[12])));
+
+#endif
         double G=cold*(1.0-c[13]*(T/tm));
         if(T>=tm) G=0.0;
         if(G<0.0) G=0.0;
+#ifdef HOIST_CONSTANTS
+        const double xi=half_afact_root*sqrt(G/c[14])*avogadro_root;
+#else
         const double afact=(4.0/3.0)*3.141592653589793*c[14]/c[15];
         const double xi=0.5*cbrt(afact)*sqrt(G/c[14])*avogadro_root;
+#endif
         const double log_x=log(xi/rate);
         const double er=erf(kappa*(T/tm)*(lg+log_x));
         const double saturation1=s0-(s0-si)*er;

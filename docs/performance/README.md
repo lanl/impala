@@ -142,3 +142,8 @@ porting remain deferred; hierarchical sampler changes are outside this branch.
 
 See [STEP5.md](STEP5.md) for device-resident experiment geometry and interpolation,
 paired end-to-end timings, and unchanged posterior-quality gates.
+
+## Step 6: GPU timing breakdown and kernel tuning
+
+See [STEP6.md](STEP6.md) for isolated GPU stage measurements, launch-size and
+invariant-calculation experiments, and matched CPU/GPU quality comparisons.

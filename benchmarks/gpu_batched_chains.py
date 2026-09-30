@@ -148,14 +148,17 @@ def serve(connections, model, terminal, timeout=180):
     groups = Counter()
     completed = {}
     eval_seconds = 0.0
+    receive_seconds = send_seconds = 0.0
     while active:
         pending = []
         retired = []
         for seed in active:
             connection = connections[seed]
+            receive_start = time.perf_counter()
             if not connection.poll(timeout):
                 raise TimeoutError(f"Chain {seed} stalled")
             tag, payload = connection.recv()
+            receive_seconds += time.perf_counter() - receive_start
             if tag == "error":
                 raise RuntimeError(f"Chain {seed}: {payload}")
             if tag == terminal:
@@ -173,13 +176,17 @@ def serve(connections, model, terminal, timeout=180):
             eval_seconds += time.perf_counter() - start
             batches[total] += 1
             groups[len(pending)] += 1
+            send_start = time.perf_counter()
             for (seed, _), prediction in zip(pending, predictions):
                 connections[seed].send(("result", prediction))
+            send_seconds += time.perf_counter() - send_start
     return {
         "chain_seconds": completed,
         "combined_batch_counts": dict(sorted(batches.items())),
         "group_sizes": dict(sorted(groups.items())),
         "evaluation_seconds": eval_seconds,
+        "receive_wait_and_decode_seconds": receive_seconds,
+        "send_encode_seconds": send_seconds,
     }
 
 
@@ -193,6 +200,9 @@ def run(args):
         "temperatures": args.temperatures,
         "save_full": args.save_full,
         "profile": args.profile,
+        "gpu_block_size": args.gpu_block_size,
+        "gpu_timing": args.gpu_timing,
+        "gpu_hoist": args.gpu_hoist,
         "commit": subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
         ).strip(),
@@ -209,7 +219,12 @@ def run(args):
         if args.backend == "gpu_resident":
             from gpu.predictions import attach
 
-            attach(model)
+            attach(
+                model,
+                block_size=args.gpu_block_size,
+                timing=args.gpu_timing,
+                hoist=args.gpu_hoist,
+            )
         with np.load(
             ROOT / "tests/data/material_preparation_baseline.npz"
         ) as f:
@@ -240,6 +255,8 @@ def run(args):
             tag, payload = c.recv()
             if tag != "ready":
                 raise RuntimeError(str(payload))
+        if args.backend == "gpu_resident":
+            model.eval.stage_samples.clear()  # Exclude fixture warm-up.
         startup_seconds = time.perf_counter() - startup
         start = time.perf_counter()
         for c in connections.values():
@@ -262,6 +279,10 @@ def run(args):
                 ).print_stats(60)
         if args.backend == "gpu_resident":
             stats["resident_evaluation"] = model.eval.statistics()
+            if args.gpu_timing:
+                (args.output / "gpu-stages.json").write_text(
+                    json.dumps(model.eval.stage_samples, indent=2) + "\n"
+                )
         for c in connections.values():
             c.send(("postprocess", None))
         serve(connections, model, "done")
@@ -313,5 +334,10 @@ if __name__ == "__main__":
     p.add_argument("--seeds", type=int, nargs="+", default=[42, 123, 456, 789])
     p.add_argument("--save-full", action="store_true")
     p.add_argument("--profile", action="store_true")
+    p.add_argument(
+        "--gpu-block-size", type=int, choices=[32, 64, 128, 256], default=128
+    )
+    p.add_argument("--gpu-timing", action="store_true")
+    p.add_argument("--gpu-hoist", action="store_true")
     p.add_argument("--output", type=Path, required=True)
     run(p.parse_args())
