@@ -1,0 +1,107 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.8in]{geometry}
+\usepackage{booktabs,hyperref}
+\hypersetup{colorlinks=true,urlcolor=blue}
+\emergencystretch=3em
+\title{Impala performance experiment: Step 5}
+\author{Resident GPU geometry and prediction interpolation}
+\date{September 30, 2026}
+\begin{document}\maketitle
+\section*{Outcome}
+For four independent 40,000-state pooled Cu chains at 50 temperatures, resident
+GPU evaluation took 214.32 s versus 252.16 s on parallel CPU:
+1.177 times CPU throughput. All predeclared posterior-quality gates: passed.
+This is an experimental prediction-only adapter; sampler equations, random draws,
+adaptation and likelihoods are unchanged. Production defaults, Mac support and
+hierarchical mixing changes remain outside this experiment.
+\section*{Evidence and implementation}
+The previous four-chain prototype spent 6.60 of 8.47 profiled seconds in grouped
+model evaluation for a 1,000-state run. It copied full histories to the CPU and
+rebuilt flattened interpolation arrays. Of this time, 2.85 s was in device reads,
+which includes waiting for asynchronous kernels, not solely transfer cost.
+The resident profile reduced grouped evaluation to 3.28 s and coordinator time
+to 5.08 s. Profiles guide investigation; the timing comparisons below are unprofiled.
+
+The new adapter caches fixed experiment histories, initial conditions and
+interpolation indices on the GPU, bounded by 256 MiB of live cached arrays.
+The same CUDA history equations emit only stress histories, which stay on-device.
+A second kernel interpolates at observed strain points. Only predictions return
+to the CPU. Parameters and constants are refreshed on every evaluation.
+
+Cache keys include content signatures for experiment arrays and batch size;
+edits invalidate cached geometry. The interpolation preparation preserves the
+original cumulative strain arithmetic and flattened experiment offsets. All
+arithmetic remains float64 with fused multiply-add disabled. The existing
+full-history adapter remains available. The new prediction-only evaluator does
+not update material state or support state continuation. The CuPy allocator can
+retain freed memory beyond the logical cache budget.
+\section*{Paired short runs}
+Each entry is wall time in seconds for four chains, each with 3,000 states and
+50 temperatures. Backend order rotates between three rounds. Jobs run sequentially,
+with one numerical-library thread per worker. Transfers, cache misses, IPC and
+coordination are included. Startup/JIT and output compression are excluded;
+startup is recorded separately. The only warm-up evaluation uses the unchanged
+fixture; unseen geometries are prepared during sampling.
+\begin{center}\begin{tabular}{lrrrr}\toprule
+Backend & Round 1 & Round 2 & Round 3 & Median\\\midrule
+Parallel CPU & 18.77 & 21.07 & 19.25 & 19.25\\
+Previous batched GPU & 24.29 & 24.47 & 25.04 & 24.47\\
+Resident GPU & 14.73 & 15.09 & 14.93 & 14.93\\
+\bottomrule\end{tabular}\end{center}
+Hardware: Intel Core Ultra 9 285HX, 24 CPU cores; RTX PRO 5000 Blackwell laptop
+GPU, approximately 24 GB device memory. Three repeats measure local variability;
+they do not establish universal speedups. Earlier step-4 times remain separate
+historical results. Identical seeds are 42, 123, 456 and 789.
+\section*{Accuracy and posterior quality}
+Short comparisons cover all-temperature parameters/noise and recorded counters.
+Exact parameter/counter checks and numerical noise/prediction checks passed.
+The frozen 256-case prediction fixture and weighted likelihood gates remain
+unchanged: prediction relative tolerance $10^{-8}$, absolute $10^{-10}$ Mbar;
+likelihood absolute tolerance $10^{-6}$. Noise tolerance is relative $10^{-8}$,
+absolute $10^{-15}$. Cache invalidation, eviction, unequal batches, rate/p
+thresholds and invalid inputs are covered by hardware tests. Full hardware-enabled suite:
+98 passed in 106.07s.
+
+For the long study, discard the first 20,000 states and use all remaining cold
+chain draws without thinning. All 16 scalar parameter/noise quantities require
+rank R-hat below 1.01, bulk/tail ESS at least 400, and MCSE(mean)/SD below 0.05.
+Mean differences must be within four combined MCSEs and 0.1 pooled posterior SD;
+prediction means within 0.1 experiment noise SD. Predictions use the same 200
+retained draws per chain as the baseline. The CPU reference is a fresh parallel
+run, also compared with the frozen original outputs.
+\begin{center}\begin{tabular}{lrr}\toprule
+Diagnostic & Parallel CPU & Resident GPU\\\midrule
+Maximum R-hat & 1.0026 & 1.0026\\
+Minimum bulk ESS & 2253.5 & 2253.5\\
+Minimum tail ESS & 3345.3 & 3345.3\\
+Minimum bulk ESS/s & 8.9368 & 10.515\\
+\bottomrule\end{tabular}\end{center}
+Quality gates: passed. Exact GPU parameter trajectories and acceptance counts:
+True. Maximum noise-array difference: 6.29e-18; maximum prediction difference:
+4.91e-15. Fresh CPU arrays exactly reproduce original saved reference: True.
+GPU/CPU effective samples per second range: 1.177--1.177. ESS/s uses wall time
+for the whole four-chain group, not summed worker times. The speed claim is
+conditional on quality gates passing for this workload.
+\section*{Reproducibility and limitations}
+\begingroup\raggedright
+Branch: \texttt{perf/gpu-resident-evaluation}.\\
+Measured implementation: \texttt{ac3392f}.\\
+Checkpoint: \texttt{perf-step5-20260930}.
+See \path{docs/performance/STEP5.md} for commands, failure records, test results
+and scope. \path{benchmarks/gpu_resident_suite.py} reproduces paired experiments;
+\path{benchmarks/gpu_resident_report.py} rebuilds compact results and this LaTeX.
+GPU dependencies remain pinned in \path{benchmarks/gpu/requirements.txt}.
+
+Raw traces, telemetry, profiles and logs are under workspace
+\path{benchmark/changes/step5/}. Versioned compact JSON, CSVs, test logs, LaTeX
+and a SHA-256 artifact manifest are under \path{docs/performance/results/step5*}.
+No original reference artifact or tolerance was changed. All commits are local;
+no upstream changes have been published. This experiment does not establish
+speedups for other models, hierarchical calibration, Mac GPUs or small batches.
+The CPU control is the existing compiled-CPU backend, not a newly rewritten
+CPU prediction-only evaluator; some preparation/interpolation savings could
+also benefit a future CPU implementation. The remaining synchronization/kernel
+costs require separate evidence before
+further changes are justified.
+\par\endgroup
+\end{document}

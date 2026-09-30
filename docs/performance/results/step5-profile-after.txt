@@ -1,0 +1,68 @@
+         978476 function calls (974116 primitive calls) in 5.078 seconds
+
+   Ordered by: cumulative time
+   List reduced from 176 to 60 due to restriction <60>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.018    0.018    5.078    5.078 gpu_batched_chains.py:145(serve)
+     1090    0.028    0.000    3.277    0.003 gpu_batched_chains.py:36(evaluate_group)
+     1090    0.101    0.000    3.201    0.003 predictions.py:141(__call__)
+     1090    0.001    0.000    2.531    0.002 __init__.py:826(asnumpy)
+     1090    2.529    0.002    2.530    0.002 {method 'get' of 'cupy._core.core._ndarray_base' objects}
+     4364    0.003    0.000    1.482    0.000 connection.py:253(poll)
+     4364    0.006    0.000    1.478    0.000 connection.py:439(_poll)
+     4364    0.015    0.000    1.472    0.000 connection.py:1134(wait)
+     4364    0.012    0.000    1.424    0.000 selectors.py:385(select)
+     4364    1.408    0.000    1.408    0.000 {method 'poll' of 'select.poll' objects}
+     1090    0.102    0.000    0.372    0.000 predictions.py:54(_geometry)
+     4360    0.005    0.000    0.173    0.000 connection.py:202(send)
+     2894    0.001    0.000    0.135    0.000 from_data.py:59(asarray)
+     2894    0.131    0.000    0.134    0.000 {built-in method cupy._core.core.array}
+     4364    0.008    0.000    0.127    0.000 connection.py:246(recv)
+      102    0.038    0.000    0.126    0.001 models_withlik.py:1180(_prepare_experiments)
+     4360    0.009    0.000    0.088    0.000 reduction.py:48(dumps)
+     7834    0.004    0.000    0.081    0.000 fromnumeric.py:48(_wrapfunc)
+     4360    0.004    0.000    0.079    0.000 connection.py:406(_send_bytes)
+     8713    0.003    0.000    0.073    0.000 connection.py:381(_send)
+     8713    0.069    0.000    0.069    0.000 {built-in method posix.write}
+     4364    0.067    0.000    0.067    0.000 {built-in method _pickle.loads}
+     4360    0.063    0.000    0.064    0.000 {method 'dump' of '_pickle.Pickler' objects}
+      102    0.000    0.000    0.062    0.001 fromnumeric.py:1421(searchsorted)
+      102    0.061    0.001    0.061    0.001 {method 'searchsorted' of 'numpy.ndarray' objects}
+      816    0.001    0.000    0.054    0.000 predictions.py:129(<genexpr>)
+     4364    0.007    0.000    0.049    0.000 connection.py:429(_recv_bytes)
+    11990    0.003    0.000    0.044    0.000 _stride_tricks_impl.py:400(broadcast_to)
+    11990    0.028    0.000    0.041    0.000 _stride_tricks_impl.py:373(_broadcast_to)
+     8728    0.010    0.000    0.039    0.000 connection.py:390(_recv)
+      102    0.000    0.000    0.032    0.000 physical_models_vec.py:871(set_history_variables)
+      102    0.005    0.000    0.032    0.000 physical_models_vec.py:935(generate_strain_history)
+      204    0.011    0.000    0.032    0.000 shape_base.py:293(hstack)
+21800/17440    0.012    0.000    0.030    0.000 {built-in method builtins.any}
+     8728    0.024    0.000    0.024    0.000 {built-in method posix.read}
+      204    0.013    0.000    0.021    0.000 shape_base.py:19(atleast_1d)
+     4364    0.004    0.000    0.019    0.000 selectors.py:340(register)
+     3270    0.019    0.000    0.019    0.000 basic.py:15(empty)
+      204    0.016    0.000    0.018    0.000 function_base.py:27(linspace)
+     1090    0.001    0.000    0.016    0.000 _shape_base_impl.py:798(split)
+      306    0.015    0.000    0.015    0.000 _function_base_impl.py:1402(diff)
+     5450    0.002    0.000    0.015    0.000 gpu_batched_chains.py:42(<genexpr>)
+     1090    0.009    0.000    0.014    0.000 _shape_base_impl.py:737(array_split)
+     4364    0.005    0.000    0.014    0.000 selectors.py:238(register)
+     5176    0.014    0.000    0.014    0.000 {method 'reduce' of 'numpy.ufunc' objects}
+     4360    0.010    0.000    0.014    0.000 reduction.py:38(__init__)
+     3576    0.002    0.000    0.014    0.000 {method 'all' of 'numpy.ndarray' objects}
+     1192    0.011    0.000    0.012    0.000 shape_base.py:378(stack)
+      306    0.012    0.000    0.012    0.000 {method 'copy' of 'numpy.ndarray' objects}
+     3576    0.001    0.000    0.012    0.000 _methods.py:64(_all)
+     1192    0.001    0.000    0.011    0.000 fromnumeric.py:2838(cumsum)
+      306    0.003    0.000    0.008    0.000 _shape_base_impl.py:1080(kron)
+    47960    0.006    0.000    0.008    0.000 gpu_batched_chains.py:43(<genexpr>)
+     4364    0.004    0.000    0.008    0.000 selectors.py:336(__init__)
+     1090    0.003    0.000    0.008    0.000 fromnumeric.py:38(_wrapit)
+    99980    0.008    0.000    0.008    0.000 {method 'append' of 'list' objects}
+      102    0.000    0.000    0.007    0.000 {built-in method builtins.all}
+      408    0.006    0.000    0.007    0.000 predictions.py:89(<genexpr>)
+     4364    0.001    0.000    0.006    0.000 selectors.py:219(_fileobj_lookup)
+    78609    0.006    0.000    0.006    0.000 {built-in method builtins.len}
+
+

@@ -1,0 +1,68 @@
+         6307658 function calls (6303298 primitive calls) in 8.472 seconds
+
+   Ordered by: cumulative time
+   List reduced from 198 to 60 due to restriction <60>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.022    0.022    8.473    8.473 gpu_batched_chains.py:145(serve)
+     1090    0.027    0.000    6.597    0.006 gpu_batched_chains.py:36(evaluate_group)
+     1090    0.308    0.000    6.519    0.006 models_withlik.py:1121(eval)
+     1090    0.339    0.000    3.671    0.003 history.py:88(__call__)
+     2180    0.001    0.000    2.854    0.001 __init__.py:826(asnumpy)
+     2180    2.849    0.001    2.852    0.001 {method 'get' of 'cupy._core.core._ndarray_base' objects}
+     4364    0.003    0.000    1.540    0.000 connection.py:253(poll)
+     4364    0.007    0.000    1.536    0.000 connection.py:439(_poll)
+     4364    0.016    0.000    1.529    0.000 connection.py:1134(wait)
+     4364    0.013    0.000    1.477    0.000 selectors.py:385(select)
+     4364    1.460    0.000    1.460    0.000 {method 'poll' of 'select.poll' objects}
+     2911    0.296    0.000    0.871    0.000 shape_base.py:293(hstack)
+     1090    0.225    0.000    0.711    0.001 models_withlik.py:1180(_prepare_experiments)
+     2911    0.356    0.000    0.574    0.000 shape_base.py:19(atleast_1d)
+     1090    0.002    0.000    0.400    0.000 _polyint.py:64(__call__)
+     1090    0.005    0.000    0.385    0.000 _interpolate.py:548(_evaluate)
+     1090    0.002    0.000    0.351    0.000 _interpolate.py:475(_call_linear_np)
+     1090    0.002    0.000    0.349    0.000 _function_base_impl.py:1538(interp)
+     1090    0.346    0.000    0.346    0.000 {built-in method numpy._core._multiarray_umath.interp}
+    12721    0.093    0.000    0.282    0.000 _shape_base_impl.py:1080(kron)
+     5450    0.002    0.000    0.279    0.000 from_data.py:59(asarray)
+     5450    0.271    0.000    0.276    0.000 {built-in method cupy._core.core.array}
+    16598    0.253    0.000    0.253    0.000 {method 'copy' of 'numpy.ndarray' objects}
+     4360    0.006    0.000    0.182    0.000 connection.py:202(send)
+      607    0.002    0.000    0.180    0.000 physical_models_vec.py:871(set_history_variables)
+      607    0.025    0.000    0.178    0.000 physical_models_vec.py:935(generate_strain_history)
+     1090    0.011    0.000    0.170    0.000 _interpolate.py:286(__init__)
+    50884    0.065    0.000    0.162    0.000 _shape_base_impl.py:515(expand_dims)
+     4364    0.008    0.000    0.129    0.000 connection.py:246(recv)
+  2192526    0.128    0.000    0.128    0.000 {method 'append' of 'list' objects}
+    27981    0.125    0.000    0.125    0.000 {built-in method numpy.array}
+     1214    0.093    0.000    0.103    0.000 function_base.py:27(linspace)
+     4360    0.011    0.000    0.098    0.000 reduction.py:48(dumps)
+  2260000    0.098    0.000    0.098    0.000 {built-in method numpy.asanyarray}
+     4360    0.005    0.000    0.076    0.000 connection.py:406(_send_bytes)
+     1090    0.001    0.000    0.074    0.000 {built-in method builtins.all}
+     6540    0.059    0.000    0.073    0.000 history.py:120(<genexpr>)
+    53064    0.048    0.000    0.071    0.000 numeric.py:1431(normalize_axis_tuple)
+     4360    0.069    0.000    0.070    0.000 {method 'dump' of '_pickle.Pickler' objects}
+     8713    0.004    0.000    0.069    0.000 connection.py:381(_send)
+     4364    0.066    0.000    0.066    0.000 {built-in method _pickle.loads}
+     8713    0.065    0.000    0.065    0.000 {built-in method posix.write}
+     5091    0.056    0.000    0.058    0.000 shape_base.py:206(_arrays_for_stack_dispatcher)
+     2911    0.001    0.000    0.058    0.000 shape_base.py:214(_vhstack_dispatcher)
+     4364    0.008    0.000    0.052    0.000 connection.py:429(_recv_bytes)
+     1214    0.048    0.000    0.049    0.000 _function_base_impl.py:1402(diff)
+      483    0.045    0.000    0.046    0.000 numeric.py:2535(array_equal)
+    11990    0.003    0.000    0.046    0.000 _stride_tricks_impl.py:400(broadcast_to)
+    11990    0.029    0.000    0.042    0.000 _stride_tricks_impl.py:373(_broadcast_to)
+     8728    0.011    0.000    0.041    0.000 connection.py:390(_recv)
+    12597    0.040    0.000    0.040    0.000 {method 'reduce' of 'numpy.ufunc' objects}
+     8113    0.003    0.000    0.037    0.000 {method 'all' of 'numpy.ndarray' objects}
+     8113    0.002    0.000    0.033    0.000 _methods.py:64(_all)
+    68696    0.030    0.000    0.030    0.000 {method 'reshape' of 'numpy.ndarray' objects}
+     1090    0.022    0.000    0.029    0.000 _interpolate.py:563(_check_bounds)
+20710/16350    0.011    0.000    0.029    0.000 {built-in method builtins.any}
+     8728    0.025    0.000    0.025    0.000 {built-in method posix.read}
+     2180    0.021    0.000    0.023    0.000 shape_base.py:378(stack)
+     4364    0.004    0.000    0.021    0.000 selectors.py:340(register)
+    12721    0.015    0.000    0.020    0.000 numeric.py:170(ones)
+
+

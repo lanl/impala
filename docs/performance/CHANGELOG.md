@@ -130,3 +130,20 @@
   suite controller between jobs to avoid editing a measured run's code.
 - Two-worker CPU smoke check passed after this correction. Added the sequential
   scaling/long-run suite driver for reproduction. Sampler/math code is unchanged.
+
+## Step 5 — resident GPU predictions — 2026-09-30
+
+- Branch `perf/gpu-resident-evaluation`, measured implementation `ac3392f`,
+  checkpoint `perf-step5-20260930`.
+- Added a bounded device geometry cache and on-device interpolation; return only
+  measured-point predictions. Shared CUDA equations retain the original history
+  mode. Prediction-only mode is explicit and experimental; production unchanged.
+- Three short paired rounds: median resident GPU 14.935 s, old GPU 24.466 s,
+  parallel CPU 19.250 s. All-temperature parameter/counter checks passed exactly.
+- Fresh four-chain long runs: resident GPU 214.318 s versus parallel CPU 252.157 s,
+  17.7% higher ESS/s. All posterior gates passed; parameter draws/counters exact,
+  noise and predictions differed only at rounding scale. CPU reproduced original
+  saved baseline arrays exactly. Full hardware-enabled suite: 98 passed.
+- Versioned reproducible suite/report scripts, LaTeX, JSON/CSV diagnostics,
+  profiles, test log and artifact hashes. See [STEP5.md](STEP5.md) for commands,
+  retained failed attempts, interface limits and deferred work.
