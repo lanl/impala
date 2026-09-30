@@ -201,6 +201,12 @@ def calibPool(setup):
             for i, model in enumerate(setup.models)
         ]
 
+    batch_proposals = getattr(setup, "_batch_pooled_proposals", False)
+    if batch_proposals and gibbs_batch is None:
+        raise ValueError(
+            "Batched proposals require the guarded batched Gibbs path"
+        )
+
     # current predictions (of the stresses):
     pred_curr = [None] * setup.nexp
     # sse_curr = np.empty([setup.ntemps, setup.nexp])
@@ -351,13 +357,18 @@ def calibPool(setup):
                     ),
                     pool=True,
                 )
-                for t in range(setup.ntemps):
-                    llik_cand[i, t] = setup.models[i].llik(
-                        setup.ys[i] - discrep_curr[i][t],
-                        pred_cand[i][t],
-                        marg_lik_cov_curr[i][t],
-                        wt_mat[i],
+                if batch_proposals:
+                    llik_cand[i] = gibbs_batch[i].proposal_likelihood(
+                        pred_cand[i], discrep_curr[i], marg_lik_cov_curr[i]
                     )
+                else:
+                    for t in range(setup.ntemps):
+                        llik_cand[i, t] = setup.models[i].llik(
+                            setup.ys[i] - discrep_curr[i][t],
+                            pred_cand[i][t],
+                            marg_lik_cov_curr[i][t],
+                            wt_mat[i],
+                        )
 
         # log posterior difference (not log likelyhood anymore since log-prior was included):
         llik_diff = (
@@ -411,13 +422,20 @@ def calibPool(setup):
                             ),
                             pool=True,
                         )
-                        for t in range(setup.ntemps):
-                            llik_cand[i, t] = setup.models[i].llik(
-                                setup.ys[i] - discrep_curr[i][t],
-                                pred_cand[i][t],
-                                marg_lik_cov_curr[i][t],
-                                wt_mat[i],
-                            )  # (((pred_cand[i] - setup.ys[i])**2 @ s2_ind_mat[i]) / s2[i][m-1]).sum(axis = 1)
+                        if batch_proposals:
+                            llik_cand[i] = gibbs_batch[i].proposal_likelihood(
+                                pred_cand[i],
+                                discrep_curr[i],
+                                marg_lik_cov_curr[i],
+                            )
+                        else:
+                            for t in range(setup.ntemps):
+                                llik_cand[i, t] = setup.models[i].llik(
+                                    setup.ys[i] - discrep_curr[i][t],
+                                    pred_cand[i][t],
+                                    marg_lik_cov_curr[i][t],
+                                    wt_mat[i],
+                                )  # (((pred_cand[i] - setup.ys[i])**2 @ s2_ind_mat[i]) / s2[i][m-1]).sum(axis = 1)
 
                 alpha[:] = -np.inf
                 # tsq_diff = 0.#((theta_cand * theta_cand).sum(axis = 1) - (theta[m] * theta[m]).sum(axis = 1))[good_values]

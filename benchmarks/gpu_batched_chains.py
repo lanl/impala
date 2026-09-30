@@ -69,6 +69,7 @@ def worker(connection, config, seed, folder):
                 temperatures=config["temperatures"],
             )
             setup._batch_pooled_gibbs = config["worker_batch_gibbs"]
+            setup._batch_pooled_proposals = config["worker_batch_proposals"]
             model = setup.models[0]
             model.model.history_backend = "numba"
             remote_stats = {"calls": 0, "wall_seconds": 0.0, "cpu_seconds": 0.0}
@@ -243,6 +244,7 @@ def run(args):
         "gpu_hoist": args.gpu_hoist,
         "worker_profile": args.worker_profile,
         "worker_batch_gibbs": args.worker_batch_gibbs,
+        "worker_batch_proposals": args.worker_batch_proposals,
         "commit": subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
         ).strip(),
@@ -383,5 +385,6 @@ if __name__ == "__main__":
     p.add_argument("--gpu-hoist", action="store_true")
     p.add_argument("--worker-profile", action="store_true")
     p.add_argument("--worker-batch-gibbs", action="store_true")
+    p.add_argument("--worker-batch-proposals", action="store_true")
     p.add_argument("--output", type=Path, required=True)
     run(p.parse_args())

@@ -47,3 +47,15 @@ class DiagonalGibbsBatch:
         squared = delta * delta * inv
         likelihood = -0.5 * ldet - 0.5 * (squared * self.weights).sum(axis=1)
         return log_s2, covariances, likelihood
+
+    def proposal_likelihood(self, predictions, discrepancy, covariances):
+        """Read current covariance order, including any accepted tempering swaps."""
+        inv = np.ascontiguousarray([cov["inv"] for cov in covariances])
+        ldet = np.asarray([cov["ldet"] for cov in covariances])
+        # Scalar llik flattens each row before reducing. Preserve that order,
+        # including when predictions arrive with Fortran or strided layout.
+        delta = np.ascontiguousarray(
+            (self.observed - discrepancy) - predictions
+        )
+        squared = delta * delta * inv
+        return -0.5 * ldet - 0.5 * (squared * self.weights).sum(axis=1)
