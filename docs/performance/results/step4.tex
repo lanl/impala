@@ -1,0 +1,116 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.8in]{geometry}
+\usepackage{booktabs,hyperref}
+\hypersetup{colorlinks=true,urlcolor=blue}
+\emergencystretch=3em
+\title{Impala performance experiment: Step 4}
+\author{Batch independent chains into larger GPU calls}
+\date{September 30, 2026}
+\begin{document}\maketitle
+\section*{Outcome}
+Batching four chains completes faster than the historical serial GPU workflow,
+but the current prototype does not beat independent compiled-CPU workers on
+this machine. Use CPU parallelism for the tested pooled workflow. Keep GPU
+batching experimental. The full four-chain posterior comparison passed
+the predeclared quality gates. Production sampler code and defaults are unchanged;
+backend cleanup, Mac testing and hierarchical algorithm changes were deferred.
+\section*{How independence is preserved}
+Each spawned process owns its sampler setup, adaptation and Python/NumPy random
+state. Seeds remain 42, 123, 456 and 789. The existing pooled sampler runs
+unchanged. When a chain needs predictions, it submits its material parameters
+and waits. The coordinator concatenates one request from each active worker,
+evaluates the combined batch, and splits the predictions back into the original
+request order. It does not combine likelihoods, targets, random draws or
+adaptation. Different request lengths and completion times are supported.
+
+CPU-parallel workers evaluate their own model directly. A CPU-batched control
+uses the same request coordinator, but evaluates the combined batch on CPU.
+GPU-batched uses the existing float64 CUDA prototype. This separates batching
+correctness, GPU acceleration and the practical multicore CPU alternative.
+\section*{Accuracy validation}
+The complete hardware-enabled suite passed all 94 tests in 115.67 seconds.
+Three new boundary tests check heterogeneous request sizes, row ordering,
+invalid requests, predictions and weighted likelihoods. Prediction tolerances
+remain relative $10^{-8}$ and absolute $10^{-10}$ Mbar; likelihood absolute error
+must be at most $10^{-6}$. The original numerical fixture was not overwritten.
+
+In the four-chain, 3,000-state, 50-temperature comparisons, all temperature-chain
+parameter arrays and recorded counters matched the independent CPU workers
+exactly for both batched CPU and batched GPU. Noise differences passed relative
+$10^{-8}$ and absolute $10^{-15}$ gates. Prediction differences passed the
+original tolerances. The eight-chain comparison likewise matched cold-chain
+parameters and counters exactly. Batching can introduce rounding even on CPU,
+because interpolation uses flattened strain coordinates with experiment offsets.
+\section*{End-to-end timing}
+All figures below are elapsed seconds until every chain has finished sampling.
+Warm-up, JIT and output compression are excluded and startup is recorded
+separately. Transfers, IPC, synchronization and host numerical work are included.
+A postprocessing barrier prevents completed workers from writing outputs or
+calculating predictions while another chain is still sampling. Backends were
+run sequentially. All chains use 50 temperatures and 100 history steps.
+\begin{center}\begin{tabular}{rrrrr}\toprule
+Chains & States/chain & Parallel CPU (s) & Batched GPU (s) & Speedup\\\midrule
+4 & 3,000 & 18.53 & 23.99 & 0.77\\
+8 & 3,000 & 20.59 & 39.26 & 0.52\\
+4 & 40,000 & 252.64 & 334.53 & 0.76\\
+\bottomrule\end{tabular}\end{center}
+Speedup is CPU wall time divided by GPU wall time; values below one mean slower.
+These are measured runs on this machine, not timing confidence intervals.
+The eight-chain probe adds seeds 111, 222, 333 and 444; it is a scaling probe,
+not a convergence study. The CPU has 24 cores (Intel Core Ultra 9 285HX), with
+one numerical-library thread per worker. The GPU is the same RTX PRO 5000
+Blackwell laptop GPU used in step 3.
+
+For four short chains, the single CPU coordinator took 46.24 s, versus 23.99 s
+with GPU evaluation. That comparison shows acceleration of the combined work,
+but the independent CPU workers took only 18.53 s. Actual mean combined batches
+were 159.1 parameter sets for four chains and 317.3 for eight, below the nominal
+200 and 400 because proposals are filtered by constraints. Their corresponding
+GPU evaluation totals were 18.11 and 30.21 s; total sampling wall times were
+23.99 and 39.26 s. Host work, transfers and synchronization remain material costs.
+\section*{Full posterior-quality comparison}
+Four independent chains per backend: 40,000 states, discard the first 20,000,
+no thinning, 50 temperatures. The same predeclared step-3 gates apply: all 16
+parameter/noise quantities need rank R-hat below 1.01, bulk/tail ESS at least 400,
+and MCSE(mean)/SD below 0.05. Posterior means must agree within four combined
+MCSEs and 0.1 pooled posterior SD; prediction means within 0.1 experiment noise
+SD. Predictions use the same 200 retained draws per chain as the baseline.
+\begin{center}\begin{tabular}{lrr}\toprule
+Diagnostic & Parallel CPU & Batched GPU\\\midrule
+Maximum R-hat & 1.0026 & 1.0026\\
+Minimum bulk ESS & 2253.5 & 2253.5\\
+Minimum tail ESS & 3345.3 & 3345.3\\
+Minimum bulk ESS/s & 8.9196 & 6.7363\\
+\bottomrule\end{tabular}\end{center}
+Overall gates passed. Maximum mean difference: 1.73e-12 combined MCSEs and
+8.79e-15 posterior SD; maximum prediction-mean difference: 7.33e-13 noise SD.
+Exact parameter trajectories for each GPU seed: 42: True, 123: True, 456: True, 789: True.
+The independent CPU runs reproduce the original saved baseline arrays: True.
+Detailed differences, including noise arrays and interval endpoints, are in JSON
+and CSV artifacts. The hierarchical mixing problem is outside this experiment.
+
+ESS/s uses the wall time for all four chains together, not the sum of the
+individual worker times. The GPU/CPU ESS/s ratios range from 0.755 to 0.755.
+This is a current multicore CPU comparison; it must not be substituted with
+historical timings from serial execution. Quality and speed are separate gates:
+accurate posterior draws do not establish a GPU performance benefit.
+\section*{Tracking, limitations and reproduction}
+Branch: \texttt{perf/gpu-batched-chains}. Initial code: \texttt{5588570}.\\
+Long-run code: \texttt{3e1ad43}. Checkpoint: \texttt{perf-step4-20260930}.
+The CPU completion timeout was corrected between runs, with the suite controller
+paused, then smoke-tested. It affects driver liveness only. Initial short runs
+record their source hashes; long runs use the committed corrected driver.
+
+See \path{docs/performance/STEP4.md} for the declared gates and commands.
+\path{benchmarks/gpu_batched_suite.py} reproduces the scaling/long-run job order;
+\path{benchmarks/gpu_batched_quality.py} applies posterior gates with wall-time
+ESS/s. Outputs must use new directories. GPU hardware tests require
+\texttt{IMPALA\_TEST\_GPU=1}. Normal CPU tests skip optional GPU dependencies.
+
+Source, tests, compact results, diagnostics and LaTeX source are committed
+locally. Raw traces, logs and this PDF are in workspace
+\path{benchmark/changes/step4/}; the versioned manifest records their hashes.
+No changes have been published upstream. The next GPU performance hypothesis
+would need to reduce host/transfer costs, not merely increase batch sizes.
+No such redesign is claimed or implemented in this checkpoint.
+\end{document}

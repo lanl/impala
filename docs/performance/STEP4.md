@@ -96,3 +96,46 @@ messages while they sample, so their completion timeout scales with the requeste
 run length. Request-serving waits retain a 180-second bound. This was corrected
 between measured jobs, followed by a two-worker smoke check, before the long runs.
 It changes driver liveness handling, not sampler arithmetic or scheduling.
+
+## Results and decision
+
+Checkpoint: `perf-step4-20260930`. Initial implementation: `5588570`;
+long-run implementation: `3e1ad43`. All timings below are elapsed sampling wall
+time for the entire group, including transfers and coordination.
+
+| Chains | States per chain | Parallel CPU | Batched GPU | CPU/GPU speedup |
+| --- | --- | --- | --- | --- |
+| 4 | 3,000 | 18.53 s | 23.99 s | 0.772x |
+| 8 | 3,000 | 20.59 s | 39.26 s | 0.525x |
+| 4 | 40,000 | 252.64 s | 334.53 s | 0.755x |
+
+The four-chain batched CPU control took 46.24 s. GPU batching beats that single
+CPU coordinator, but loses to independent CPU workers. Mean combined request
+sizes were 159.1 and 317.3 for four/eight chains. Larger calls alone do not make
+this workflow faster than multicore CPU execution. These are individual measured
+runs, not timing confidence intervals.
+
+All long-run quality gates passed for all 16 parameter/noise quantities. Maximum
+R-hat was 1.002585; minimum bulk ESS 2253.48 and tail ESS 3345.25. GPU cold-chain
+parameter draws and acceptance counts matched CPU exactly for all four seeds.
+Maximum noise-array discrepancy was 6.29e-18; maximum prediction discrepancy
+4.91e-15. The parallel CPU runs reproduced the original saved theta, noise,
+acceptance and prediction arrays exactly. Four-chain short runs also checked
+all temperatures; the eight-chain scaling check compared cold-chain outputs.
+
+Minimum bulk ESS/s was 8.920 on parallel CPU versus 6.736 on batched GPU.
+GPU sampling took 32.4% longer, with 24.5% lower ESS/s. The measured quality is
+preserved, but the performance gate fails. Keep compiled CPU parallelism for
+this workload and preserve GPU batching as an experimental benchmark.
+
+Validation: 94 hardware-enabled tests passed in 115.67 s; the subsequent driver
+timeout correction passed a two-worker smoke check and the full long CPU run.
+Initial short runs recorded the development HEAD, with runner source hashes
+matching `5588570`; eight-chain runs used that commit and long runs used
+`3e1ad43`. No production sampler or model source changed in this step.
+
+Compact results, CSV diagnostics, test log, LaTeX source and artifact hashes are
+in `docs/performance/results/step4*`. Raw traces/logs and the PDF are in workspace
+`benchmark/changes/step4/`. The next GPU hypothesis would need to reduce host
+preparation, transfers or coordination costs. Cleanup, Mac testing and the
+hierarchical mixing investigation remain separate future work.

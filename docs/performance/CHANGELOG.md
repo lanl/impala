@@ -115,7 +115,12 @@
 - Full hardware-enabled suite: **94 passed in 115.67 seconds**. Initial short
   runs matched all-temperature parameter/counter arrays exactly; numerical
   noise/prediction differences passed the existing tolerances.
-- Scaling and full-run results will be recorded separately. See [STEP4.md](STEP4.md).
+- Full four-chain run: GPU 334.53 s versus parallel CPU 252.64 s; all quality
+  gates passed, with exact parameter draws/counts and rounding-scale noise
+  differences. GPU ESS/s was 24.5% lower. Eight-chain scaling also favored CPU.
+- Preserve this experimental implementation at `perf-step4-20260930`; retain
+  CPU parallelism for the tested workflow. Results, diagnostics, LaTeX and hashes
+  are versioned. See [STEP4.md](STEP4.md).
 
 ### Step-4 driver refinement
 
