@@ -68,8 +68,10 @@ def worker(connection, config, seed, folder):
                 iterations=config["iterations"],
                 temperatures=config["temperatures"],
             )
+            setup._batch_pooled_gibbs = config["worker_batch_gibbs"]
             model = setup.models[0]
             model.model.history_backend = "numba"
+            remote_stats = {"calls": 0, "wall_seconds": 0.0, "cpu_seconds": 0.0}
             if config["backend"] != "cpu_parallel":
 
                 def remote(params, pool=None, **kwargs):
@@ -77,8 +79,19 @@ def worker(connection, config, seed, folder):
                         raise ValueError(
                             "Only ordinary pooled evaluations are supported"
                         )
+                    if config["worker_profile"]:
+                        remote_start = time.perf_counter()
+                        remote_cpu = time.process_time()
                     connection.send(("evaluate", params))
                     tag, predictions = connection.recv()
+                    if config["worker_profile"]:
+                        remote_stats["calls"] += 1
+                        remote_stats["wall_seconds"] += (
+                            time.perf_counter() - remote_start
+                        )
+                        remote_stats["cpu_seconds"] += (
+                            time.process_time() - remote_cpu
+                        )
                     if tag != "result":
                         raise RuntimeError("Invalid coordinator reply")
                     return predictions
@@ -87,11 +100,35 @@ def worker(connection, config, seed, folder):
             connection.send(("ready", None))
             assert connection.recv()[0] == "start"
             mc.seeds(seed)
+            profiler = cProfile.Profile() if config["worker_profile"] else None
             start = time.perf_counter()
+            cpu_start = time.process_time()
+            if profiler:
+                profiler.enable()
             out = mc.run_calibration(setup, True)
+            if profiler:
+                profiler.disable()
+            cpu_seconds = time.process_time() - cpu_start
             seconds = time.perf_counter() - start
             connection.send(("sampled", seconds))
             assert connection.recv()[0] == "postprocess"
+            if profiler:
+                profiler.dump_stats(str(folder / "worker.prof"))
+                with (folder / "profile.txt").open("w") as stream:
+                    pstats.Stats(
+                        profiler, stream=stream
+                    ).strip_dirs().sort_stats("cumulative").print_stats(70)
+                (folder / "worker-timing.json").write_text(
+                    json.dumps(
+                        {
+                            "sampling_wall_seconds": seconds,
+                            "process_cpu_seconds": cpu_seconds,
+                            "remote": remote_stats.copy(),
+                        },
+                        indent=2,
+                    )
+                    + "\n"
+                )
             arrays = {
                 "theta": out.theta[:, 0].copy(),
                 "s2": out.s2[0][:, 0].copy(),
@@ -127,6 +164,7 @@ def worker(connection, config, seed, folder):
                 "seed": seed,
                 "mode": "pooled",
                 "sampling_seconds": seconds,
+                "process_cpu_seconds": cpu_seconds,
                 "iterations_per_second": (config["iterations"] - 1) / seconds,
                 "parameter_names": list(setup.bounds),
                 "bounds": setup.bounds_mat.tolist(),
@@ -203,6 +241,8 @@ def run(args):
         "gpu_block_size": args.gpu_block_size,
         "gpu_timing": args.gpu_timing,
         "gpu_hoist": args.gpu_hoist,
+        "worker_profile": args.worker_profile,
+        "worker_batch_gibbs": args.worker_batch_gibbs,
         "commit": subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
         ).strip(),
@@ -306,6 +346,8 @@ def run(args):
                     ROOT / "benchmarks/gpu/history.py",
                     ROOT / "benchmarks/gpu/cu_history.cu",
                     ROOT / "benchmarks/gpu/predictions.py",
+                    ROOT / "src/impala/superCal/impala_pool.py",
+                    ROOT / "src/impala/superCal/_pooled_gibbs.py",
                 )
             },
         }
@@ -339,5 +381,7 @@ if __name__ == "__main__":
     )
     p.add_argument("--gpu-timing", action="store_true")
     p.add_argument("--gpu-hoist", action="store_true")
+    p.add_argument("--worker-profile", action="store_true")
+    p.add_argument("--worker-batch-gibbs", action="store_true")
     p.add_argument("--output", type=Path, required=True)
     run(p.parse_args())

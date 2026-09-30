@@ -182,6 +182,25 @@ def calibPool(setup):
         for i in range(setup.nexp)
     ]
 
+    # Experimental, explicitly requested implementation of the same Gibbs step.
+    gibbs_batch = None
+    if getattr(setup, "_batch_pooled_gibbs", False):
+        from ._pooled_gibbs import DiagonalGibbsBatch
+
+        gibbs_batch = [
+            DiagonalGibbsBatch(
+                model,
+                itl_mat[i],
+                setup.ny_s2[i],
+                setup.ig_a[i],
+                setup.ig_b[i],
+                setup.s2_ind[i],
+                wt_mat[i],
+                setup.ys[i],
+            )
+            for i, model in enumerate(setup.models)
+        ]
+
     # current predictions (of the stresses):
     pred_curr = [None] * setup.nexp
     # sse_curr = np.empty([setup.ntemps, setup.nexp])
@@ -429,35 +448,45 @@ def calibPool(setup):
                 dev_sq = (pred_curr[i] - setup.ys[i]) ** 2 @ s2_ind_mat[
                     i
                 ]  # squared deviations
-                for t in range(setup.ntemps):
-                    log_s2[i][m][t] = np.log(
-                        1
-                        / np.random.gamma(
-                            (
-                                itl_mat[i][t]
-                                * (setup.ny_s2[i] / 2 + setup.ig_a[i] + 1)
-                                - 1
-                            ),
-                            (
-                                1
-                                / (
-                                    itl_mat[i][t]
-                                    * (setup.ig_b[i] + dev_sq[t].flatten() / 2)
-                                )
-                            ),
+                if gibbs_batch is not None:
+                    (log_s2[i][m], marg_lik_cov_curr[i], llik_curr[i]) = (
+                        gibbs_batch[i].update(
+                            dev_sq, pred_curr[i], discrep_curr[i]
                         )
                     )
-                    marg_lik_cov_curr[i][t] = setup.models[i].lik_cov_inv(
-                        np.exp(log_s2[i][m][t])[setup.s2_ind[i]],
-                        wt_mat[i],
-                        setup.s2_ind[i],
-                    )
-                    llik_curr[i, t] = setup.models[i].llik(
-                        setup.ys[i] - discrep_curr[i][t],
-                        pred_curr[i][t],
-                        marg_lik_cov_curr[i][t],
-                        wt_mat[i],
-                    )
+                else:
+                    for t in range(setup.ntemps):
+                        log_s2[i][m][t] = np.log(
+                            1
+                            / np.random.gamma(
+                                (
+                                    itl_mat[i][t]
+                                    * (setup.ny_s2[i] / 2 + setup.ig_a[i] + 1)
+                                    - 1
+                                ),
+                                (
+                                    1
+                                    / (
+                                        itl_mat[i][t]
+                                        * (
+                                            setup.ig_b[i]
+                                            + dev_sq[t].flatten() / 2
+                                        )
+                                    )
+                                ),
+                            )
+                        )
+                        marg_lik_cov_curr[i][t] = setup.models[i].lik_cov_inv(
+                            np.exp(log_s2[i][m][t])[setup.s2_ind[i]],
+                            wt_mat[i],
+                            setup.s2_ind[i],
+                        )
+                        llik_curr[i, t] = setup.models[i].llik(
+                            setup.ys[i] - discrep_curr[i][t],
+                            pred_curr[i][t],
+                            marg_lik_cov_curr[i][t],
+                            wt_mat[i],
+                        )
 
             elif setup.models[i].s2 == "gibbs_trunc":
                 dev_sq = (pred_curr[i] - setup.ys[i]) ** 2 @ s2_ind_mat[

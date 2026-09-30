@@ -147,3 +147,8 @@ paired end-to-end timings, and unchanged posterior-quality gates.
 
 See [STEP6.md](STEP6.md) for isolated GPU stage measurements, launch-size and
 invariant-calculation experiments, and matched CPU/GPU quality comparisons.
+
+## Step 7: worker CPU profiling and batched Gibbs bookkeeping
+
+See [STEP7.md](STEP7.md) for the opt-in pooled worker optimization, RNG-state
+regressions, matched CPU/GPU controls, and posterior-quality validation.
