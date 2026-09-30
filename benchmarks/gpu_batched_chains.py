@@ -33,7 +33,8 @@ import numpy as np
 from cache_material_preparation import ROOT, mc, setup_for
 
 
-def evaluate_group(model, requests):
+def evaluate_group(model, requests, timing=None):
+    started = time.perf_counter() if timing is not None else None
     """Combine heterogeneous batch lengths; split in the same request order."""
     names = tuple(requests[0])
     if any(tuple(r) != names for r in requests):
@@ -44,8 +45,16 @@ def evaluate_group(model, requests):
     ):
         raise ValueError("Invalid parameter batch shapes")
     combined = {k: np.concatenate([r[k] for r in requests]) for k in names}
+    if timing is not None:
+        timing["model_start"] = time.perf_counter()
+        timing["assembly_s"] = timing["model_start"] - started
     predictions = model.eval(combined, pool=True)
-    return np.split(predictions, np.cumsum(sizes)[:-1]), sum(sizes)
+    if timing is not None:
+        timing["model_end"] = time.perf_counter()
+    result = np.split(predictions, np.cumsum(sizes)[:-1]), sum(sizes)
+    if timing is not None:
+        timing["split_s"] = time.perf_counter() - timing["model_end"]
+    return result
 
 
 def worker(connection, config, seed, folder):
@@ -72,7 +81,16 @@ def worker(connection, config, seed, folder):
             setup._batch_pooled_proposals = config["worker_batch_proposals"]
             model = setup.models[0]
             model.model.history_backend = "numba"
-            remote_stats = {"calls": 0, "wall_seconds": 0.0, "cpu_seconds": 0.0}
+            remote_stats = {
+                "calls": 0,
+                "wall_seconds": 0.0,
+                "cpu_seconds": 0.0,
+                "send_seconds": 0.0,
+                "receive_seconds": 0.0,
+            }
+            timed_remote = (
+                config["worker_profile"] or config["coordination_timing"]
+            )
             if config["backend"] != "cpu_parallel":
 
                 def remote(params, pool=None, **kwargs):
@@ -80,13 +98,25 @@ def worker(connection, config, seed, folder):
                         raise ValueError(
                             "Only ordinary pooled evaluations are supported"
                         )
-                    if config["worker_profile"]:
+                    if timed_remote:
                         remote_start = time.perf_counter()
                         remote_cpu = time.process_time()
-                    connection.send(("evaluate", params))
+                    if config["coordination_timing"]:
+                        connection.send((
+                            "evaluate_timed",
+                            (params, remote_start),
+                        ))
+                    else:
+                        connection.send(("evaluate", params))
+                    if timed_remote:
+                        sent = time.perf_counter()
                     tag, predictions = connection.recv()
-                    if config["worker_profile"]:
+                    if timed_remote:
                         remote_stats["calls"] += 1
+                        remote_stats["send_seconds"] += sent - remote_start
+                        remote_stats["receive_seconds"] += (
+                            time.perf_counter() - sent
+                        )
                         remote_stats["wall_seconds"] += (
                             time.perf_counter() - remote_start
                         )
@@ -119,6 +149,7 @@ def worker(connection, config, seed, folder):
                     pstats.Stats(
                         profiler, stream=stream
                     ).strip_dirs().sort_stats("cumulative").print_stats(70)
+            if timed_remote:
                 (folder / "worker-timing.json").write_text(
                     json.dumps(
                         {
@@ -181,7 +212,10 @@ def worker(connection, config, seed, folder):
             connection.close()
 
 
-def serve(connections, model, terminal, timeout=180):
+def serve(connections, model, terminal, timeout=180, timing=False):
+    serve_started = time.perf_counter()
+    poll_seconds = decode_seconds = 0.0
+    timeline = []
     active = list(connections)
     batches = Counter()
     groups = Counter()
@@ -190,20 +224,35 @@ def serve(connections, model, terminal, timeout=180):
     receive_seconds = send_seconds = 0.0
     while active:
         pending = []
+        arrivals = []
         retired = []
         for seed in active:
             connection = connections[seed]
             receive_start = time.perf_counter()
             if not connection.poll(timeout):
                 raise TimeoutError(f"Chain {seed} stalled")
+            if timing:
+                poll_finished = time.perf_counter()
             tag, payload = connection.recv()
+            if timing:
+                received = time.perf_counter()
+                poll_seconds += poll_finished - receive_start
+                decode_seconds += received - poll_finished
             receive_seconds += time.perf_counter() - receive_start
             if tag == "error":
                 raise RuntimeError(f"Chain {seed}: {payload}")
             if tag == terminal:
                 completed[seed] = payload
                 retired.append(seed)
-            elif tag == "evaluate":
+            elif tag in ("evaluate", "evaluate_timed"):
+                if tag == "evaluate_timed":
+                    payload, request_started = payload
+                    if timing:
+                        arrivals.append({
+                            "seed": seed,
+                            "request_start": request_started,
+                            "received": received,
+                        })
                 pending.append((seed, payload))
             else:
                 raise RuntimeError(f"Unexpected message {tag}")
@@ -211,15 +260,28 @@ def serve(connections, model, terminal, timeout=180):
             active.remove(seed)
         if pending:
             start = time.perf_counter()
-            predictions, total = evaluate_group(model, [p for _, p in pending])
+            event = {"requests": arrivals} if timing else None
+            predictions, total = evaluate_group(
+                model, [p for _, p in pending], event
+            )
             eval_seconds += time.perf_counter() - start
             batches[total] += 1
             groups[len(pending)] += 1
             send_start = time.perf_counter()
             for (seed, _), prediction in zip(pending, predictions):
                 connections[seed].send(("result", prediction))
-            send_seconds += time.perf_counter() - send_start
-    return {
+            send_finished = time.perf_counter()
+            send_seconds += send_finished - send_start
+            if timing:
+                event.update(
+                    batch=total,
+                    workers=len(pending),
+                    send_start=send_start,
+                    send_end=send_finished,
+                )
+                timeline.append(event)
+    elapsed = time.perf_counter() - serve_started
+    result = {
         "chain_seconds": completed,
         "combined_batch_counts": dict(sorted(batches.items())),
         "group_sizes": dict(sorted(groups.items())),
@@ -227,6 +289,18 @@ def serve(connections, model, terminal, timeout=180):
         "receive_wait_and_decode_seconds": receive_seconds,
         "send_encode_seconds": send_seconds,
     }
+    if timing:
+        result["coordination"] = {
+            "serve_wall_seconds": elapsed,
+            "poll_wait_seconds": poll_seconds,
+            "receive_decode_seconds": decode_seconds,
+            "other_seconds": elapsed
+            - receive_seconds
+            - eval_seconds
+            - send_seconds,
+            "timeline": timeline,
+        }
+    return result
 
 
 def run(args):
@@ -243,6 +317,7 @@ def run(args):
         "gpu_timing": args.gpu_timing,
         "gpu_hoist": args.gpu_hoist,
         "worker_profile": args.worker_profile,
+        "coordination_timing": args.coordination_timing,
         "worker_batch_gibbs": args.worker_batch_gibbs,
         "worker_batch_proposals": args.worker_batch_proposals,
         "commit": subprocess.check_output(
@@ -309,7 +384,15 @@ def run(args):
         profiler = cProfile.Profile() if args.profile else None
         if profiler:
             profiler.enable()
-        stats = serve(connections, model, "sampled", timeout=timeout)
+        parent_cpu_start = time.process_time()
+        stats = serve(
+            connections,
+            model,
+            "sampled",
+            timeout=timeout,
+            timing=args.coordination_timing,
+        )
+        parent_cpu_seconds = time.process_time() - parent_cpu_start
         if profiler:
             profiler.disable()
         wall = time.perf_counter() - start
@@ -319,6 +402,12 @@ def run(args):
                 pstats.Stats(profiler, stream=stream).strip_dirs().sort_stats(
                     "cumulative"
                 ).print_stats(60)
+        if args.coordination_timing:
+            trace = stats["coordination"].pop("timeline")
+            (args.output / "coordination-timeline.json").write_text(
+                json.dumps(trace) + "\n"
+            )
+            stats["parent_process_cpu_seconds"] = parent_cpu_seconds
         if args.backend == "gpu_resident":
             stats["resident_evaluation"] = model.eval.statistics()
             if args.gpu_timing:
@@ -384,6 +473,7 @@ if __name__ == "__main__":
     p.add_argument("--gpu-timing", action="store_true")
     p.add_argument("--gpu-hoist", action="store_true")
     p.add_argument("--worker-profile", action="store_true")
+    p.add_argument("--coordination-timing", action="store_true")
     p.add_argument("--worker-batch-gibbs", action="store_true")
     p.add_argument("--worker-batch-proposals", action="store_true")
     p.add_argument("--output", type=Path, required=True)
