@@ -126,3 +126,8 @@ including R-hat, ESS, and ESS per second, before calling the change successful.
 The next experiment is on branch `perf/compile-material-history`. See
 [STEP2.md](STEP2.md) for the optional Cu backend, its accuracy gates, and the
 independent original-checkout benchmark. Step-1 artifacts remain unchanged.
+
+## Step 3: GPU prototype
+
+See [STEP3.md](STEP3.md) for the separate `perf/gpu-material-history` experiment,
+optional GPU environment, hardware tests, and predeclared quality gates.

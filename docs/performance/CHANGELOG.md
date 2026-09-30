@@ -75,3 +75,15 @@
 - See `results/step2-results.json`, `results/step2-manifest.json`,
   `results/step2-pytest.txt`, and `results/step2.tex`. Full artifacts and PDF:
   workspace `benchmark/changes/step2/`.
+
+## Step 3 — GPU Cu history prototype — 2026-09-29
+
+- Branch: `perf/gpu-material-history`, based on `perf-step2-20260929`.
+- Added an experimental float64 CUDA history kernel and benchmark-only adapter;
+  production CPU code and default configuration are unchanged.
+- Full suite with opt-in hardware tests: **91 passed in 113.57 seconds**,
+  including eight new GPU tests. See `results/step3-pytest.txt`.
+- Added transfer-inclusive paired timing and calibration runners, and a pooled
+  multi-seed quality comparison with predeclared gates in [STEP3.md](STEP3.md).
+- Results will be recorded in a separate checkpoint; preliminary probes are not
+  a general GPU speedup or posterior-equivalence claim.

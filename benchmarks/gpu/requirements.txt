@@ -1,0 +1,6 @@
+# Optional prototype dependencies; install in the existing locked CPU environment.
+cupy-cuda13x==14.2.0
+cuda-pathfinder==1.8.2
+cuda-toolkit[cudart,nvrtc]==13.2.0
+nvidia-cuda-runtime==13.2.51
+nvidia-cuda-nvrtc==13.2.51
