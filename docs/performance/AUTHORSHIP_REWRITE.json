@@ -1,0 +1,36 @@
+{
+  "reason": "Correct optimization commit author and committer to Ayan Biswas <ayan@lanl.gov>.",
+  "original_upstream_commit": "6ccd5a1ce8ea4b79755ad4387cf43605b4f5aa0e",
+  "original_branch_head": "06a88fc7eb0a3fc75d19f2368687f50fd73fe976",
+  "rewritten_branch_head": "b95e9d5d6cc2d708a417cfe953ea04840203f5a7",
+  "unchanged_commit_trees": true,
+  "preserved": "Original author/committer timestamps, commit messages, source/results trees and upstream history.",
+  "provenance": "Benchmark metadata and report commit IDs intentionally retain measured original IDs; use this mapping to locate their rewritten equivalents. Existing artifact hashes remain valid.",
+  "backup_refs_prefix": "refs/backup/authorship-20260930/",
+  "updated_local_refs": [
+    "refs/heads/perf/cache-material-preparation",
+    "refs/heads/perf/compile-material-history",
+    "refs/heads/perf/gpu-batched-chains",
+    "refs/heads/perf/gpu-material-history",
+    "refs/heads/perf/gpu-resident-evaluation",
+    "refs/tags/perf-step1-20260929",
+    "refs/tags/perf-step2-20260929",
+    "refs/tags/perf-step3-20260929",
+    "refs/tags/perf-step4-20260930",
+    "refs/tags/perf-step5-20260930"
+  ],
+  "commit_mapping": {
+    "7ac9310c695c8f32587eba452e245c1ad273b2b5": "3d65dffcf699f08f51830def493ca9d1b5ce4c4e",
+    "5c5cb017b162f922c2d00b02577bea15d0b6918e": "9b2248d98296971f0a1490cb3581ad148986e427",
+    "7ba4cc37b0213d31c179e1909fa2fb0d2ccc145b": "54cdd97b2e38fe70f668f5650f840d39e950e833",
+    "ac87663e294e8c46e4b78070bd9e1a3d702b6b83": "e92b272764b0eb7e24a59546f729884f883c6202",
+    "225cc37fe554e642cb2823b741158e0f005834af": "c15d9936f12bca37d034ff16f16f389b02a863d6",
+    "7817d9a4f839faf7fc76b2208995dc79442728e8": "40af451637407dfeec1fb496a2af02cf613969e5",
+    "dce1d8a87dd2339d912d7f071937bfe7918e1a99": "0cc2f435dfa96cc0aff9d739f7ebd7061bfcf4bb",
+    "55885705e1b78169c393d31fe058513764851c06": "b73f3f98578b7cf452d1adfb15649d8a3b4766d8",
+    "3e1ad43b778fbb3c60e657fca1086bc92f619420": "3aa61657e6d8ef6f95a67e2b5b2c4592cf901d65",
+    "c6ad078c9c729e6d981b58d21126bc6c0aa5de8f": "5a53cf9c47e8027450a0e41912d91114eb38961c",
+    "ac3392f5b9a1f5d90fb7de4aada682891c2b7f6a": "9ebb5f96908962de3dbd55f240206cfbbde24494",
+    "06a88fc7eb0a3fc75d19f2368687f50fd73fe976": "b95e9d5d6cc2d708a417cfe953ea04840203f5a7"
+  }
+}
