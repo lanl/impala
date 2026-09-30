@@ -165,3 +165,24 @@
   passed with unchanged tolerances.
 - Reports retain all screening options, profiles, raw traces and hash inventory.
   See [STEP6.md](STEP6.md) for commands and the remaining worker-side bottleneck.
+
+## Step 7 — worker CPU profiling and batched Gibbs bookkeeping — 2026-09-30
+
+- Branch `perf/gpu-worker-overhead`; measured code `d6a53cc`; checkpoint
+  `perf-step7-20260930`. Authored by Ayan Biswas <ayanju04@gmail.com>.
+- Profiled worker CPU separately from remote-request wall time. Batched ordinary
+  pooled Gibbs draws and diagonal covariance/likelihood bookkeeping, preserving
+  the existing distribution, arithmetic order and RNG stream. Opt-in only.
+- Three short rounds: median CPU 19.122 -> 15.823 s; GPU 13.437 -> 11.124 s.
+- Fresh four-chain, 40k-state, 50-temperature runs: prior GPU 196.576 s; new GPU
+  157.594 s; equally optimized CPU 217.575 s. New GPU throughput/ESS per second
+  improves 24.7% versus prior GPU and 38.1% versus improved CPU.
+- Every saved GPU array exactly matches prior GPU workers. Optimized CPU
+  parameters/noise/counters/predictions exactly reproduce frozen original CPU
+  traces. GPU/CPU parameters and counters match exactly; residual numerical
+  errors pass unchanged gates. All 16 posterior diagnostics pass.
+- 18 focused tests and 126 hardware-enabled full-suite tests passed. Original
+  fixture and reference traces unchanged; measured source hashes verified.
+- See [STEP7.md](STEP7.md), `results/step7-results.json`, `results/step7.tex`,
+  and `results/step7-manifest.json`. PDF/raw artifacts are in workspace
+  `benchmark/changes/step7/`. No push; hierarchical mixing remains separate.

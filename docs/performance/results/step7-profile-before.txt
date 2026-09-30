@@ -1,0 +1,78 @@
+         5351719 function calls in 14.558 seconds
+
+   Ordered by: cumulative time
+   List reduced from 137 to 70 due to restriction <70>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000   14.558   14.558 multi_calib.py:999(run_calibration)
+        1    2.439    2.439   14.558   14.558 impala_pool.py:108(calibPool)
+     3288    0.015    0.000    9.378    0.003 gpu_batched_chains.py:76(remote)
+     3288    0.012    0.000    9.183    0.003 connection.py:246(recv)
+     3288    0.016    0.000    9.059    0.003 connection.py:429(_recv_bytes)
+     6576    0.027    0.000    9.036    0.001 connection.py:390(_recv)
+     6595    8.981    0.001    8.981    0.001 {built-in method posix.read}
+   314350    0.625    0.000    1.094    0.000 models_withlik.py:63(llik)
+   802230    0.517    0.000    0.517    0.000 {method 'reduce' of 'numpy.ufunc' objects}
+   493975    0.101    0.000    0.510    0.000 {method 'sum' of 'numpy.ndarray' objects}
+   150000    0.329    0.000    0.485    0.000 models_withlik.py:75(lik_cov_inv)
+   303259    0.094    0.000    0.463    0.000 fromnumeric.py:2436(any)
+   493975    0.075    0.000    0.408    0.000 _methods.py:47(_sum)
+   303259    0.163    0.000    0.369    0.000 fromnumeric.py:86(_wrapreduction_any_all)
+   778656    0.184    0.000    0.184    0.000 {method 'flatten' of 'numpy.ndarray' objects}
+     3288    0.006    0.000    0.167    0.000 connection.py:202(send)
+     2999    0.035    0.000    0.139    0.000 impala_pool.py:99(gen_cand)
+     3288    0.015    0.000    0.128    0.000 reduction.py:48(dumps)
+     3288    0.106    0.000    0.106    0.000 {built-in method _pickle.loads}
+     2999    0.058    0.000    0.105    0.000 impala_pool.py:58(update)
+   490865    0.101    0.000    0.101    0.000 {method 'copy' of 'numpy.ndarray' objects}
+     3288    0.093    0.000    0.094    0.000 {method 'dump' of '_pickle.Pickler' objects}
+     2999    0.063    0.000    0.088    0.000 _linalg.py:777(cholesky)
+     3358    0.003    0.000    0.073    0.000 impala_noprobit_emu.py:318(checkConstraints)
+     3358    0.066    0.000    0.069    0.000 impala_noprobit_emu.py:543(constraints_ptw)
+   149775    0.056    0.000    0.056    0.000 {method 'copy' of 'numpy.generic' objects}
+     8399    0.003    0.000    0.046    0.000 einsumfunc.py:1244(einsum)
+     8399    0.043    0.000    0.043    0.000 {built-in method numpy._core._multiarray_umath.c_einsum}
+     6647    0.017    0.000    0.041    0.000 impala_noprobit_emu.py:612(tran_unif)
+     9990    0.033    0.000    0.033    0.000 impala_noprobit_emu.py:806(ldig_kern)
+     3288    0.006    0.000    0.032    0.000 connection.py:406(_send_bytes)
+   311612    0.029    0.000    0.029    0.000 {method 'items' of 'dict' objects}
+     6595    0.025    0.000    0.025    0.000 {method 'write' of '_io.BytesIO' objects}
+     6647    0.025    0.000    0.025    0.000 impala_noprobit_emu.py:579(unnormalize)
+     3288    0.002    0.000    0.023    0.000 connection.py:381(_send)
+     4995    0.004    0.000    0.021    0.000 fromnumeric.py:3287(prod)
+   303259    0.020    0.000    0.020    0.000 fromnumeric.py:2431(_any_dispatcher)
+     3288    0.020    0.000    0.020    0.000 {built-in method posix.write}
+     3288    0.013    0.000    0.017    0.000 reduction.py:38(__init__)
+     4995    0.007    0.000    0.017    0.000 fromnumeric.py:66(_wrapreduction)
+     3290    0.005    0.000    0.013    0.000 impala_noprobit_emu.py:121(theta_log_prior)
+     3000    0.005    0.000    0.012    0.000 pbar.py:74(__next__)
+     2702    0.008    0.000    0.011    0.000 _twodim_base_impl.py:176(eye)
+     6576    0.011    0.000    0.011    0.000 {built-in method time.process_time}
+    69362    0.009    0.000    0.009    0.000 {method 'copy' of 'dict' objects}
+     2999    0.004    0.000    0.007    0.000 _linalg.py:188(_commonType)
+     3000    0.003    0.000    0.007    0.000 _ufunc_config.py:472(__enter__)
+     6576    0.006    0.000    0.006    0.000 {method 'getbuffer' of '_io.BytesIO' objects}
+     3000    0.002    0.000    0.006    0.000 pbar.py:87(print)
+     3290    0.004    0.000    0.005    0.000 shape_base.py:78(atleast_2d)
+    19841    0.005    0.000    0.005    0.000 {built-in method builtins.len}
+    11294    0.005    0.000    0.005    0.000 {built-in method builtins.getattr}
+     3288    0.005    0.000    0.005    0.000 {built-in method _struct.unpack}
+    41995    0.005    0.000    0.005    0.000 einsumfunc.py:1236(_einsum_dispatcher)
+     6001    0.004    0.000    0.004    0.000 {built-in method numpy.zeros}
+     2999    0.002    0.000    0.003    0.000 _linalg.py:163(_makearray)
+       75    0.003    0.000    0.003    0.000 {built-in method builtins.print}
+     3358    0.003    0.000    0.003    0.000 serialize.py:30(_numba_unpickle)
+     3000    0.001    0.000    0.003    0.000 _ufunc_config.py:488(__exit__)
+     3000    0.002    0.000    0.002    0.000 {built-in method numpy._core._multiarray_umath._make_extobj}
+     4995    0.002    0.000    0.002    0.000 {method 'reshape' of 'numpy.ndarray' objects}
+     3288    0.002    0.000    0.002    0.000 {method 'update' of 'dict' objects}
+     2999    0.002    0.000    0.002    0.000 _linalg.py:237(_assert_stacked_square)
+     3288    0.002    0.000    0.002    0.000 {built-in method _struct.pack}
+     3288    0.002    0.000    0.002    0.000 {method 'getvalue' of '_io.BytesIO' objects}
+     2999    0.001    0.000    0.002    0.000 _linalg.py:182(_realType)
+     6576    0.002    0.000    0.002    0.000 {built-in method time.perf_counter}
+     5998    0.001    0.000    0.002    0.000 _linalg.py:168(isComplexType)
+     2999    0.002    0.000    0.002    0.000 {method 'astype' of 'numpy.ndarray' objects}
+     3000    0.002    0.000    0.002    0.000 {method 'reset' of '_contextvars.ContextVar' objects}
+
+

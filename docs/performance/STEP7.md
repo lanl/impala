@@ -96,3 +96,78 @@ The suite saves exact driver settings, source hashes (including the sampler and
 Gibbs helper), GPU telemetry and raw outputs. Initial before/after profiles are
 retained under workspace `benchmark/changes/step7/profile-before` and
 `profile-after`; their development source hashes precede the final code checkpoint.
+
+## Completed short checks and full regressions
+
+Measured implementation: `d6a53cc`. Direct Gibbs/RNG/unsupported-input tests:
+18 passed in 1.14 s. Full hardware-enabled suite: **126 passed in 105.55 s**.
+All eleven short comparisons with the first scalar CPU round passed exact
+all-temperature parameter/counter checks and the declared numerical gates.
+
+| Backend | Round 1 (s) | Round 2 (s) | Round 3 (s) | Median (s) |
+| --- | ---: | ---: | ---: | ---: |
+| CPU, scalar workers | 19.122 | 18.846 | 21.867 | 19.122 |
+| CPU, batched workers | 15.588 | 16.612 | 15.823 | 15.823 |
+| GPU, scalar workers | 13.111 | 13.437 | 13.581 | 13.437 |
+| GPU, batched workers | 11.126 | 11.120 | 11.124 | 11.124 |
+
+Median short-run throughput improves by 1.209x on CPU and 1.208x on GPU. The
+variation in CPU controls is retained rather than hidden by combining historical
+timings. Only the separate long-run measurements support the final ESS/s claim.
+
+## Rebuild the report and inventory
+
+Keep the artifact subdirectories `profile-before`, `profile-after`, `short`,
+`long`, `quality`, and the files `profile-agreement.json`, `pytest.log`.
+`profile-before`/`profile-after` correspond to the profile suite's `gpu_control`/
+`gpu_candidate`; its agreement file contains the same per-seed comparison nested
+under `gpu_candidate`. The recorded artifact layout retains the initial direct
+profile calls. A direct profile comparison can be regenerated with the shared
+`gpu_resident_suite.compare` function.
+
+```bash
+.venv/bin/python benchmarks/gpu_worker_report.py \
+  --artifacts ../benchmark/changes/step7 \
+  --original ../benchmark/results/reference
+XDG_CACHE_HOME=/tmp/impala-tex-cache ../benchmark/tools/tectonic \
+  --keep-logs --outdir ../benchmark/changes/step7 \
+  docs/performance/results/step7.tex
+.venv/bin/python benchmarks/gpu_worker_manifest.py \
+  --artifacts ../benchmark/changes/step7
+```
+
+The manifest checks measured short/long source hashes and records all raw outputs,
+benchmark/library source, tests, fixtures, Cu inputs and frozen original traces.
+
+## Final long-run result
+
+Four chains, 40,000 states each, 50 temperatures; elapsed group sampling time:
+
+| Backend | Seconds |
+| --- | ---: |
+| Prior GPU workers (step-6 configuration) | 196.576 |
+| GPU with batched Gibbs workers | 157.594 |
+| CPU with the same batched Gibbs workers | 217.575 |
+
+The new GPU implementation takes 19.83% less time and delivers 1.247x throughput
+versus the prior GPU workers. It delivers 1.381x throughput versus the equally
+optimized CPU. These are fresh paired long controls, one run per backend; the
+three short repetitions above provide supporting timing evidence.
+
+All saved GPU arrays match the prior GPU worker path bit-for-bit for all four
+seeds. The optimized CPU parameter/noise/counter/prediction arrays independently
+match the frozen original CPU traces exactly. GPU versus CPU parameters and
+counters match exactly; maximum noise difference is 6.29e-18 and prediction
+difference 4.91e-15, within unchanged gates.
+
+All 16 posterior quantities pass the predeclared checks: maximum R-hat 1.002585,
+minimum bulk ESS 2253.48, minimum tail ESS 3345.25. Minimum bulk ESS/s increases
+from 10.357 on the improved CPU to 14.299 on GPU (1.381x). Posterior and prediction
+mean gates pass. Identical saved GPU samples imply the same ESS as prior GPU
+workers, so their 1.247x throughput gain is also a 1.247x ESS/s gain.
+
+Implementation commit: `d6a53cc`; final local checkpoint: `perf-step7-20260930`.
+Compact results, profiles, CSV diagnostics, test output, LaTeX and checksums are
+versioned in `results/step7*`. PDF: workspace `benchmark/changes/step7/step7.pdf`.
+No upstream push was performed. This does not resolve hierarchical mixing or
+establish performance on other models, workloads or hardware.
