@@ -207,3 +207,25 @@
 - See [STEP8.md](STEP8.md), `results/step8-results.json`, `results/step8.tex`
   and `results/step8-manifest.json`; PDF/raw artifacts in workspace
   `benchmark/changes/step8/`. No push; hierarchical mixing remains separate.
+
+## Step 9 — GPU execution versus coordination profiling — 2026-09-30
+
+- Branch `perf/gpu-coordination-profile`, instrumentation code `694fd8d`, checkpoint
+  `perf-step9-20260930`; authored by Ayan Biswas <ayanju04@gmail.com>.
+- Added optional worker request timestamps and coordinator poll/decode, assembly,
+  model and send timelines. Reused CUDA-event stage profiling. No sampler,
+  kernel, scheduling or default change; CPU time and wall time kept distinct.
+- 19 focused hardware-enabled tests passed. Nine standard and three larger-call
+  runs preserve every saved array exactly; standard outputs also match step 8.
+- Standard median plain/coordination/detailed time: 10.811/10.801/11.052 s.
+  Representative detailed breakdown: kernels 49.8%, other model work 17.8%,
+  polling 24.3%, request decode/reply send 6.6%; remaining assembly/bookkeeping.
+- Larger calls reveal first-use geometry costs: 1.028 s first misses versus
+  0.141 s repeated misses. Cache growth alone cannot remove first-use cost.
+- Initial 200-temperature setup failed in scalar warm-up (negative Gamma shape).
+  Failure logs preserved; larger calls instead use eight independent 50-temperature
+  chains. No algorithm alteration to bypass the failure.
+- Recommend history-kernel profiling and model-side preparation measurements
+  before asynchronous scheduling. No new speedup or convergence claim.
+- See [STEP9.md](STEP9.md), `results/step9-results.json`, `results/step9.tex` and
+  `results/step9-manifest.json`; PDF/raw artifacts in `benchmark/changes/step9/`.

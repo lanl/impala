@@ -157,3 +157,8 @@ regressions, matched CPU/GPU controls, and posterior-quality validation.
 
 See [STEP8.md](STEP8.md) for current worker profiling, exact proposal-likelihood
 batching, matched CPU/GPU controls, and original-reference quality checks.
+
+## Step 9: separate GPU execution and coordination
+
+See [STEP9.md](STEP9.md) for instrumentation controls, request timelines,
+CUDA stage measurements, larger-call diagnostics and exact-output verification.

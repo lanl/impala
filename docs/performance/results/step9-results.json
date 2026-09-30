@@ -1,0 +1,3512 @@
+{
+  "measured_commit": "694fd8db2ae284b2d9ec56b51b5d6c684f639526",
+  "medians_s": {
+    "plain": 10.811004646122456,
+    "coordination": 10.800539123825729,
+    "stages": 11.051892179995775
+  },
+  "runs": {
+    "standard_plain_0": {
+      "wall_s": 10.726433435454965
+    },
+    "standard_coordination_0": {
+      "wall_s": 10.800539123825729,
+      "parent_cpu_s": 8.239391268999999,
+      "model_wall_s": 7.192110296338797,
+      "assembly_split_s": 0.13173974957317114,
+      "poll_wait_s": 2.700242778286338,
+      "receive_decode_s": 0.2995731234550476,
+      "reply_send_s": 0.43565311934798956,
+      "batch_size": {
+        "mean": 159.07537993920974,
+        "p50": 156.0,
+        "p95": 200.0,
+        "max": 200.0
+      },
+      "calls": 3290,
+      "request_start_spread_s": {
+        "mean": 0.00013735369725384973,
+        "p50": 0.000132677610963583,
+        "p95": 0.00021094130352139465,
+        "max": 0.002293381839990616
+      },
+      "latest_request_to_model_s": {
+        "mean": 0.0001799129201580507,
+        "p50": 0.00016970885917544365,
+        "p95": 0.0002887910697609185,
+        "max": 0.003384750336408615
+      },
+      "earliest_request_to_model_s": {
+        "mean": 0.00031726661741190044,
+        "p50": 0.00030002836138010025,
+        "p95": 0.00042405957356095314,
+        "max": 0.0034110387787222862
+      },
+      "per_request_to_model_s": {
+        "mean": 0.0002440923842462445,
+        "p50": 0.00024163350462913513,
+        "p95": 0.000369691988453269,
+        "max": 0.0034110387787222862
+      },
+      "workers": {
+        "42": {
+          "sampling_wall_seconds": 10.786993681453168,
+          "process_cpu_seconds": 2.264099829,
+          "remote": {
+            "calls": 3288,
+            "wall_seconds": 8.999740878120065,
+            "cpu_seconds": 0.4840771999999651,
+            "send_seconds": 0.14885103609412909,
+            "receive_seconds": 8.84938663430512
+          },
+          "outside_remote_wall_s": 1.7872528033331037,
+          "outside_remote_cpu_s": 1.780022629000035
+        },
+        "123": {
+          "sampling_wall_seconds": 10.787082146853209,
+          "process_cpu_seconds": 2.2901198040000006,
+          "remote": {
+            "calls": 3288,
+            "wall_seconds": 8.95888673234731,
+            "cpu_seconds": 0.46923990799995696,
+            "send_seconds": 0.14864791370928288,
+            "receive_seconds": 8.80872627068311
+          },
+          "outside_remote_wall_s": 1.828195414505899,
+          "outside_remote_cpu_s": 1.8208798960000436
+        },
+        "456": {
+          "sampling_wall_seconds": 10.800031195394695,
+          "process_cpu_seconds": 2.290310055,
+          "remote": {
+            "calls": 3290,
+            "wall_seconds": 8.98330189101398,
+            "cpu_seconds": 0.4805202309999883,
+            "send_seconds": 0.15195321384817362,
+            "receive_seconds": 8.829898945987225
+          },
+          "outside_remote_wall_s": 1.816729304380715,
+          "outside_remote_cpu_s": 1.8097898240000116
+        },
+        "789": {
+          "sampling_wall_seconds": 10.80026470683515,
+          "process_cpu_seconds": 2.2661885870000003,
+          "remote": {
+            "calls": 3290,
+            "wall_seconds": 8.995220510289073,
+            "cpu_seconds": 0.4680416359999766,
+            "send_seconds": 0.14590997714549303,
+            "receive_seconds": 8.847861531190574
+          },
+          "outside_remote_wall_s": 1.8050441965460777,
+          "outside_remote_cpu_s": 1.7981469510000236
+        }
+      },
+      "other_wall_s": 0.04122005682438612
+    },
+    "standard_stages_0": {
+      "wall_s": 11.051892179995775,
+      "parent_cpu_s": 8.488095045,
+      "model_wall_s": 7.428127441555262,
+      "assembly_split_s": 0.13275054283440113,
+      "poll_wait_s": 2.7039500111714005,
+      "receive_decode_s": 0.30519912391901016,
+      "reply_send_s": 0.44038375187665224,
+      "batch_size": {
+        "mean": 159.07537993920974,
+        "p50": 156.0,
+        "p95": 200.0,
+        "max": 200.0
+      },
+      "calls": 3290,
+      "request_start_spread_s": {
+        "mean": 0.00014157964448843684,
+        "p50": 0.00013483548536896706,
+        "p95": 0.0002327956724911928,
+        "max": 0.0008476199582219124
+      },
+      "latest_request_to_model_s": {
+        "mean": 0.00018076313925640924,
+        "p50": 0.00017065322026610374,
+        "p95": 0.00028857812285423276,
+        "max": 0.0032510943710803986
+      },
+      "earliest_request_to_model_s": {
+        "mean": 0.0003223427837448461,
+        "p50": 0.0003064102493226528,
+        "p95": 0.00044026570394635185,
+        "max": 0.0033676307648420334
+      },
+      "per_request_to_model_s": {
+        "mean": 0.00024972000362067807,
+        "p50": 0.00025084707885980606,
+        "p95": 0.00038140383549034595,
+        "max": 0.0033676307648420334
+      },
+      "workers": {
+        "42": {
+          "sampling_wall_seconds": 11.038217007182539,
+          "process_cpu_seconds": 2.261074397,
+          "remote": {
+            "calls": 3288,
+            "wall_seconds": 9.250889748334885,
+            "cpu_seconds": 0.4805129950000344,
+            "send_seconds": 0.14986074436455965,
+            "receive_seconds": 9.099480138160288
+          },
+          "outside_remote_wall_s": 1.7873272588476539,
+          "outside_remote_cpu_s": 1.7805614019999654
+        },
+        "123": {
+          "sampling_wall_seconds": 11.038289470598102,
+          "process_cpu_seconds": 2.225337871,
+          "remote": {
+            "calls": 3288,
+            "wall_seconds": 9.282479928806424,
+            "cpu_seconds": 0.4764713180000344,
+            "send_seconds": 0.14696042519062757,
+            "receive_seconds": 9.133958322927356
+          },
+          "outside_remote_wall_s": 1.7558095417916775,
+          "outside_remote_cpu_s": 1.7488665529999654
+        },
+        "456": {
+          "sampling_wall_seconds": 11.051496340893209,
+          "process_cpu_seconds": 2.307031853,
+          "remote": {
+            "calls": 3290,
+            "wall_seconds": 9.21227374766022,
+            "cpu_seconds": 0.47474110600000596,
+            "send_seconds": 0.14952833019196987,
+            "receive_seconds": 9.061226421035826
+          },
+          "outside_remote_wall_s": 1.8392225932329893,
+          "outside_remote_cpu_s": 1.8322907469999938
+        },
+        "789": {
+          "sampling_wall_seconds": 11.051213383674622,
+          "process_cpu_seconds": 2.2753968429999993,
+          "remote": {
+            "calls": 3290,
+            "wall_seconds": 9.241389704868197,
+            "cpu_seconds": 0.472303260999996,
+            "send_seconds": 0.15204272791743279,
+            "receive_seconds": 9.087889779359102
+          },
+          "outside_remote_wall_s": 1.8098236788064241,
+          "outside_remote_cpu_s": 1.8030935820000034
+        }
+      },
+      "other_wall_s": 0.04148130863904953,
+      "gpu_stage_totals_s": {
+        "validation_s": 0.23928136471658945,
+        "geometry_host_and_upload_s": 0.49310713540762663,
+        "parameter_expand_and_upload_s": 0.7275374894961715,
+        "allocation_s": 0.039130073972046375,
+        "history_device_s": 5.410313729047775,
+        "history_launch_wait_s": 5.44342475105077,
+        "interpolation_device_s": 0.039336320003960284,
+        "interpolation_launch_wait_s": 0.06163422204554081,
+        "download_and_host_allocation_s": 0.2691779248416424,
+        "output_validation_s": 0.11733043752610683,
+        "total_s": 7.395755810663104
+      },
+      "device_kernel_s": 5.449650049051736,
+      "device_kernel_fraction_of_wall": 0.4930965630406484,
+      "model_other_wall_s": 1.9784773925035255,
+      "geometry_misses": 144,
+      "unique_batch_sizes": 130,
+      "repeated_geometry_misses": 14,
+      "first_geometry_miss_s": 0.3881978066638112,
+      "repeated_geometry_miss_s": 0.052822486497461796,
+      "resident_cache": {
+        "hits": 3146,
+        "misses": 145,
+        "resident_bytes": 267422400,
+        "cache_bytes": 268435456,
+        "input_bytes": 655957920,
+        "output_bytes": 1369774224
+      }
+    },
+    "standard_coordination_1": {
+      "wall_s": 10.740144798532128,
+      "parent_cpu_s": 8.213863244,
+      "model_wall_s": 7.180576415732503,
+      "assembly_split_s": 0.12913406919687986,
+      "poll_wait_s": 2.662719178944826,
+      "receive_decode_s": 0.2940821023657918,
+      "reply_send_s": 0.43265495356172323,
+      "batch_size": {
+        "mean": 159.07537993920974,
+        "p50": 156.0,
+        "p95": 200.0,
+        "max": 200.0
+      },
+      "calls": 3290,
+      "request_start_spread_s": {
+        "mean": 0.00013733284327125113,
+        "p50": 0.00013190461322665215,
+        "p95": 0.0002203969284892081,
+        "max": 0.0011312980204820633
+      },
+      "latest_request_to_model_s": {
+        "mean": 0.0001775467295573294,
+        "p50": 0.0001643807627260685,
+        "p95": 0.00029432596638798706,
+        "max": 0.0033857831731438637
+      },
+      "earliest_request_to_model_s": {
+        "mean": 0.00031487957282858053,
+        "p50": 0.0002955254167318344,
+        "p95": 0.00044296490959823116,
+        "max": 0.003464743494987488
+      },
+      "per_request_to_model_s": {
+        "mean": 0.00024097832217110296,
+        "p50": 0.00023565860465168953,
+        "p95": 0.0003739350941032171,
+        "max": 0.003464743494987488
+      },
+      "workers": {
+        "42": {
+          "sampling_wall_seconds": 10.726768513210118,
+          "process_cpu_seconds": 2.2249249420000003,
+          "remote": {
+            "calls": 3288,
+            "wall_seconds": 8.972374567762017,
+            "cpu_seconds": 0.4773594690000058,
+            "send_seconds": 0.1518347905948758,
+            "receive_seconds": 8.819185249507427
+          },
+          "outside_remote_wall_s": 1.7543939454481006,
+          "outside_remote_cpu_s": 1.7475654729999945
+        },
+        "123": {
+          "sampling_wall_seconds": 10.726883589290082,
+          "process_cpu_seconds": 2.2815845029999995,
+          "remote": {
+            "calls": 3288,
+            "wall_seconds": 8.915327166207135,
+            "cpu_seconds": 0.47708229900001786,
+            "send_seconds": 0.14951554127037525,
+            "receive_seconds": 8.764349546283484
+          },
+          "outside_remote_wall_s": 1.8115564230829477,
+          "outside_remote_cpu_s": 1.8045022039999816
+        },
+        "456": {
+          "sampling_wall_seconds": 10.739507049322128,
+          "process_cpu_seconds": 2.2243366079999998,
+          "remote": {
+            "calls": 3290,
+            "wall_seconds": 8.979332168586552,
+            "cpu_seconds": 0.4706890799999952,
+            "send_seconds": 0.14978445041924715,
+            "receive_seconds": 8.82808015216142
+          },
+          "outside_remote_wall_s": 1.7601748807355762,
+          "outside_remote_cpu_s": 1.7536475280000046
+        },
+        "789": {
+          "sampling_wall_seconds": 10.739760085940361,
+          "process_cpu_seconds": 2.2553443280000005,
+          "remote": {
+            "calls": 3290,
+            "wall_seconds": 8.951030596159399,
+            "cpu_seconds": 0.47328137900006606,
+            "send_seconds": 0.14922614209353924,
+            "receive_seconds": 8.800321726128459
+          },
+          "outside_remote_wall_s": 1.7887294897809625,
+          "outside_remote_cpu_s": 1.7820629489999344
+        }
+      },
+      "other_wall_s": 0.04097807873040438
+    },
+    "standard_stages_1": {
+      "wall_s": 10.964075298048556,
+      "parent_cpu_s": 8.433576140000001,
+      "model_wall_s": 7.411228423006833,
+      "assembly_split_s": 0.127399536781013,
+      "poll_wait_s": 2.6629022592678666,
+      "receive_decode_s": 0.29266943223774433,
+      "reply_send_s": 0.43002895824611187,
+      "batch_size": {
+        "mean": 159.07537993920974,
+        "p50": 156.0,
+        "p95": 200.0,
+        "max": 200.0
+      },
+      "calls": 3290,
+      "request_start_spread_s": {
+        "mean": 0.00015414268497411604,
+        "p50": 0.0001442180946469307,
+        "p95": 0.0002462774980813263,
+        "max": 0.0014665452763438225
+      },
+      "latest_request_to_model_s": {
+        "mean": 0.00016590403449526312,
+        "p50": 0.0001542060635983944,
+        "p95": 0.0002832114696502684,
+        "max": 0.003274410031735897
+      },
+      "earliest_request_to_model_s": {
+        "mean": 0.00032004671946937914,
+        "p50": 0.0002936064265668392,
+        "p95": 0.00048487964086234563,
+        "max": 0.003313599154353142
+      },
+      "per_request_to_model_s": {
+        "mean": 0.0002421097918851066,
+        "p50": 0.00023860344663262367,
+        "p95": 0.0003891668748110533,
+        "max": 0.003313599154353142
+      },
+      "workers": {
+        "42": {
+          "sampling_wall_seconds": 10.950028652325273,
+          "process_cpu_seconds": 2.2116146190000006,
+          "remote": {
+            "calls": 3288,
+            "wall_seconds": 9.20666797272861,
+            "cpu_seconds": 0.47499628700001484,
+            "send_seconds": 0.1497257361188531,
+            "receive_seconds": 9.055517422035336
+          },
+          "outside_remote_wall_s": 1.7433606795966625,
+          "outside_remote_cpu_s": 1.7366183319999857
+        },
+        "123": {
+          "sampling_wall_seconds": 10.950177658349276,
+          "process_cpu_seconds": 2.224791927,
+          "remote": {
+            "calls": 3288,
+            "wall_seconds": 9.189608737826347,
+            "cpu_seconds": 0.4709723179999896,
+            "send_seconds": 0.14893026743084192,
+            "receive_seconds": 9.039289740845561
+          },
+          "outside_remote_wall_s": 1.7605689205229282,
+          "outside_remote_cpu_s": 1.7538196090000104
+        },
+        "456": {
+          "sampling_wall_seconds": 10.963260003365576,
+          "process_cpu_seconds": 2.219951324,
+          "remote": {
+            "calls": 3290,
+            "wall_seconds": 9.215372614562511,
+            "cpu_seconds": 0.47891323599997726,
+            "send_seconds": 0.15067135635763407,
+            "receive_seconds": 9.063329039141536
+          },
+          "outside_remote_wall_s": 1.7478873888030648,
+          "outside_remote_cpu_s": 1.741038088000023
+        },
+        "789": {
+          "sampling_wall_seconds": 10.963685428723693,
+          "process_cpu_seconds": 2.304938946,
+          "remote": {
+            "calls": 3290,
+            "wall_seconds": 9.122754258103669,
+            "cpu_seconds": 0.47127909799996726,
+            "send_seconds": 0.1506224749609828,
+            "receive_seconds": 8.970675650052726
+          },
+          "outside_remote_wall_s": 1.8409311706200242,
+          "outside_remote_cpu_s": 1.8336598480000328
+        }
+      },
+      "other_wall_s": 0.03984668850898743,
+      "gpu_stage_totals_s": {
+        "validation_s": 0.2259803917258978,
+        "geometry_host_and_upload_s": 0.49068625178188086,
+        "parameter_expand_and_upload_s": 0.7247079890221357,
+        "allocation_s": 0.03832730930298567,
+        "history_device_s": 5.42126255774498,
+        "history_launch_wait_s": 5.455081547610462,
+        "interpolation_device_s": 0.0388159040287137,
+        "interpolation_launch_wait_s": 0.06088415998965502,
+        "download_and_host_allocation_s": 0.2634655823931098,
+        "output_validation_s": 0.11602241359651089,
+        "total_s": 7.3802236802876
+      },
+      "device_kernel_s": 5.460078461773693,
+      "device_kernel_fraction_of_wall": 0.49799716924103093,
+      "model_other_wall_s": 1.9511499612331393,
+      "geometry_misses": 144,
+      "unique_batch_sizes": 130,
+      "repeated_geometry_misses": 14,
+      "first_geometry_miss_s": 0.3841941775754094,
+      "repeated_geometry_miss_s": 0.05429977644234896,
+      "resident_cache": {
+        "hits": 3146,
+        "misses": 145,
+        "resident_bytes": 267422400,
+        "cache_bytes": 268435456,
+        "input_bytes": 655957920,
+        "output_bytes": 1369774224
+      }
+    },
+    "standard_plain_1": {
+      "wall_s": 10.811004646122456
+    },
+    "standard_stages_2": {
+      "wall_s": 11.158225687220693,
+      "parent_cpu_s": 8.606094115,
+      "model_wall_s": 7.495902152732015,
+      "assembly_split_s": 0.1408879542723298,
+      "poll_wait_s": 2.6924861893057823,
+      "receive_decode_s": 0.31781943049281836,
+      "reply_send_s": 0.4668679954484105,
+      "batch_size": {
+        "mean": 159.07537993920974,
+        "p50": 156.0,
+        "p95": 200.0,
+        "max": 200.0
+      },
+      "calls": 3290,
+      "request_start_spread_s": {
+        "mean": 0.00012473679037260793,
+        "p50": 0.00011684047058224678,
+        "p95": 0.00020766430534422387,
+        "max": 0.0007950467988848686
+      },
+      "latest_request_to_model_s": {
+        "mean": 0.00019798804963386892,
+        "p50": 0.00018930062651634216,
+        "p95": 0.0003092606086283922,
+        "max": 0.0030989376828074455
+      },
+      "earliest_request_to_model_s": {
+        "mean": 0.00032272484000647685,
+        "p50": 0.0003093201667070389,
+        "p95": 0.0004487823229283094,
+        "max": 0.0031230179592967033
+      },
+      "per_request_to_model_s": {
+        "mean": 0.00025843720217415196,
+        "p50": 0.0002593141980469227,
+        "p95": 0.0003840227145701647,
+        "max": 0.0031230179592967033
+      },
+      "workers": {
+        "42": {
+          "sampling_wall_seconds": 11.14487137645483,
+          "process_cpu_seconds": 2.284802249,
+          "remote": {
+            "calls": 3288,
+            "wall_seconds": 9.336053070612252,
+            "cpu_seconds": 0.4834400569999566,
+            "send_seconds": 0.1495817033573985,
+            "receive_seconds": 9.184901280328631
+          },
+          "outside_remote_wall_s": 1.8088183058425784,
+          "outside_remote_cpu_s": 1.8013621920000435
+        },
+        "123": {
+          "sampling_wall_seconds": 11.144619005732238,
+          "process_cpu_seconds": 2.249528592,
+          "remote": {
+            "calls": 3288,
+            "wall_seconds": 9.365908327512443,
+            "cpu_seconds": 0.47790550300000767,
+            "send_seconds": 0.14699334651231766,
+            "receive_seconds": 9.217182773165405
+          },
+          "outside_remote_wall_s": 1.7787106782197952,
+          "outside_remote_cpu_s": 1.7716230889999922
+        },
+        "456": {
+          "sampling_wall_seconds": 11.157831172458827,
+          "process_cpu_seconds": 2.2352861959999997,
+          "remote": {
+            "calls": 3290,
+            "wall_seconds": 9.403198268264532,
+            "cpu_seconds": 0.4873780300000279,
+            "send_seconds": 0.152169581502676,
+            "receive_seconds": 9.24941656831652
+          },
+          "outside_remote_wall_s": 1.7546329041942954,
+          "outside_remote_cpu_s": 1.7479081659999718
+        },
+        "789": {
+          "sampling_wall_seconds": 11.157751861028373,
+          "process_cpu_seconds": 2.2196774579999996,
+          "remote": {
+            "calls": 3290,
+            "wall_seconds": 9.404168738983572,
+            "cpu_seconds": 0.4729184109999647,
+            "send_seconds": 0.14719286654144526,
+            "receive_seconds": 9.255556538701057
+          },
+          "outside_remote_wall_s": 1.7535831220448017,
+          "outside_remote_cpu_s": 1.746759047000035
+        }
+      },
+      "other_wall_s": 0.04426196496933699,
+      "gpu_stage_totals_s": {
+        "validation_s": 0.24565546307712793,
+        "geometry_host_and_upload_s": 0.5162417944520712,
+        "parameter_expand_and_upload_s": 0.7392444256693125,
+        "allocation_s": 0.040450443513691425,
+        "history_device_s": 5.424615970373154,
+        "history_launch_wait_s": 5.458556939847767,
+        "interpolation_device_s": 0.040166976014152166,
+        "interpolation_launch_wait_s": 0.06297126971185207,
+        "download_and_host_allocation_s": 0.27308147586882114,
+        "output_validation_s": 0.12151092104613781,
+        "total_s": 7.462416051886976
+      },
+      "device_kernel_s": 5.464782946387306,
+      "device_kernel_fraction_of_wall": 0.48975375651758146,
+      "model_other_wall_s": 2.0311192063447088,
+      "geometry_misses": 144,
+      "unique_batch_sizes": 130,
+      "repeated_geometry_misses": 14,
+      "first_geometry_miss_s": 0.40786855481565,
+      "repeated_geometry_miss_s": 0.052558355033397675,
+      "resident_cache": {
+        "hits": 3146,
+        "misses": 145,
+        "resident_bytes": 267422400,
+        "cache_bytes": 268435456,
+        "input_bytes": 655957920,
+        "output_bytes": 1369774224
+      }
+    },
+    "standard_plain_2": {
+      "wall_s": 10.8413418661803
+    },
+    "standard_coordination_2": {
+      "wall_s": 10.847118251025677,
+      "parent_cpu_s": 8.265173588,
+      "model_wall_s": 7.215664752759039,
+      "assembly_split_s": 0.13203409779816866,
+      "poll_wait_s": 2.7145480727776885,
+      "receive_decode_s": 0.29814863950014114,
+      "reply_send_s": 0.44515092577785254,
+      "batch_size": {
+        "mean": 159.07537993920974,
+        "p50": 156.0,
+        "p95": 200.0,
+        "max": 200.0
+      },
+      "calls": 3290,
+      "request_start_spread_s": {
+        "mean": 0.00013603758474523174,
+        "p50": 0.0001266486942768097,
+        "p95": 0.00023267348296940327,
+        "max": 0.0012579066678881645
+      },
+      "latest_request_to_model_s": {
+        "mean": 0.00018217626047578264,
+        "p50": 0.00016919011250138283,
+        "p95": 0.00030164704658091067,
+        "max": 0.0034720124676823616
+      },
+      "earliest_request_to_model_s": {
+        "mean": 0.00031821384522101435,
+        "p50": 0.0002955957315862179,
+        "p95": 0.00044939974322915076,
+        "max": 0.003506285138428211
+      },
+      "per_request_to_model_s": {
+        "mean": 0.00024532042438089034,
+        "p50": 0.0002414141781628132,
+        "p95": 0.000384089769795537,
+        "max": 0.003506285138428211
+      },
+      "workers": {
+        "42": {
+          "sampling_wall_seconds": 10.833213098347187,
+          "process_cpu_seconds": 2.2793708530000005,
+          "remote": {
+            "calls": 3288,
+            "wall_seconds": 9.026458621025085,
+            "cpu_seconds": 0.4799066150000524,
+            "send_seconds": 0.14986222423613071,
+            "receive_seconds": 8.875104417093098
+          },
+          "outside_remote_wall_s": 1.8067544773221016,
+          "outside_remote_cpu_s": 1.7994642379999481
+        },
+        "123": {
+          "sampling_wall_seconds": 10.83294340595603,
+          "process_cpu_seconds": 2.308520058,
+          "remote": {
+            "calls": 3288,
+            "wall_seconds": 8.999433662742376,
+            "cpu_seconds": 0.48219443499999315,
+            "send_seconds": 0.14985703863203526,
+            "receive_seconds": 8.84803899563849
+          },
+          "outside_remote_wall_s": 1.8335097432136536,
+          "outside_remote_cpu_s": 1.826325623000007
+        },
+        "456": {
+          "sampling_wall_seconds": 10.846629212610424,
+          "process_cpu_seconds": 2.2915070230000003,
+          "remote": {
+            "calls": 3290,
+            "wall_seconds": 9.021735928021371,
+            "cpu_seconds": 0.47381150299999586,
+            "send_seconds": 0.14890196826308966,
+            "receive_seconds": 8.871092924848199
+          },
+          "outside_remote_wall_s": 1.8248932845890522,
+          "outside_remote_cpu_s": 1.8176955200000044
+        },
+        "789": {
+          "sampling_wall_seconds": 10.846765406429768,
+          "process_cpu_seconds": 2.283489962,
+          "remote": {
+            "calls": 3290,
+            "wall_seconds": 9.027395026758313,
+            "cpu_seconds": 0.47102274099999875,
+            "send_seconds": 0.1489993929862976,
+            "receive_seconds": 8.87686722818762
+          },
+          "outside_remote_wall_s": 1.8193703796714544,
+          "outside_remote_cpu_s": 1.8124672210000012
+        }
+      },
+      "other_wall_s": 0.041571762412786484
+    },
+    "large_plain": {
+      "wall_s": 4.923132316209376
+    },
+    "large_coordination": {
+      "wall_s": 5.02513391431421,
+      "parent_cpu_s": 4.188282291,
+      "model_wall_s": 3.569234407506883,
+      "assembly_split_s": 0.06459601316601038,
+      "poll_wait_s": 0.9038043636828661,
+      "receive_decode_s": 0.17514335829764605,
+      "reply_send_s": 0.2881454201415181,
+      "batch_size": {
+        "mean": 332.66880733944953,
+        "p50": 313.0,
+        "p95": 400.0,
+        "max": 400.0
+      },
+      "calls": 1090,
+      "request_start_spread_s": {
+        "mean": 0.0003764531951090065,
+        "p50": 0.0003050975501537323,
+        "p95": 0.0008457637857645749,
+        "max": 0.002475057728588581
+      },
+      "latest_request_to_model_s": {
+        "mean": 0.00022715253140264695,
+        "p50": 0.00020309491083025932,
+        "p95": 0.00038519040681421756,
+        "max": 0.0006310893222689629
+      },
+      "earliest_request_to_model_s": {
+        "mean": 0.0006036057265116534,
+        "p50": 0.0005479650571942329,
+        "p95": 0.0011414119508117437,
+        "max": 0.0030209533870220184
+      },
+      "per_request_to_model_s": {
+        "mean": 0.0004219000212796921,
+        "p50": 0.00036121997982263565,
+        "p95": 0.0009458841290324926,
+        "max": 0.0030209533870220184
+      },
+      "workers": {
+        "42": {
+          "sampling_wall_seconds": 5.024168388918042,
+          "process_cpu_seconds": 0.694355217,
+          "remote": {
+            "calls": 1090,
+            "wall_seconds": 4.497594336047769,
+            "cpu_seconds": 0.17000834599999237,
+            "send_seconds": 0.055161528289318085,
+            "receive_seconds": 4.441979714669287
+          },
+          "outside_remote_wall_s": 0.5265740528702736,
+          "outside_remote_cpu_s": 0.5243468710000077
+        },
+        "123": {
+          "sampling_wall_seconds": 5.024680172093213,
+          "process_cpu_seconds": 0.7321227110000006,
+          "remote": {
+            "calls": 1090,
+            "wall_seconds": 4.469965464435518,
+            "cpu_seconds": 0.17991773099999797,
+            "send_seconds": 0.055717578157782555,
+            "receive_seconds": 4.413750073872507
+          },
+          "outside_remote_wall_s": 0.5547147076576948,
+          "outside_remote_cpu_s": 0.5522049800000026
+        },
+        "456": {
+          "sampling_wall_seconds": 5.023850232362747,
+          "process_cpu_seconds": 0.7187995029999996,
+          "remote": {
+            "calls": 1090,
+            "wall_seconds": 4.479350929148495,
+            "cpu_seconds": 0.176893139999998,
+            "send_seconds": 0.05368511192500591,
+            "receive_seconds": 4.425058730877936
+          },
+          "outside_remote_wall_s": 0.544499303214252,
+          "outside_remote_cpu_s": 0.5419063630000016
+        },
+        "789": {
+          "sampling_wall_seconds": 5.024552943184972,
+          "process_cpu_seconds": 0.7173973230000001,
+          "remote": {
+            "calls": 1090,
+            "wall_seconds": 4.484307263046503,
+            "cpu_seconds": 0.17976023700000088,
+            "send_seconds": 0.05482811015099287,
+            "receive_seconds": 4.428912968374789
+          },
+          "outside_remote_wall_s": 0.5402456801384687,
+          "outside_remote_cpu_s": 0.5376370859999993
+        },
+        "1011": {
+          "sampling_wall_seconds": 5.024317832663655,
+          "process_cpu_seconds": 0.7152844299999996,
+          "remote": {
+            "calls": 1090,
+            "wall_seconds": 4.483787689357996,
+            "cpu_seconds": 0.1772763430000044,
+            "send_seconds": 0.0554549777880311,
+            "receive_seconds": 4.427801636978984
+          },
+          "outside_remote_wall_s": 0.5405301433056593,
+          "outside_remote_cpu_s": 0.5380080869999952
+        },
+        "1213": {
+          "sampling_wall_seconds": 5.024727746844292,
+          "process_cpu_seconds": 0.7082347329999994,
+          "remote": {
+            "calls": 1090,
+            "wall_seconds": 4.491708796471357,
+            "cpu_seconds": 0.17778369799999894,
+            "send_seconds": 0.05725499801337719,
+            "receive_seconds": 4.433897553943098
+          },
+          "outside_remote_wall_s": 0.5330189503729343,
+          "outside_remote_cpu_s": 0.5304510350000005
+        },
+        "1415": {
+          "sampling_wall_seconds": 5.024144844152033,
+          "process_cpu_seconds": 0.7130407239999998,
+          "remote": {
+            "calls": 1090,
+            "wall_seconds": 4.477576897479594,
+            "cpu_seconds": 0.1689590890000101,
+            "send_seconds": 0.05835457518696785,
+            "receive_seconds": 4.4186985632404685
+          },
+          "outside_remote_wall_s": 0.5465679466724396,
+          "outside_remote_cpu_s": 0.5440816349999897
+        },
+        "1617": {
+          "sampling_wall_seconds": 5.024644386023283,
+          "process_cpu_seconds": 0.8039126439999995,
+          "remote": {
+            "calls": 1090,
+            "wall_seconds": 4.370876898989081,
+            "cpu_seconds": 0.15336025199999348,
+            "send_seconds": 0.07628590986132622,
+            "receive_seconds": 4.29425663407892
+          },
+          "outside_remote_wall_s": 0.6537674870342016,
+          "outside_remote_cpu_s": 0.650552392000006
+        }
+      },
+      "other_wall_s": 0.024210351519286633
+    },
+    "large_stages": {
+      "wall_s": 5.0472662672400475,
+      "parent_cpu_s": 4.234461804,
+      "model_wall_s": 3.621392598375678,
+      "assembly_split_s": 0.06466691195964813,
+      "poll_wait_s": 0.8765650968998671,
+      "receive_decode_s": 0.17347156070172787,
+      "reply_send_s": 0.28639340959489346,
+      "batch_size": {
+        "mean": 332.66880733944953,
+        "p50": 313.0,
+        "p95": 400.0,
+        "max": 400.0
+      },
+      "calls": 1090,
+      "request_start_spread_s": {
+        "mean": 0.00032597063621933305,
+        "p50": 0.00025747669860720634,
+        "p95": 0.0008116676937788723,
+        "max": 0.0011731451377272606
+      },
+      "latest_request_to_model_s": {
+        "mean": 0.00022010266815030246,
+        "p50": 0.00020221713930368423,
+        "p95": 0.00036477958783507345,
+        "max": 0.000506523996591568
+      },
+      "earliest_request_to_model_s": {
+        "mean": 0.0005460733043696355,
+        "p50": 0.00043791811913251877,
+        "p95": 0.0011436413042247295,
+        "max": 0.0014166180044412613
+      },
+      "per_request_to_model_s": {
+        "mean": 0.00040386434037819366,
+        "p50": 0.0003369571641087532,
+        "p95": 0.0009539792779833069,
+        "max": 0.0014166180044412613
+      },
+      "workers": {
+        "42": {
+          "sampling_wall_seconds": 5.046061803586781,
+          "process_cpu_seconds": 0.7237998149999996,
+          "remote": {
+            "calls": 1090,
+            "wall_seconds": 4.495266894809902,
+            "cpu_seconds": 0.17534697700001622,
+            "send_seconds": 0.054831087589263916,
+            "receive_seconds": 4.440005044452846
+          },
+          "outside_remote_wall_s": 0.5507949087768793,
+          "outside_remote_cpu_s": 0.5484528379999833
+        },
+        "123": {
+          "sampling_wall_seconds": 5.046692657284439,
+          "process_cpu_seconds": 0.7184763950000006,
+          "remote": {
+            "calls": 1090,
+            "wall_seconds": 4.500199076719582,
+            "cpu_seconds": 0.17440424999998783,
+            "send_seconds": 0.05389381479471922,
+            "receive_seconds": 4.445768356323242
+          },
+          "outside_remote_wall_s": 0.5464935805648565,
+          "outside_remote_cpu_s": 0.5440721450000128
+        },
+        "456": {
+          "sampling_wall_seconds": 5.046755058690906,
+          "process_cpu_seconds": 0.7023081979999999,
+          "remote": {
+            "calls": 1090,
+            "wall_seconds": 4.5175028340891,
+            "cpu_seconds": 0.1755452520000187,
+            "send_seconds": 0.05401845462620258,
+            "receive_seconds": 4.46289704926312
+          },
+          "outside_remote_wall_s": 0.5292522246018052,
+          "outside_remote_cpu_s": 0.5267629459999812
+        },
+        "789": {
+          "sampling_wall_seconds": 5.046383887529373,
+          "process_cpu_seconds": 0.7122203170000008,
+          "remote": {
+            "calls": 1090,
+            "wall_seconds": 4.507775126956403,
+            "cpu_seconds": 0.17616227499998427,
+            "send_seconds": 0.054712834767997265,
+            "receive_seconds": 4.452405266463757
+          },
+          "outside_remote_wall_s": 0.5386087605729699,
+          "outside_remote_cpu_s": 0.5360580420000165
+        },
+        "1011": {
+          "sampling_wall_seconds": 5.046459561213851,
+          "process_cpu_seconds": 0.6906987869999996,
+          "remote": {
+            "calls": 1090,
+            "wall_seconds": 4.5339488768950105,
+            "cpu_seconds": 0.18062965100000117,
+            "send_seconds": 0.0555102052167058,
+            "receive_seconds": 4.477817565202713
+          },
+          "outside_remote_wall_s": 0.5125106843188405,
+          "outside_remote_cpu_s": 0.5100691359999985
+        },
+        "1213": {
+          "sampling_wall_seconds": 5.046304331161082,
+          "process_cpu_seconds": 0.7017772749999995,
+          "remote": {
+            "calls": 1090,
+            "wall_seconds": 4.520557259209454,
+            "cpu_seconds": 0.17854814499999616,
+            "send_seconds": 0.05747843440622091,
+            "receive_seconds": 4.462444721721113
+          },
+          "outside_remote_wall_s": 0.5257470719516277,
+          "outside_remote_cpu_s": 0.5232291300000034
+        },
+        "1415": {
+          "sampling_wall_seconds": 5.046369102783501,
+          "process_cpu_seconds": 0.6674599509999997,
+          "remote": {
+            "calls": 1090,
+            "wall_seconds": 4.5487099047750235,
+            "cpu_seconds": 0.17218204800000425,
+            "send_seconds": 0.05571672599762678,
+            "receive_seconds": 4.492443638853729
+          },
+          "outside_remote_wall_s": 0.4976591980084777,
+          "outside_remote_cpu_s": 0.4952779029999954
+        },
+        "1617": {
+          "sampling_wall_seconds": 5.046783993020654,
+          "process_cpu_seconds": 0.7953914820000003,
+          "remote": {
+            "calls": 1090,
+            "wall_seconds": 4.400640028528869,
+            "cpu_seconds": 0.15253322199998554,
+            "send_seconds": 0.07659770082682371,
+            "receive_seconds": 4.323650203645229
+          },
+          "outside_remote_wall_s": 0.6461439644917846,
+          "outside_remote_cpu_s": 0.6428582600000148
+        }
+      },
+      "other_wall_s": 0.02477668970823288,
+      "gpu_stage_totals_s": {
+        "validation_s": 0.0944514637812972,
+        "geometry_host_and_upload_s": 1.1899781534448266,
+        "parameter_expand_and_upload_s": 0.2584957582876086,
+        "allocation_s": 0.017961962148547173,
+        "history_device_s": 1.8132879667282105,
+        "history_launch_wait_s": 1.8246225714683533,
+        "interpolation_device_s": 0.01590623999852687,
+        "interpolation_launch_wait_s": 0.02278865035623312,
+        "download_and_host_allocation_s": 0.13687783107161522,
+        "output_validation_s": 0.060793706215918064,
+        "total_s": 3.608051602728665
+      },
+      "device_kernel_s": 1.8291942067267373,
+      "device_kernel_fraction_of_wall": 0.3624128607201418,
+      "model_other_wall_s": 1.7921983916489408,
+      "geometry_misses": 162,
+      "unique_batch_sizes": 143,
+      "repeated_geometry_misses": 19,
+      "first_geometry_miss_s": 1.0282473806291819,
+      "repeated_geometry_miss_s": 0.14073293842375278,
+      "resident_cache": {
+        "hits": 928,
+        "misses": 163,
+        "resident_bytes": 267805440,
+        "cache_bytes": 268435456,
+        "input_bytes": 1169210128,
+        "output_bytes": 949254840
+      }
+    }
+  },
+  "instrumentation_all_arrays_exact": true,
+  "step8_all_arrays_exact": true,
+  "agreement": {
+    "standard_plain_0": {
+      "pooled_123": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_42": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_456": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_789": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      }
+    },
+    "standard_coordination_0": {
+      "pooled_123": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_42": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_456": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_789": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      }
+    },
+    "standard_stages_0": {
+      "pooled_123": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_42": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_456": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_789": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      }
+    },
+    "standard_coordination_1": {
+      "pooled_123": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_42": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_456": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_789": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      }
+    },
+    "standard_stages_1": {
+      "pooled_123": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_42": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_456": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_789": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      }
+    },
+    "standard_plain_1": {
+      "pooled_123": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_42": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_456": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_789": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      }
+    },
+    "standard_stages_2": {
+      "pooled_123": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_42": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_456": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_789": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      }
+    },
+    "standard_plain_2": {
+      "pooled_123": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_42": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_456": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_789": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      }
+    },
+    "standard_coordination_2": {
+      "pooled_123": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_42": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_456": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_789": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      }
+    },
+    "large_plain": {
+      "pooled_1011": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_1213": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_123": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_1415": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_1617": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_42": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_456": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_789": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      }
+    },
+    "large_coordination": {
+      "pooled_1011": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_1213": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_123": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_1415": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_1617": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_42": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_456": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_789": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      }
+    },
+    "large_stages": {
+      "pooled_1011": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_1213": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_123": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_1415": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_1617": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_42": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_456": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      },
+      "pooled_789": {
+        "theta": {
+          "exact": true
+        },
+        "s2": {
+          "exact": true
+        },
+        "count": {
+          "exact": true
+        },
+        "count_s2": {
+          "exact": true
+        },
+        "count_decor": {
+          "exact": true
+        },
+        "observed": {
+          "exact": true
+        },
+        "experiment_index": {
+          "exact": true
+        },
+        "full_theta": {
+          "exact": true
+        },
+        "full_s2": {
+          "exact": true
+        },
+        "predictions": {
+          "exact": true
+        },
+        "prediction_indices": {
+          "exact": true
+        },
+        "predictive_observations": {
+          "exact": true
+        }
+      }
+    }
+  },
+  "step8_agreement": {
+    "42": {
+      "theta": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "s2": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "count": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "count_s2": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "count_decor": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "observed": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "experiment_index": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "full_theta": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "full_s2": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "predictions": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "prediction_indices": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "predictive_observations": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      }
+    },
+    "123": {
+      "theta": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "s2": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "count": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "count_s2": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "count_decor": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "observed": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "experiment_index": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "full_theta": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "full_s2": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "predictions": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "prediction_indices": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "predictive_observations": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      }
+    },
+    "456": {
+      "theta": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "s2": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "count": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "count_s2": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "count_decor": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "observed": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "experiment_index": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "full_theta": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "full_s2": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "predictions": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "prediction_indices": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "predictive_observations": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      }
+    },
+    "789": {
+      "theta": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "s2": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "count": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "count_s2": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "count_decor": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "observed": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "experiment_index": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "full_theta": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "full_s2": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "predictions": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "prediction_indices": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      },
+      "predictive_observations": {
+        "exact": true,
+        "max_absolute_difference": 0.0
+      }
+    }
+  }
+}
