@@ -137,3 +137,8 @@ optional GPU environment, hardware tests, and predeclared quality gates.
 See [STEP4.md](STEP4.md) for the independent-process GPU batching investigation
 and the comparison against multicore CPU execution. Backend cleanup and Mac
 porting remain deferred; hierarchical sampler changes are outside this branch.
+
+## Step 5: resident GPU predictions
+
+See [STEP5.md](STEP5.md) for device-resident experiment geometry and interpolation,
+paired end-to-end timings, and unchanged posterior-quality gates.

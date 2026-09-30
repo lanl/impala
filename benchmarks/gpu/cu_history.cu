@@ -50,12 +50,16 @@ extern "C" __global__ void cu_history(
         if(p<=1.0e-10 && ts>ty)
             scaled=ts-(ts-ty)*exp(-eps*theta/(ts-ty));
         stress=scaled*G*2.0;
+#ifdef PREDICTION_ONLY
+        out[i*n+j]=stress;
+#else
         out[(i*6+0)*n+j]=times[i*n+j];
         out[(i*6+1)*n+j]=eps;
         out[(i*6+2)*n+j]=stress;
         out[(i*6+3)*n+j]=T;
         out[(i*6+4)*n+j]=G;
         out[(i*6+5)*n+j]=rho;
+#endif
     }
     final_aux[j]=Cv;
     final_aux[n+j]=tm;

@@ -18,9 +18,11 @@ os.environ.setdefault("MPLCONFIGDIR", "/tmp/impala-matplotlib")
 
 import argparse
 import contextlib
+import cProfile
 import hashlib
 import json
 import multiprocessing as mp
+import pstats
 import subprocess
 import time
 import traceback
@@ -190,6 +192,7 @@ def run(args):
         "iterations": args.iterations,
         "temperatures": args.temperatures,
         "save_full": args.save_full,
+        "profile": args.profile,
         "commit": subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
         ).strip(),
@@ -203,6 +206,10 @@ def run(args):
             from gpu.history import attach
 
             attach(model.model)
+        if args.backend == "gpu_resident":
+            from gpu.predictions import attach
+
+            attach(model)
         with np.load(
             ROOT / "tests/data/material_preparation_baseline.npz"
         ) as f:
@@ -240,8 +247,21 @@ def run(args):
         # CPU-only workers send no requests while sampling. Their completion
         # wait must scale with run length; broker requests retain a short bound.
         timeout = max(180, args.iterations / 20) if model is None else 180
+        profiler = cProfile.Profile() if args.profile else None
+        if profiler:
+            profiler.enable()
         stats = serve(connections, model, "sampled", timeout=timeout)
+        if profiler:
+            profiler.disable()
         wall = time.perf_counter() - start
+        if profiler:
+            profiler.dump_stats(str(args.output / "sampling.prof"))
+            with (args.output / "profile.txt").open("w") as stream:
+                pstats.Stats(profiler, stream=stream).strip_dirs().sort_stats(
+                    "cumulative"
+                ).print_stats(60)
+        if args.backend == "gpu_resident":
+            stats["resident_evaluation"] = model.eval.statistics()
         for c in connections.values():
             c.send(("postprocess", None))
         serve(connections, model, "done")
@@ -264,6 +284,7 @@ def run(args):
                     Path(__file__),
                     ROOT / "benchmarks/gpu/history.py",
                     ROOT / "benchmarks/gpu/cu_history.cu",
+                    ROOT / "benchmarks/gpu/predictions.py",
                 )
             },
         }
@@ -284,12 +305,13 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument(
         "--backend",
-        choices=["cpu_parallel", "cpu_batched", "gpu_batched"],
+        choices=["cpu_parallel", "cpu_batched", "gpu_batched", "gpu_resident"],
         required=True,
     )
     p.add_argument("--iterations", type=int, default=3000)
     p.add_argument("--temperatures", type=int, default=50)
     p.add_argument("--seeds", type=int, nargs="+", default=[42, 123, 456, 789])
     p.add_argument("--save-full", action="store_true")
+    p.add_argument("--profile", action="store_true")
     p.add_argument("--output", type=Path, required=True)
     run(p.parse_args())
