@@ -1,0 +1,14 @@
+........................................................................ [ 76%]
+......................                                                   [100%]
+============================= slowest 10 durations =============================
+29.50s call     tests/test_clust.py::test_clust
+25.34s call     tests/test_hier.py::test_hier
+13.03s call     tests/test_friedman_fit.py::test_friedman_fit
+7.48s call     tests/test_physical_models_vec.py::test_constparams
+5.49s call     tests/test_physmod_init.py::test_modelinit_1
+5.32s call     tests/test_physmod_init.py::test_modelinit_3
+5.30s call     tests/test_physmod_init.py::test_modelinit_2
+5.29s call     tests/test_theta_prior.py::test_calibPool_prior_shifts_posterior
+4.97s call     tests/test_physmod_init.py::test_modelinit_4
+4.03s call     tests/test_batched_gpu_requests.py::test_heterogeneous_requests_preserve_rows_and_likelihood[cpu]
+94 passed in 115.67s (0:01:55)

@@ -131,3 +131,9 @@ independent original-checkout benchmark. Step-1 artifacts remain unchanged.
 
 See [STEP3.md](STEP3.md) for the separate `perf/gpu-material-history` experiment,
 optional GPU environment, hardware tests, and predeclared quality gates.
+
+## Step 4: batched independent chains
+
+See [STEP4.md](STEP4.md) for the independent-process GPU batching investigation
+and the comparison against multicore CPU execution. Backend cleanup and Mac
+porting remain deferred; hierarchical sampler changes are outside this branch.

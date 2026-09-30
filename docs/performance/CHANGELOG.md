@@ -104,3 +104,15 @@
   Complete results, CSV diagnostics, PDF source and hashes are versioned in
   `results/step3*`; raw artifacts and PDF are in workspace
   `benchmark/changes/step3/`. See [STEP3.md](STEP3.md) for scope and limitations.
+
+## Step 4 — batch independent chains — 2026-09-30
+
+- Branch: `perf/gpu-batched-chains`, based on `perf-step3-20260929`.
+- Added separate-process pooled chains with independent RNG/adaptation state and
+  an evaluation-only batching coordinator. No sampler algorithm changes.
+- Added multicore CPU, batched CPU and batched GPU controls, request-boundary
+  regression tests, and posterior diagnostics using elapsed four-chain wall time.
+- Full hardware-enabled suite: **94 passed in 115.67 seconds**. Initial short
+  runs matched all-temperature parameter/counter arrays exactly; numerical
+  noise/prediction differences passed the existing tolerances.
+- Scaling and full-run results will be recorded separately. See [STEP4.md](STEP4.md).
