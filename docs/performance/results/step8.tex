@@ -1,0 +1,114 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.7in]{geometry}
+\usepackage{booktabs,hyperref}
+\hypersetup{colorlinks=true,urlcolor=blue}
+\emergencystretch=3em
+\title{Impala performance experiment: Step 8}
+\author{Batched proposal likelihoods across temperatures}
+\date{September 30, 2026}
+\begin{document}\maketitle
+\section*{Outcome}
+Four pooled Cu chains, 40,000 states each, 50 temperatures: previous GPU proposal
+path 156.06 s; batched-proposal GPU 154.17 s; batched-proposal parallel CPU 205.90 s.
+CPU retaining scalar proposal likelihoods takes 212.91 s.
+The new GPU path delivers 1.012 times the previous GPU throughput, 1.336
+times the batched-proposal CPU throughput, and 1.381 times the
+scalar-proposal CPU throughput. All predeclared posterior gates: passed.
+Every saved GPU output matches the previous proposal path exactly: True.
+Full hardware-enabled suite: 135 passed in 120.10s.
+\section*{Why worker computation was selected}
+The seed-42 diagnostic used 3,000 states and 50 temperatures. Before optimization,
+wall time was 11.582 s and process CPU time 3.040 s. Remote model requests
+used 9.067 s wall but only 0.534 s CPU. The remaining CPU
+work included 164,400 scalar likelihood calls (0.539 s cumulative).
+This makes proposal likelihoods a useful CPU target, without assuming that
+remote waiting is avoidable communication overhead. After batching, 3,287
+proposal likelihood calls take 0.259 s cumulative; scalar calls remain only
+for initialization.
+
+With batching, seed-42 process CPU time was 2.588 s and instrumented wall
+time 11.061 s. Four-chain profiled outputs matched exactly at all temperatures.
+Profiles perturb timing and are diagnostic evidence, not performance gates.
+Removing scalar calls also removes profiler events; assembling fresh covariance
+arrays has a cost. The profiled CPU reduction is not proof of a CPU speedup.
+Remote wall time includes GPU evaluation, other workers, useful sampler computation
+and scheduling. Summed worker CPU time is not elapsed group time.
+\section*{What changed and what is preserved}
+The opt-in implementation batches diagonal likelihood calculations across
+all temperatures for ordinary and decorrelation parameter proposals. It reads
+the current covariance dictionaries on each call, including changes from swaps
+and Gibbs updates; no covariance cache is retained. C-contiguous residuals
+preserve the scalar per-observation reduction and arithmetic order.
+
+Nine new tests compare exact likelihoods across 1/8/50 temperatures and
+C/Fortran/strided input layouts, with swapped and replaced covariances; the
+global RNG state remains unchanged. Together with Gibbs tests, 27 focused
+tests pass. Proposal generation, acceptance, priors, adaptation, decorrelation
+order, Gibbs draws, swaps and GPU calculations remain unchanged.
+
+The private \texttt{setup.\_batch\_pooled\_proposals} option requires the guarded
+step-7 Gibbs batching path. It is restricted to ordinary deterministic
+material-strength models with diagonal likelihood, untruncated Gibbs noise and
+no discrepancy or custom likelihood/covariance/step overrides. Defaults remain
+unchanged. Both controls and candidates use step-7 Gibbs batching; only proposal
+likelihood evaluation differs.
+\section*{Repeated end-to-end timings}
+Short runs use four chains, each with 3,000 states and 50 temperatures. Execution
+order reverses in round 2 and rotates in round 3. Seconds are elapsed time for the
+entire group. CPU and GPU each have matched old/new proposal controls.
+\begin{center}\begin{tabular}{lrrrr}\toprule
+Backend & Round 1 & Round 2 & Round 3 & Median\\\midrule
+CPU, scalar proposals & 15.99 & 16.33 & 16.17 & 16.17\\
+CPU, batched proposals & 14.98 & 17.26 & 17.43 & 17.26\\
+GPU, scalar proposals & 10.99 & 11.21 & 11.20 & 11.20\\
+GPU, batched proposals & 10.77 & 10.88 & 10.94 & 10.88\\
+\bottomrule\end{tabular}\end{center}
+Jobs run sequentially with one numerical-library thread per worker. Startup/JIT
+and saving are excluded; initialization inside sampling, cache misses, CPU work,
+transfers and coordination remain included. The long study uses fresh prior-proposal
+GPU, batched-proposal GPU and batched-proposal CPU runs.
+Short CPU batching regressed in two of three rounds (median time +6.78 percent),
+whereas all three GPU rounds improved (median throughput +3.01 percent).
+This prompted an additional fresh scalar-proposal CPU long control, run last.
+Both CPU paths retain Gibbs batching. GPU comparisons include both CPU paths.
+The long CPU run improves while short medians regress: CPU evidence is mixed.
+Long timings are one run per backend; a small gain is not a universal speed guarantee.
+Keep the proposal optimization opt-in; no general CPU speedup is established.
+The long GPU gain is about 1.2 percent, smaller than the short median gain;
+without repeated long trials it does not establish a robust speedup beyond
+timing variability. The previous step-7 improvement remains a separate result.
+\section*{Accuracy and posterior quality}
+Short regressions require exact parameters/counters at all temperatures, noise
+relative/absolute tolerances $10^{-8}/10^{-15}$, and prediction tolerances
+$10^{-8}/10^{-10}$. The original frozen prediction/likelihood fixture is unchanged.
+For long diagnostics, discard 20,000 states, no thinning. All 16 parameter/noise
+quantities require R-hat below 1.01, bulk/tail ESS at least 400 and MCSE/SD below
+0.05. Mean differences must be within four combined MCSEs and 0.1 pooled SD;
+prediction means within 0.1 experiment noise SD, using the same 200 selected
+retained draws per chain as the original reference.
+
+Quality gates: passed. Maximum R-hat 1.002585; minimum bulk/tail ESS 2253.48/3345.25.
+Minimum bulk ESS/s: 10.944 on batched-proposal CPU, 14.617 on improved GPU.
+CPU control/candidate saved outputs exactly match: True.
+Fresh optimized CPU arrays reproduce the frozen original arrays exactly: True.
+GPU parameter draws/counters match CPU exactly: True. Noise/prediction
+errors remain within the declared gates. All saved GPU arrays match the previous
+GPU proposal path exactly: True. No tolerance or original artifact was changed.
+\section*{Tracking and reproduction}
+\begingroup\small\raggedright
+Branch: \texttt{perf/gpu-proposal-likelihood}. Measured code: \texttt{a27110d}.\\
+Checkpoint: \texttt{perf-step8-20260930}. Commits use Ayan Biswas
+\texttt{<ayanju04@gmail.com>}; nothing was pushed upstream.
+See \path{docs/performance/STEP8.md} and \path{benchmarks/gpu_proposal_suite.py}
+for commands, controls and limitations. Select the candidate with
+\texttt{--worker-batch-proposals}, alongside \texttt{--worker-batch-gibbs} and the tuned-GPU flags.
+\path{benchmarks/gpu_proposal_report.py} rebuilds compact results and this LaTeX.
+Raw profiles, telemetry and traces are in workspace \path{benchmark/changes/step8/};
+versioned JSON/CSV summaries, profiles, test output, LaTeX and SHA-256 inventory
+are under \path{docs/performance/results/step8*}. The initial worker profiles
+precede the code checkpoint; the timing gates use committed code. Hardware is
+the same 24-core Core Ultra 9 285HX and RTX PRO 5000 Blackwell laptop GPU.
+Cleanup, Mac validation, hierarchical mixing and asynchronous scheduling remain
+outside this checkpoint.
+\par\endgroup
+\end{document}

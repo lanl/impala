@@ -186,3 +186,24 @@
 - See [STEP7.md](STEP7.md), `results/step7-results.json`, `results/step7.tex`,
   and `results/step7-manifest.json`. PDF/raw artifacts are in workspace
   `benchmark/changes/step7/`. No push; hierarchical mixing remains separate.
+
+## Step 8 — batched proposal likelihoods — 2026-09-30
+
+- Branch `perf/gpu-proposal-likelihood`; measured code `a27110d`; local checkpoint
+  `perf-step8-20260930`, authored by Ayan Biswas <ayanju04@gmail.com>.
+- Added guarded, opt-in batching of ordinary/decorrelation proposal likelihoods.
+  Preserve arithmetic/reduction order and read current covariances after swaps;
+  proposal generation, acceptance, RNG stream and GPU math remain unchanged.
+- 27 focused tests and **135 full GPU-enabled tests passed**. Full-temperature
+  short gates pass; all saved long GPU outputs exactly match the prior GPU path.
+  CPU outputs independently reproduce frozen original parameter/noise/counter/
+  prediction arrays. All 16 posterior-quality gates pass.
+- Short GPU median 11.203 -> 10.875 s (+3.01% throughput); long GPU 156.062 ->
+  154.173 s (+1.23%). Long CPU scalar/batched proposals: 212.907/205.902 s;
+  short CPU medians 16.167/17.263 s. CPU evidence is mixed. GPU versus faster
+  fresh CPU: 1.336x throughput/ESS per second, including earlier optimizations.
+- Keep optional: a small measured gain without repeated long trials does not
+  establish a robust general speedup. No default change or algorithm change.
+- See [STEP8.md](STEP8.md), `results/step8-results.json`, `results/step8.tex`
+  and `results/step8-manifest.json`; PDF/raw artifacts in workspace
+  `benchmark/changes/step8/`. No push; hierarchical mixing remains separate.

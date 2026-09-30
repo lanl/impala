@@ -152,3 +152,8 @@ invariant-calculation experiments, and matched CPU/GPU quality comparisons.
 
 See [STEP7.md](STEP7.md) for the opt-in pooled worker optimization, RNG-state
 regressions, matched CPU/GPU controls, and posterior-quality validation.
+
+## Step 8: batched proposal likelihoods
+
+See [STEP8.md](STEP8.md) for current worker profiling, exact proposal-likelihood
+batching, matched CPU/GPU controls, and original-reference quality checks.
