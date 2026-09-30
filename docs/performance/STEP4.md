@@ -90,3 +90,9 @@ For the long-run comparison, use the diagnostics environment:
 
 This applies the existing posterior gates and explicitly replaces summed worker
 times with the simultaneous-chain wall times when calculating ESS/s.
+
+Driver validation refinement: independent CPU workers do not send evaluation
+messages while they sample, so their completion timeout scales with the requested
+run length. Request-serving waits retain a 180-second bound. This was corrected
+between measured jobs, followed by a two-worker smoke check, before the long runs.
+It changes driver liveness handling, not sampler arithmetic or scheduling.

@@ -140,7 +140,7 @@ def worker(connection, config, seed, folder):
             connection.close()
 
 
-def serve(connections, model, terminal):
+def serve(connections, model, terminal, timeout=180):
     active = list(connections)
     batches = Counter()
     groups = Counter()
@@ -151,7 +151,7 @@ def serve(connections, model, terminal):
         retired = []
         for seed in active:
             connection = connections[seed]
-            if not connection.poll(180):
+            if not connection.poll(timeout):
                 raise TimeoutError(f"Chain {seed} stalled")
             tag, payload = connection.recv()
             if tag == "error":
@@ -237,7 +237,10 @@ def run(args):
         start = time.perf_counter()
         for c in connections.values():
             c.send(("start", None))
-        stats = serve(connections, model, "sampled")
+        # CPU-only workers send no requests while sampling. Their completion
+        # wait must scale with run length; broker requests retain a short bound.
+        timeout = max(180, args.iterations / 20) if model is None else 180
+        stats = serve(connections, model, "sampled", timeout=timeout)
         wall = time.perf_counter() - start
         for c in connections.values():
             c.send(("postprocess", None))

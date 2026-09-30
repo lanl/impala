@@ -116,3 +116,12 @@
   runs matched all-temperature parameter/counter arrays exactly; numerical
   noise/prediction differences passed the existing tolerances.
 - Scaling and full-run results will be recorded separately. See [STEP4.md](STEP4.md).
+
+### Step-4 driver refinement
+
+- Initial code checkpoint: `5588570`.
+- Made the CPU-only completion wait scale with run length; the coordinator has no
+  evaluation messages to receive from those workers while sampling. Paused the
+  suite controller between jobs to avoid editing a measured run's code.
+- Two-worker CPU smoke check passed after this correction. Added the sequential
+  scaling/long-run suite driver for reproduction. Sampler/math code is unchanged.
