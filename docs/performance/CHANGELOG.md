@@ -147,3 +147,21 @@
 - Versioned reproducible suite/report scripts, LaTeX, JSON/CSV diagnostics,
   profiles, test log and artifact hashes. See [STEP5.md](STEP5.md) for commands,
   retained failed attempts, interface limits and deferred work.
+
+## Step 6 — GPU stages and history-kernel tuning — 2026-09-30
+
+- Branch `perf/gpu-kernel-tuning`, measured code `6d6ec91`, checkpoint
+  `perf-step6-20260930`. Commits use Ayan Biswas <ayanju04@gmail.com>.
+- Added optional synchronized stage timing and parent wait/send measurements.
+  History CUDA event time was the largest device cost. Transfer/wait measurements
+  include runtime and useful worker work; documented their interpretation limits.
+- Selected 32-thread history blocks plus invariant cube-root/power calculations
+  outside the integration loop. Physics, precision, sampler and defaults unchanged.
+- Three short rounds: median tuned GPU 13.532 s, previous GPU 14.874 s, parallel
+  CPU 21.250 s. Full hardware-enabled suite: 108 passed in 105.36 s.
+- Fresh long runs: tuned GPU 202.711 s, previous GPU 213.558 s, CPU 249.349 s;
+  5.4% higher ESS/s than previous GPU and 23.0% higher than CPU. All saved tuned
+  GPU arrays matched previous GPU exactly. Original-reference and posterior gates
+  passed with unchanged tolerances.
+- Reports retain all screening options, profiles, raw traces and hash inventory.
+  See [STEP6.md](STEP6.md) for commands and the remaining worker-side bottleneck.

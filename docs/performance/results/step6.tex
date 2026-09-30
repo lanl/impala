@@ -1,0 +1,110 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.8in]{geometry}
+\usepackage{booktabs,hyperref}
+\hypersetup{colorlinks=true,urlcolor=blue}
+\emergencystretch=3em
+\title{Impala performance experiment: Step 6}
+\author{GPU timing breakdown and exact-math kernel tuning}
+\date{September 30, 2026}
+\begin{document}\maketitle
+\section*{Outcome}
+Four independent pooled Cu chains, 40,000 states each, 50 temperatures:
+previous resident GPU 213.56 s, tuned GPU 202.71 s, parallel CPU 249.35 s.
+The tuned GPU delivers 1.054 times the previous GPU throughput and
+1.230 times parallel CPU throughput. All predeclared posterior-quality gates:
+passed. The full hardware-enabled suite: 108 passed in 105.36s.
+
+The selected candidate uses 32 threads per history-kernel block and computes
+invariant reference-density cube-root/power terms and a constant cube-root factor
+once per history. The control uses 128 threads and the original loop expressions.
+There are no changes to the physical equations, float64 precision, sampler,
+likelihood, random draws, integration grid or adaptation. Fused multiply-add
+remains disabled. The coordinator and interpolation kernel launch size are unchanged.
+\section*{Where the time goes}
+Each diagnostic run uses four chains with 1,000 states and 50 temperatures.
+Explicit synchronization separates transfer wall time from outstanding kernels.
+CUDA event intervals measure history and interpolation execution. Their host
+launch/wait intervals, recorded in JSON, include those device intervals.
+\begin{center}\begin{tabular}{lrr}\toprule
+Category (seconds) & Control GPU & Tuned GPU\\\midrule
+History CUDA events & 2.338 & 1.795\\
+Interpolation CUDA events & 0.013 & 0.013\\
+Geometry host + upload & 0.353 & 0.363\\
+Parameters + upload & 0.236 & 0.226\\
+Download + host allocation & 0.096 & 0.095\\
+Parent receive/wait/decode & 1.563 & 1.649\\
+Parent send/encode & 0.154 & 0.159\\
+Total instrumented wall time & 4.968 & 4.518\\
+\bottomrule\end{tabular}\end{center}
+These rows are not an additive full budget: host validation, launch and other
+overhead also contribute. Receive time includes useful sampler work in worker
+processes, scheduling, IPC and synchronization; it is not all avoidable overhead.
+Transfer intervals include runtime/allocation costs, not pure DMA. CUDA event
+intervals can include launch gaps. Stage synchronization perturbs timing, so
+speed claims use the separate uninstrumented runs below. Warm-up is excluded
+from stage samples.
+\section*{Screening and repeated calibration timings}
+Screening rotates 40 warmed calls across block sizes 32/64/128/256 and hoisting
+at 32/128, for batches 4/50/100/159/200/317. Predictions must match the control
+bitwise at every call. The selected combination was fastest in the representative
+screen; raw timings and stage events include unsuccessful options too.
+
+Short end-to-end comparisons use four chains with 3,000 states and 50 temperatures.
+Backend order rotates across three rounds. Each row gives elapsed sampling seconds
+for the entire chain group, not the sum of worker times.
+\begin{center}\begin{tabular}{lrrrr}\toprule
+Backend & Round 1 & Round 2 & Round 3 & Median\\\midrule
+Parallel CPU & 19.16 & 21.25 & 21.28 & 21.25\\
+Previous resident GPU & 14.78 & 14.93 & 14.87 & 14.87\\
+Tuned GPU & 13.31 & 13.69 & 13.53 & 13.53\\
+\bottomrule\end{tabular}\end{center}
+All jobs run sequentially; numerical-library threads are fixed to one per worker.
+Startup/JIT and output saving are excluded, but transfers, preparation/cache misses,
+CPU work and coordination are included. The same fixture warm-up precedes sampling.
+The long study has one fresh run per backend. Three short repeats characterize
+local variation; these are not universal timing guarantees. Hardware remains the
+24-core Intel Core Ultra 9 285HX and RTX PRO 5000 Blackwell laptop GPU.
+\section*{Accuracy and sampling quality}
+All-temperature short-chain checks require exact parameter/counter arrays, noise
+relative/absolute tolerances $10^{-8}/10^{-15}$, and prediction tolerances
+$10^{-8}/10^{-10}$. The original frozen 256-case fixture retains its prediction
+and weighted-likelihood gates (absolute likelihood error at most $10^{-6}$).
+Regression tests cover all block sizes with/without hoisting, changes to conditions
+and constants, cache eviction, unequal batches, rate/p thresholds and invalid inputs.
+Instrumentation is checked to preserve predictions.
+
+Long diagnostics discard 20,000 states, without thinning. All 16 parameter/noise
+quantities require rank R-hat below 1.01, bulk/tail ESS at least 400, and MCSE/SD
+below 0.05. Means must agree within four combined MCSEs and 0.1 pooled SD;
+prediction means within 0.1 experiment noise SD. Predictions use the same 200
+retained draws per chain as the reference.
+
+Maximum R-hat: 1.002585. Minimum bulk/tail ESS: 2253.48/3345.25.
+Minimum bulk ESS/s: 9.037 on CPU and 11.117 on tuned GPU.
+Exact tuned-GPU parameter draws and acceptance counts versus CPU: True.
+Maximum noise-array difference: 6.29e-18; maximum prediction difference: 4.91e-15.
+The fresh CPU arrays reproduce the frozen original baseline exactly: True.
+Every saved tuned GPU array matches the previous GPU exactly: True.
+Long model-evaluation time fell from 115.85 to 92.86 s, while parent
+receive/wait/decode rose from 91.31 to 103.86 s. This category includes useful
+worker computation; profile workers before attributing it to avoidable IPC.
+Quality gates: passed. ESS/s always uses group elapsed wall time.
+\section*{Reproduction and scope}
+\begingroup\raggedright
+Branch: \texttt{perf/gpu-kernel-tuning}.\\
+Measured implementation: \texttt{6d6ec91}. Checkpoint: \texttt{perf-step6-20260930}.\\
+See \path{docs/performance/STEP6.md} for exact commands and limitations.
+\path{benchmarks/gpu_kernel_suite.py} reproduces diagnostic, short and long jobs;
+\path{benchmarks/gpu_kernel_report.py} rebuilds compact results and this LaTeX.
+The candidate is explicit: \texttt{--backend gpu\_resident --gpu-block-size 32 --gpu-hoist}.
+The normal experimental default remains the previous GPU configuration.
+
+Raw traces, telemetry, timing samples and logs are under workspace
+\path{benchmark/changes/step6/}. Versioned JSON/CSV summaries, test output, LaTeX
+and an artifact hash manifest are under \path{docs/performance/results/step6*}.
+Original fixtures and earlier results remain unchanged. Commits use Ayan Biswas
+\texttt{<ayanju04@gmail.com>} and are local; nothing was pushed upstream.
+No production-library, Mac, hierarchical-mixing or asynchronous scheduling changes
+are included. Performance gains apply to this tested pooled workload.
+\par\endgroup
+\end{document}

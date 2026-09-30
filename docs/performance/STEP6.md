@@ -114,3 +114,85 @@ CUPY_CACHE_DIR=/tmp/impala-cupy-cache .venv/bin/python \
   --gpu-block-size 32 --gpu-hoist --iterations 40000 --temperatures 50 \
   --output NEW_CANDIDATE
 ```
+
+## Short-run and regression results
+
+Measured implementation: `6d6ec91`. Full hardware-enabled suite:
+**108 passed in 105.36 s**. Focused GPU regressions: 25 passed in 7.40 s.
+All eight short comparisons with the first CPU round passed exact all-temperature
+parameter/counter checks and the declared noise/prediction tolerances.
+
+| Backend | Round 1 (s) | Round 2 (s) | Round 3 (s) | Median (s) |
+| --- | ---: | ---: | ---: | ---: |
+| Parallel CPU | 19.161 | 21.250 | 21.283 | 21.250 |
+| Previous resident GPU | 14.776 | 14.934 | 14.874 | 14.874 |
+| Tuned GPU | 13.314 | 13.687 | 13.532 | 13.532 |
+
+The tuned short-run median is 1.099x the previous GPU throughput and 1.570x
+parallel CPU throughput. CPU variation across rounds reinforces the need to
+report the actual measured controls rather than multiplying historical speedups.
+
+The committed-code diagnostic measured history CUDA event totals falling from
+2.338 to 1.795 s (23.2% less). Instrumented group wall time fell from 4.968 to
+4.518 s. Both diagnostics passed their all-temperature array comparison.
+The difference between kernel and whole-run gains reflects remaining worker,
+preparation, transfer and coordination costs; kernel speedup is not sampler speedup.
+
+## Rebuild the report and artifact inventory
+
+After completing the suite and quality checks, retain the directory names
+`diagnostic`, `short`, `long`, `quality` and `pytest.log` under the artifact root.
+
+```bash
+.venv/bin/python benchmarks/gpu_kernel_report.py \
+  --artifacts ../benchmark/changes/step6 \
+  --original ../benchmark/results/reference
+XDG_CACHE_HOME=/tmp/impala-tex-cache ../benchmark/tools/tectonic \
+  --keep-logs --outdir ../benchmark/changes/step6 \
+  docs/performance/results/step6.tex
+.venv/bin/python benchmarks/gpu_kernel_manifest.py \
+  --artifacts ../benchmark/changes/step6
+```
+
+The manifest verifies committed diagnostic/short/long source hashes and records
+raw artifacts, source, fixtures, Cu inputs and original reference traces.
+The initial screening and first instrumented run preceded the code checkpoint;
+they are exploratory evidence, separate from the committed-code timing gates.
+
+## Long-run result and decision
+
+Fresh four-chain, 40,000-state, 50-temperature sampling:
+
+| Backend | Group sampling wall time |
+| --- | ---: |
+| Previous resident GPU (128 threads, original loop) | 213.558 s |
+| Tuned GPU (32 threads, invariant terms outside loop) | 202.711 s |
+| Parallel compiled CPU | 249.349 s |
+
+The tuned GPU used 5.1% less time than the previous GPU configuration, delivering
+**5.4% higher ESS/s**. Relative to the fresh parallel CPU run, it used 18.7% less
+time and delivered **23.0% higher ESS/s**. The smaller long-run gain compared with
+the short tests is reported explicitly; kernel improvements are not multiplied
+into a hypothetical whole-sampler speedup.
+
+Every saved candidate array (including noise and posterior predictions) matches
+the previous GPU exactly. GPU parameters and all recorded counters also match
+CPU exactly; noise/prediction differences remain at the same rounding scale as
+step 5 (maximum 6.29e-18 and 4.91e-15). Fresh CPU theta, noise, acceptance and
+prediction arrays exactly reproduce the frozen original reference outputs.
+All 16 posterior-quality gates passed: maximum R-hat 1.002585, minimum bulk ESS
+2253.48 and tail ESS 3345.25. Minimum bulk ESS/s is 9.037 on CPU and 11.117 on
+the tuned GPU. No tolerance or reference artifact changed.
+
+Long model-evaluation time fell from 115.849 to 92.864 s, but parent
+receive/wait/decode grew from 91.309 to 103.864 s. The latter includes useful
+worker sampler computation and scheduling, not only IPC. It now accounts for
+about half the candidate wall time. The next useful investigation is a
+worker-side CPU profile before changing batching/scheduling; this experiment
+alone cannot explain the increase or establish that all waiting is avoidable.
+
+Retain the tuning as explicit experimental options. No production defaults or
+sampling algorithms changed. Checkpoint `perf-step6-20260930` on
+`perf/gpu-kernel-tuning`; measured code `6d6ec91`. Final report artifacts and
+reproduction helpers are committed locally under Ayan Biswas
+<ayanju04@gmail.com>. Nothing was pushed upstream.
