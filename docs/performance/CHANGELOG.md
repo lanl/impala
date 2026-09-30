@@ -85,5 +85,22 @@
   including eight new GPU tests. See `results/step3-pytest.txt`.
 - Added transfer-inclusive paired timing and calibration runners, and a pooled
   multi-seed quality comparison with predeclared gates in [STEP3.md](STEP3.md).
-- Results will be recorded in a separate checkpoint; preliminary probes are not
-  a general GPU speedup or posterior-equivalence claim.
+- Final results are recorded below; this remains a benchmark-only prototype.
+
+### Step-3 results
+
+- Prototype code: `7817d9a`; results checkpoint: `perf-step3-20260929`.
+- All four 40,000-state pooled GPU chains passed the predeclared quality gates
+  against the original CPU reference. Parameter draws/counters matched exactly;
+  noise and prediction differences were at rounding scale. Max R-hat 1.002585,
+  min bulk ESS 2253.48, min tail ESS 3345.25.
+- GPU evaluation gains depend on batch size: 1.16x at 50, 2.90x at 200, 4.87x at
+  1000; slower at batches 1–8. All timings include transfers and host work.
+- Real pooled seed-42 calibration at 50 temperatures: compiled CPU 186.68 s,
+  GPU 211.88 s (13.5% slower). Small-batch calibration also favored CPU.
+- Decision: retain compiled CPU for this workflow; keep GPU as an experimental
+  adapter. Historical-original ESS/s gains are not gains over compiled CPU.
+- Added reproducible suite/call-size scripts and array-level diagnostic detail.
+  Complete results, CSV diagnostics, PDF source and hashes are versioned in
+  `results/step3*`; raw artifacts and PDF are in workspace
+  `benchmark/changes/step3/`. See [STEP3.md](STEP3.md) for scope and limitations.

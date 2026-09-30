@@ -138,6 +138,18 @@ def main(args):
             comparison.ess_per_second_ratio_historical_cpu.max()
         ),
         "exact_cold_chains": exact,
+        "array_agreement": {
+            str(seed): {
+                key: {
+                    "exact": bool(np.array_equal(r[key], g[key])),
+                    "max_absolute_difference": float(
+                        np.max(np.abs(r[key] - g[key]))
+                    ),
+                }
+                for key in ("theta", "s2", "count", "predictions")
+            }
+            for seed, r, g in zip(SEEDS, rr, gr)
+        },
     }
     result["all_quality_gates_pass"] = bool(
         rs["all_converged"]

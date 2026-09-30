@@ -1,0 +1,400 @@
+{
+  "path_base": "workspace root (parent of impala checkout)",
+  "artifacts": [
+    {
+      "path": "benchmark/changes/step3/call_sizes/results.json",
+      "bytes": 834,
+      "sha256": "76ae8dc1622b2054f3b4d38e88bf9d3ba748e95608f7bee0148cbd5222b369a6"
+    },
+    {
+      "path": "benchmark/changes/step3/call_sizes.log",
+      "bytes": 6790,
+      "sha256": "280930ae298bb37a54e7b43b2db8ac2bb9243e013fffa38bd201e0d4709f971a"
+    },
+    {
+      "path": "benchmark/changes/step3/control/original_comparison.json",
+      "bytes": 74,
+      "sha256": "741b807fae3430163b4a44760b424d91a07a4155701a95bcaeaa147e3cf09415"
+    },
+    {
+      "path": "benchmark/changes/step3/control/pooled_42/draws.npz",
+      "bytes": 4651804,
+      "sha256": "ec4ddb145b2e1eb5dd732c3fca7263d8a1f856a8f65d99d9406ef32bd63d356f"
+    },
+    {
+      "path": "benchmark/changes/step3/control/pooled_42/metadata.json",
+      "bytes": 1140,
+      "sha256": "eb82682d81ebb9129feb0e461824765e8ce586429f188f5d571d2198cee46aa3"
+    },
+    {
+      "path": "benchmark/changes/step3/control_pooled_42.log",
+      "bytes": 80184,
+      "sha256": "198d148bd7fca0e6f34b015e31444be8c11af0fd58ceff5c91b20626db1fe8a8"
+    },
+    {
+      "path": "benchmark/changes/step3/environment.json",
+      "bytes": 395,
+      "sha256": "a90057c0b4db2a4b5a95cdfefc076d6f98559c1341ad80febc8e6d0e538b7a5a"
+    },
+    {
+      "path": "benchmark/changes/step3/micro/fixture.npz",
+      "bytes": 1259778,
+      "sha256": "8bbfb7111307ec7d088e5633c233370ce60ecf30fbd8f91b5f5f61c6221c1763"
+    },
+    {
+      "path": "benchmark/changes/step3/micro/results.json",
+      "bytes": 14309,
+      "sha256": "c2d3ff451267f49c74cffa521cacb51c2fee6786036eaad6370915c2ec76c3ca"
+    },
+    {
+      "path": "benchmark/changes/step3/micro.log",
+      "bytes": 2180,
+      "sha256": "e8f2824becd851db6fc30d51c03cc274dd7a35761bf25df1e84a4bcdaf94e172"
+    },
+    {
+      "path": "benchmark/changes/step3/pooled_123/draws.npz",
+      "bytes": 4644685,
+      "sha256": "85f92c9586fe9945652a29b8f921d35831282966e12aa35500e41213812acfac"
+    },
+    {
+      "path": "benchmark/changes/step3/pooled_123/metadata.json",
+      "bytes": 1140,
+      "sha256": "9286b0c595304f137c847b3fca3c0ab5ec75299e0e491adb1fc6d465c077ccab"
+    },
+    {
+      "path": "benchmark/changes/step3/pooled_123.log",
+      "bytes": 92446,
+      "sha256": "b05131796604a7fccb3f1400657bf79c0826726d3961a7ebef7ef0d6672318c9"
+    },
+    {
+      "path": "benchmark/changes/step3/pooled_42/draws.npz",
+      "bytes": 4651846,
+      "sha256": "f724c307f62dac9aad0c0ea56417be6d281dc6a832d1d3a2641e59bdf5385839"
+    },
+    {
+      "path": "benchmark/changes/step3/pooled_42/metadata.json",
+      "bytes": 1140,
+      "sha256": "d56db27afe7fad9c544bcb2c84e0482bb54b11f64c1fe7c85e64a5670c7bc69b"
+    },
+    {
+      "path": "benchmark/changes/step3/pooled_42.log",
+      "bytes": 90655,
+      "sha256": "2df1feb6a6915fae909fe4e41bef0c8a8c5d8de1548cee1e4a1cb64fb0070c23"
+    },
+    {
+      "path": "benchmark/changes/step3/pooled_456/draws.npz",
+      "bytes": 4654202,
+      "sha256": "f42743fd0c12b6da6f137b5d3261954d1d669f0ea785f6351406999f5b127ac3"
+    },
+    {
+      "path": "benchmark/changes/step3/pooled_456/metadata.json",
+      "bytes": 1141,
+      "sha256": "a9ce3a0c5799aa7c5bff6aa516dea21c77d1023791a04e9f726d31689bb75607"
+    },
+    {
+      "path": "benchmark/changes/step3/pooled_456.log",
+      "bytes": 90495,
+      "sha256": "0ac675ad91280c7a879c3f50f070bf0781ec7d351085300b6ffd5c2716b0b909"
+    },
+    {
+      "path": "benchmark/changes/step3/pooled_789/draws.npz",
+      "bytes": 4695594,
+      "sha256": "082066a143efc4180f686b952b230fb5bd80f5279fb6a45196186e82d9fb9980"
+    },
+    {
+      "path": "benchmark/changes/step3/pooled_789/metadata.json",
+      "bytes": 1140,
+      "sha256": "5cb63c994a626e33c79a44408962f1a415bbe45b5b8274c8a77095f7fdfa66e2"
+    },
+    {
+      "path": "benchmark/changes/step3/pooled_789.log",
+      "bytes": 86967,
+      "sha256": "97d07c05402f3e514886b61f5d628290c9a9bcfdb0d7b81b855705719d9df5b8"
+    },
+    {
+      "path": "benchmark/changes/step3/quality/comparison.csv",
+      "bytes": 2933,
+      "sha256": "60519029a0c7f5fe2ebd42322b891d20bb2c21426547c0a31d009ef19f9fa095"
+    },
+    {
+      "path": "benchmark/changes/step3/quality/gpu_diagnostics.csv",
+      "bytes": 3756,
+      "sha256": "7a5fc127bf87fac0263b6466d11372eadbe755a137fd89014937a640383ee87f"
+    },
+    {
+      "path": "benchmark/changes/step3/quality/original_diagnostics.csv",
+      "bytes": 3761,
+      "sha256": "9afa0e2ea51eeada1e9a55bb564c388ba4b177719bcdeeb6185fe66a0c5faccc"
+    },
+    {
+      "path": "benchmark/changes/step3/quality/prediction_comparison.npz",
+      "bytes": 6196,
+      "sha256": "c44ed4685ae031ac5f0f2fc31d0771499dcd1329406fe4da7c9ec667de779a95"
+    },
+    {
+      "path": "benchmark/changes/step3/quality/summary.json",
+      "bytes": 2846,
+      "sha256": "13a831cd316e2fa52305b9f3287b99fac2ce9f2aa2e23b3c14cbc6ed329fe613"
+    },
+    {
+      "path": "benchmark/changes/step3/quality-selfcheck/comparison.csv",
+      "bytes": 2670,
+      "sha256": "b6474ae540cfc27e7b8409e9533553ea2dd6cd973aae7a79b71ca1357acde065"
+    },
+    {
+      "path": "benchmark/changes/step3/quality-selfcheck/gpu_diagnostics.csv",
+      "bytes": 3761,
+      "sha256": "9afa0e2ea51eeada1e9a55bb564c388ba4b177719bcdeeb6185fe66a0c5faccc"
+    },
+    {
+      "path": "benchmark/changes/step3/quality-selfcheck/original_diagnostics.csv",
+      "bytes": 3761,
+      "sha256": "9afa0e2ea51eeada1e9a55bb564c388ba4b177719bcdeeb6185fe66a0c5faccc"
+    },
+    {
+      "path": "benchmark/changes/step3/quality-selfcheck/prediction_comparison.npz",
+      "bytes": 5639,
+      "sha256": "15fef42c91c4104ab8e8c13f912aaf33709de8a2ff940885790feea516ce2576"
+    },
+    {
+      "path": "benchmark/changes/step3/quality-selfcheck/summary.json",
+      "bytes": 2602,
+      "sha256": "a310f5a109fc232ca399a8aa49d61220cd3ebc91813dd9c73d1dd5867b692ea2"
+    },
+    {
+      "path": "benchmark/changes/step3/quality-selfcheck.log",
+      "bytes": 2602,
+      "sha256": "a310f5a109fc232ca399a8aa49d61220cd3ebc91813dd9c73d1dd5867b692ea2"
+    },
+    {
+      "path": "benchmark/changes/step3/quality.log",
+      "bytes": 3298,
+      "sha256": "ee439b658618d519af188868f6b7b9cdeceeb512d70cd226d143c933e8c2560c"
+    },
+    {
+      "path": "benchmark/changes/step3/report-build.log",
+      "bytes": 3220,
+      "sha256": "49d3ea1ad55be63fa4cb35e0bc81a5adc330260c9ac681bc69eeb0e9ef6eb469"
+    },
+    {
+      "path": "benchmark/changes/step3/smoke/comparison.json",
+      "bytes": 633,
+      "sha256": "19e209293eb2a37c79585fbcf4c3da12cfa2ac84f2d97a01b4f36b06731e92b7"
+    },
+    {
+      "path": "benchmark/changes/step3/smoke/cpu_hier_42/draws.npz",
+      "bytes": 3664976,
+      "sha256": "1d980a94ac4b56659322b02c8ce5a2376c2c82ad5335c7cc596602f11d8ecb1b"
+    },
+    {
+      "path": "benchmark/changes/step3/smoke/cpu_hier_42/metadata.json",
+      "bytes": 1132,
+      "sha256": "c6197e10752dfe358b69a22087d886bf6fde826e05e59a01233535c9c49896ef"
+    },
+    {
+      "path": "benchmark/changes/step3/smoke/cpu_pooled_42/draws.npz",
+      "bytes": 1217470,
+      "sha256": "74e4d05f19dec6c662093163a91d1ad48aba4ee21ed1aa5394ee910b31678fda"
+    },
+    {
+      "path": "benchmark/changes/step3/smoke/cpu_pooled_42/metadata.json",
+      "bytes": 1137,
+      "sha256": "53392ea9d26929d695c20d1aa21aab918fd1ac7ebcfd239e5c40caab532b95c3"
+    },
+    {
+      "path": "benchmark/changes/step3/smoke/gpu_hier_42/draws.npz",
+      "bytes": 3664997,
+      "sha256": "d2e219e9f47b17eeebec8cf177e6ad4a5425528028e6320953e6065ad40e5785"
+    },
+    {
+      "path": "benchmark/changes/step3/smoke/gpu_hier_42/metadata.json",
+      "bytes": 1136,
+      "sha256": "272713b5fbc64f835e14b86a6feec56489bd8a107e536528106dffa68069f1a3"
+    },
+    {
+      "path": "benchmark/changes/step3/smoke/gpu_pooled_42/draws.npz",
+      "bytes": 1217520,
+      "sha256": "113fae658728849c6b17e6aa0bc8984f45b33f1fa171f275cffbedf5db292e1e"
+    },
+    {
+      "path": "benchmark/changes/step3/smoke/gpu_pooled_42/metadata.json",
+      "bytes": 1136,
+      "sha256": "988385831dc2ebcd451057b78c3920ed2f51b6448d5f8145b2f19eff929af01b"
+    },
+    {
+      "path": "benchmark/changes/step3/smoke_cpu_hier_42.log",
+      "bytes": 4927,
+      "sha256": "ab5e0499a91c1b69b1b8ec14938e26e5919bf4c510ee3fe19d0ad6215190b4b9"
+    },
+    {
+      "path": "benchmark/changes/step3/smoke_cpu_pooled_42.log",
+      "bytes": 3093,
+      "sha256": "be4c421594eacf4679bc8239e8163874ef257846f0e1eadc1b41286276bc1221"
+    },
+    {
+      "path": "benchmark/changes/step3/smoke_gpu_hier_42.log",
+      "bytes": 6687,
+      "sha256": "f8d6be5340cd82169a83184cbdb9c519b2feb228fb2796d1e9122bd96bc7fd0f"
+    },
+    {
+      "path": "benchmark/changes/step3/smoke_gpu_pooled_42.log",
+      "bytes": 5347,
+      "sha256": "e14e3824b89b091c2a4bd7cf7dbafd2709162e7c9410eacd16894fc8624ded49"
+    },
+    {
+      "path": "benchmark/changes/step3/step3.log",
+      "bytes": 9745,
+      "sha256": "ccc4b9792a324e334a34e9266767cecc6d5cce03ab7c96c46fa6b265e0c3f516"
+    },
+    {
+      "path": "benchmark/changes/step3/step3.pdf",
+      "bytes": 41158,
+      "sha256": "1059665f7ba1b569f048f64c7299c17cb873fe21fd5de60ed120e4a504381b47"
+    },
+    {
+      "path": "benchmark/changes/step3/suite.log",
+      "bytes": 684,
+      "sha256": "882576510d59b757a22310bb0af104daed8f293bbf74fef03aad6b27fe1b94a3"
+    },
+    {
+      "path": "benchmark/changes/step3/suite_driver.py",
+      "bytes": 1413,
+      "sha256": "431c5b79222cbcb1189f4621065d799d342e97a8d20f8c0bc012dd149777d48e"
+    },
+    {
+      "path": "benchmark/changes/step3/test-pairplot.png",
+      "bytes": 86215,
+      "sha256": "3736128186695f345a0c479104d7cde22bb540fbc69968fd9fff94743b949299"
+    },
+    {
+      "path": "benchmark/results/reference/pooled_123/draws.npz",
+      "bytes": 4644715,
+      "sha256": "5c4768a212fa9217b9d11874716176935b6e9df0abc709e11abc238080142011"
+    },
+    {
+      "path": "benchmark/results/reference/pooled_123/metadata.json",
+      "bytes": 3260,
+      "sha256": "8f75bd1104a345590b511b028c7f900c93ef578abff2c0ba4835ff15b011e188"
+    },
+    {
+      "path": "benchmark/results/reference/pooled_42/draws.npz",
+      "bytes": 4651804,
+      "sha256": "ec4ddb145b2e1eb5dd732c3fca7263d8a1f856a8f65d99d9406ef32bd63d356f"
+    },
+    {
+      "path": "benchmark/results/reference/pooled_42/metadata.json",
+      "bytes": 3258,
+      "sha256": "5c53abda1c6e2fd85ee27b544bb96c5ebf5eef4f98d187a8cd17229c66c79cad"
+    },
+    {
+      "path": "benchmark/results/reference/pooled_456/draws.npz",
+      "bytes": 4654225,
+      "sha256": "108a5d467c3f25866e51b2a137f9616099031cf851883e7eb05c0d6360ee1af1"
+    },
+    {
+      "path": "benchmark/results/reference/pooled_456/metadata.json",
+      "bytes": 3261,
+      "sha256": "0d5effc45fd9aae29cd00eb5cd992447a380b2823ca0dbf329068a5da4b4f5f9"
+    },
+    {
+      "path": "benchmark/results/reference/pooled_789/draws.npz",
+      "bytes": 4695671,
+      "sha256": "1dfea573e6299b292e85ac9a6134540371d388fe48a9ff30edac9dc28c8247cc"
+    },
+    {
+      "path": "benchmark/results/reference/pooled_789/metadata.json",
+      "bytes": 3258,
+      "sha256": "7c3e369da73b1d30395c6c19473fd6fa53bf9e54255342c0fb530a49b6a5320f"
+    },
+    {
+      "path": "impala/benchmarks/gpu/cu_history.cu",
+      "bytes": 2776,
+      "sha256": "782581361ed92780de365fffa2157598cc73c83ed93dc92dda55b622eee2c192"
+    },
+    {
+      "path": "impala/benchmarks/gpu/history.py",
+      "bytes": 5531,
+      "sha256": "c01e594edfba4a7ccf97cc34bdd24dfbc42cea9b241b583afd295d378e1f6659"
+    },
+    {
+      "path": "impala/benchmarks/gpu/requirements.txt",
+      "bytes": 218,
+      "sha256": "14574029a071771d37008245d866c2cb035754d94ade2537dfbd4e0db849dad8"
+    },
+    {
+      "path": "impala/benchmarks/gpu_calibration.py",
+      "bytes": 3760,
+      "sha256": "3f2c2deaa0d38733f9fd2f718fb50b484b5c00df5d8f6062d9b7ba01568a585e"
+    },
+    {
+      "path": "impala/benchmarks/gpu_call_sizes.py",
+      "bytes": 1412,
+      "sha256": "b5bfce7f0910ce226537b196dcd9e0ef6ecabbd5d2ee0b4d5fe412dd763e9e30"
+    },
+    {
+      "path": "impala/benchmarks/gpu_material_history.py",
+      "bytes": 5067,
+      "sha256": "bfe623deed26b2bc421b392f7e38345d4427727e221bb0a603849071c16d8a5e"
+    },
+    {
+      "path": "impala/benchmarks/gpu_quality.py",
+      "bytes": 6390,
+      "sha256": "a91df5a5b39e88ae53854fbb53e716e321c15ef1cd9a52d93f695409c8762d0b"
+    },
+    {
+      "path": "impala/benchmarks/gpu_suite.py",
+      "bytes": 2603,
+      "sha256": "934a21dd07384918dc0b67d40c703154d2242dedd59810a44f42c9fd62baf9a7"
+    },
+    {
+      "path": "impala/docs/performance/STEP3.md",
+      "bytes": 8064,
+      "sha256": "434d713a5d77eb829920a921368b463fec442c0235bb2eaa53d69b34fa11a359"
+    },
+    {
+      "path": "impala/docs/performance/results/step3-comparison.csv",
+      "bytes": 2933,
+      "sha256": "60519029a0c7f5fe2ebd42322b891d20bb2c21426547c0a31d009ef19f9fa095"
+    },
+    {
+      "path": "impala/docs/performance/results/step3-gpu-diagnostics.csv",
+      "bytes": 3756,
+      "sha256": "7a5fc127bf87fac0263b6466d11372eadbe755a137fd89014937a640383ee87f"
+    },
+    {
+      "path": "impala/docs/performance/results/step3-original-diagnostics.csv",
+      "bytes": 3761,
+      "sha256": "9afa0e2ea51eeada1e9a55bb564c388ba4b177719bcdeeb6185fe66a0c5faccc"
+    },
+    {
+      "path": "impala/docs/performance/results/step3-pytest.txt",
+      "bytes": 907,
+      "sha256": "0e4260d8a732d6394fa58dd17ca65f8a8b668d789345301eec03d9ce595406fc"
+    },
+    {
+      "path": "impala/docs/performance/results/step3-results.json",
+      "bytes": 13988,
+      "sha256": "346c5b79ddd2852803496b6c24cb16829e73341bc99daa7a8749b6359444c6f7"
+    },
+    {
+      "path": "impala/docs/performance/results/step3.tex",
+      "bytes": 7799,
+      "sha256": "8af2bdd19ab5bbb588b2645f28ba0036fede5d22423a16f714c5f78dc3dd5dd3"
+    },
+    {
+      "path": "impala/tests/data/material_preparation_baseline.npz",
+      "bytes": 674077,
+      "sha256": "bd6cc44045dc67b4febb63cbacae44141a954c7dc03d2e7a30e0d40bcaf973ef"
+    },
+    {
+      "path": "impala/tests/test_gpu_material_history.py",
+      "bytes": 4016,
+      "sha256": "5af038944bcb0dc61c82522728c379f304a459fe0a8a686e4c8b084f33215f73"
+    },
+    {
+      "path": "impala/uv.lock",
+      "bytes": 408209,
+      "sha256": "5bbce0c9aaf5fe7c1bfb8579d3666fe3f4ce216b1968eff5a9d1355f9f1b492d"
+    }
+  ]
+}

@@ -73,3 +73,60 @@ seeds for the quality study. `--backend cpu` selects the compiled CPU control.
 For small-batch smoke/timing comparisons, use 3,000 states and eight temperatures.
 The hardware tests are skipped unless `IMPALA_TEST_GPU=1`; ordinary CPU CI does
 not require CuPy or a GPU. Do not regenerate any baseline fixture with this code.
+
+To reproduce the complete sequential calibration job order, use
+`benchmarks/gpu_suite.py --output NEW_SUITE_DIRECTORY`. It runs the two-mode
+small-batch comparisons, one fresh 50-temperature compiled-CPU control, then the
+four pooled GPU chains. Run quality diagnostics with the existing ArviZ environment:
+
+```bash
+../benchmark/.venv/bin/python benchmarks/gpu_quality.py \
+  --reference ../benchmark/results/reference \
+  --candidate NEW_SUITE_DIRECTORY --output NEW_DIAGNOSTICS_DIRECTORY
+```
+
+The original CPU reference remains untouched. Its sampling-time comparison is
+historical; only the new compiled-CPU control provides a contemporaneous runtime.
+
+## Result and decision — 2026-09-29
+
+**Retain the compiled CPU for the current calibration workflow.** The GPU
+prototype is accurate and helps large batches, but does not improve the tested
+sampler. Production library code and default configuration are unchanged.
+
+- Implementation measured: `7817d9a`; final checkpoint: `perf-step3-20260929`.
+- Full hardware-enabled suite: **91 passed in 113.57 seconds**.
+- Original 256-case maximum prediction error: `5.97e-16 Mbar`; maximum weighted
+  log-likelihood error: `1.75e-10`, both within the existing numerical gates.
+- Four 40,000-state pooled GPU runs at 50 temperatures passed **all 16**
+  convergence/quality checks. Maximum R-hat: **1.002585**; minimum bulk ESS:
+  **2253.48**; minimum tail ESS: **3345.25**.
+- Parameter draws and acceptance counters matched the original exactly at all
+  four seeds. Noise-variance differences were below `3.7e-18`; saved prediction
+  differences were below `7.1e-17 Mbar`. Joint parameter/noise arrays are therefore
+  not bitwise identical, although parameter trajectories are identical.
+- Transfer-inclusive model speedups vs compiled CPU at batches 1/4/8/50/200/1000:
+  **0.19x / 0.28x / 0.38x / 1.16x / 2.90x / 4.87x**. Values below 1 mean slower.
+- Eight-temperature, 3,000-state seed-42 pooled sampling: CPU **3.55 s**, GPU
+  **8.90 s**. Hierarchical: CPU **8.01 s**, GPU **12.32 s**.
+- Matched 50-temperature, 40,000-state pooled seed 42: CPU **186.68 s**, GPU
+  **211.88 s**, so GPU was **13.5% slower**. The four GPU runs took
+  211.88/215.08/211.44/202.79 seconds. The fresh CPU control exactly reproduced
+  the original seed-42 parameter/noise arrays, saved predictions and counters.
+- A separate instrumented 3,000-state CPU run at 50 temperatures recorded 3,288
+  model calls with mean batch **39.72**, range **1–50**. Constraint filtering
+  reduces actual batch sizes; the fixed batch-50 result is not an end-to-end gain.
+  This early-chain sample is explanatory evidence, not a full-run profile.
+- GPU ESS/s was 1.14x the **historical original** CPU reference. That older CPU
+  predates steps 1 and 2; do not present this as a gain over compiled CPU.
+- The new quality comparator also passed an original-versus-itself sanity check.
+  Hierarchical posterior equivalence remains unestablished because its original
+  reference did not converge; only short execution/numerical checks were made.
+
+Raw artifacts and PDF: workspace `benchmark/changes/step3/`. Versioned compact
+results, diagnostics, test log, LaTeX source and manifest are under
+`docs/performance/results/step3*`. No baseline artifacts were overwritten.
+A future GPU experiment should target naturally larger batches, such as batching
+independent chains, before considering integration into the sampler. The current
+prototype alone does not justify increasing temperatures or changing inference
+settings merely to make GPU timing look better.

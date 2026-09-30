@@ -1,0 +1,135 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.8in]{geometry}
+\usepackage{booktabs,hyperref}
+\hypersetup{colorlinks=true,urlcolor=blue}
+\emergencystretch=3em
+\title{Impala performance experiment: Step 3}
+\author{Float64 GPU material-history prototype}
+\date{September 29, 2026}
+\begin{document}\maketitle
+\section*{Decision}
+GPU benefit depends on batch size. It is substantially slower than the compiled
+CPU at small batches, modestly faster at 50 parameter sets, and substantially
+faster for large batches. Keep this as an experimental benchmark adapter rather
+than a default GPU backend. In the matched seed-42 calibration, GPU sampling
+was 13.5\% slower than the compiled CPU. The full 50-temperature pooled study passed
+the predeclared posterior-quality gates. The known hierarchical convergence
+issue remains unresolved; short hierarchical runs certify execution only.
+\section*{Implementation and setup}
+The prototype assigns one CUDA thread to each material history and advances all
+100 steps in that thread. It uses double precision, disables fused multiply-add,
+and does not enable fast math. Cu PTW equations match the CPU implementation;
+GPU transcendental functions can still round differently. Interpolation and
+MCMC stay on the CPU. Conditions, parameters and initial states are transferred
+every call; full histories and final state are returned. Timings include host
+preparation, allocation, transfers and interpolation. No persistent device grid
+cache is used; CuPy can reuse memory-pool allocations.
+
+Hardware: NVIDIA RTX PRO 5000 Blackwell Generation Laptop GPU, compute capability
+12.0, about 24 GB memory. CuPy 14.2.0 and CUDA runtime/NVRTC 13.2.51 were installed
+as optional virtual-environment packages. The system toolkit was root-readable
+only, so no system permission changes were made. An existing GPU process was
+left untouched; sequential timings are observations under this machine's load.
+\section*{Numerical accuracy}
+All 91 tests passed in 113.57 seconds, including eight explicit GPU hardware tests.
+Tests cover pooled/hierarchical batches, full histories and final fields,
+continued states, edited inputs, different integration grids, small-p branches,
+strain-rate thresholds and invalid PTW parameters. The original 256-case fixture
+had maximum prediction error 5.97e-16 Mbar and maximum weighted log-likelihood
+error $1.75\times10^{-10}$. Prediction tolerances are relative $10^{-8}$
+and absolute $10^{-10}$ Mbar. The log likelihood absolute tolerance is $10^{-6}$.
+Baseline fixtures were not regenerated.
+
+Unlike step 2, exact GPU chain equality is not required or expected. Tiny
+rounding changes can eventually change MCMC accept/reject decisions. We assess
+posterior agreement and effective samples per second in addition to numerical
+fixtures, using criteria declared before calibration runs.
+\section*{Transfer-inclusive model timing}
+Thirty paired, alternating CPU/GPU evaluations per batch, after warm-up.
+CPU is the compiled step-2 implementation. Times are milliseconds; speedup is
+CPU time divided by GPU time. Kernel-only times were measured separately with
+CUDA events and exclude host work and transfers.
+\begin{center}\begin{tabular}{rrrrr}\toprule
+Batch & CPU (ms) & GPU (ms) & Kernel (ms) & Speedup\\\midrule
+1 & 0.446 & 2.344 & 1.811 & 0.19\\
+4 & 0.643 & 2.293 & 1.912 & 0.28\\
+8 & 0.898 & 2.345 & 1.915 & 0.38\\
+50 & 3.606 & 3.099 & 2.115 & 1.16\\
+200 & 13.104 & 4.512 & 2.136 & 2.90\\
+1000 & 67.609 & 13.887 & 2.121 & 4.87\\
+\bottomrule\end{tabular}\end{center}
+A batch of $B$ parameter sets expands to $6B$ copper experiment histories.
+Near-constant kernel latency at these sizes explains why small batches lose.
+Startup/compilation is excluded from these warmed timings. First-call metadata
+is recorded, but the CUDA disk cache may already be populated.
+An instrumented 3,000-state pooled CPU run at 50 temperatures recorded
+3,288 model calls, with mean batch size 39.72 and range 1--50. Constraint
+filtering therefore makes real calls smaller than the fixed batch-50 test.
+This early-chain sample helps explain the crossover; it is not a full-run profile.
+\section*{Calibration timing}
+Small-batch smoke runs: seed 42, 3,000 states, eight temperatures.
+\begin{center}\begin{tabular}{lrrr}\toprule
+Mode & CPU (s) & GPU (s) & Speedup\\\midrule
+pooled & 3.55 & 8.90 & 0.40\\
+hier & 8.01 & 12.32 & 0.65\\
+\bottomrule\end{tabular}\end{center}
+The larger study used 40,000 states and 50 temperatures. Fresh compiled CPU
+seed 42 took 186.68 seconds; GPU seed 42 took 211.88 seconds,
+a speedup of 0.88x. This single current CPU timing is not a multi-seed
+throughput confidence interval. GPU sampling times:
+\begin{center}\begin{tabular}{rr}\toprule
+Seed & Sampling seconds\\\midrule
+42 & 211.88\\
+123 & 215.08\\
+456 & 211.44\\
+789 & 202.79\\
+\bottomrule\end{tabular}\end{center}
+The fresh compiled CPU control was also compared with the saved original seed-42
+chain. Exact agreement for the checked arrays: True.
+\section*{Pooled posterior quality}
+Four independent GPU seeds (42, 123, 456, 789) are compared with the preserved
+original CPU study at the same configuration. Discard the first 20,000 states
+of each chain; analyze all remaining states without thinning. Diagnostics cover
+10 material parameters and six noise standard deviations.
+
+Predeclared gates: rank R-hat below 1.01; bulk and tail ESS at least 400;
+MCSE(mean)/SD below 0.05; posterior-mean differences at most four combined MCSEs
+and 0.1 pooled posterior SD; maximum prediction-mean difference at most 0.1 noise
+SD. Prediction checks use the same 200 retained draws per run as the baseline.
+\begin{center}\begin{tabular}{lrr}\toprule
+Diagnostic & Original CPU & GPU\\\midrule
+Maximum R-hat & 1.003 & 1.003\\
+Minimum bulk ESS & 2253 & 2253\\
+Minimum tail ESS & 3345 & 3345\\
+Minimum bulk ESS/s & 2.342 & 2.679\\
+\bottomrule\end{tabular}\end{center}
+Maximum posterior mean difference: $4.21\times10^{-13}$ combined MCSEs
+and $2.12\times10^{-15}$ posterior SD. Maximum prediction-mean difference:
+$2.47\times10^{-15}$ noise SD. All quality gates passed. Credible-interval
+endpoint differences are recorded separately in the comparison CSV.
+All four parameter trajectories and acceptance counters matched exactly.
+Noise-variance differences were below $3.7\times10^{-18}$; saved-prediction
+differences were below $7.1\times10^{-17}$ Mbar. Thus the combined parameter
+and noise arrays are not bitwise identical despite identical parameter draws.
+
+The ESS/s table uses total sampling seconds across four runs. Original CPU
+runtimes are historical and precede both CPU optimizations. Thus the observed
+GPU/original ESS/s ratio (1.14) must not be described as the gain over
+the current compiled CPU. Only the fresh seed-42 timing provides that direct
+runtime comparison. The pooled result does not establish hierarchical quality
+or generalize to other material models.
+\section*{Tracking and reproduction}
+Prototype commit: \texttt{7817d9a}. Branch: \texttt{perf/gpu-material-history}.\\
+Final checkpoint: \texttt{perf-step3-20260929}. All commits and tags are local.
+Production CPU library code and defaults are unchanged. Source, tests, pinned
+optional requirements, declared gates, compact results, CSV diagnostics and
+LaTeX source are in Git. Raw traces, logs and this PDF are in workspace
+\texttt{benchmark/changes/step3/}, with a versioned hash manifest.
+
+See \path{docs/performance/STEP3.md} for individual commands and limitations.
+The complete sequential calibration order is reproducible with
+\path{benchmarks/gpu_suite.py}; quality analysis uses
+\path{benchmarks/gpu_quality.py} in the ArviZ environment. GPU tests require
+\texttt{IMPALA\_TEST\_GPU=1}; normal CPU CI skips them. Installation reference:
+\url{https://docs.cupy.dev/en/stable/install.html}.
+\end{document}

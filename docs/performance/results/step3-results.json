@@ -1,0 +1,626 @@
+{
+  "micro": {
+    "commit": "7817d9a4f839faf7fc76b2208995dc79442728e8",
+    "kernel_sha256": "782581361ed92780de365fffa2157598cc73c83ed93dc92dda55b622eee2c192",
+    "adapter_sha256": "c01e594edfba4a7ccf97cc34bdd24dfbc42cea9b241b583afd295d378e1f6659",
+    "gpu": {
+      "name": "NVIDIA RTX PRO 5000 Blackwell Generation Laptop GPU",
+      "compute_capability": [
+        12,
+        0
+      ],
+      "total_memory": 25148850176
+    },
+    "packages": {
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "numba": "0.65.1",
+      "cupy-cuda13x": "14.2.0",
+      "cuda-toolkit": "13.2.0",
+      "nvidia-cuda-runtime": "13.2.51",
+      "nvidia-cuda-nvrtc": "13.2.51"
+    },
+    "driver_version": 13020,
+    "first_evaluation_seconds": {
+      "cpu": 3.7390338350087404,
+      "gpu": 0.16555577237159014
+    },
+    "fixture": {
+      "cases": 256,
+      "max_prediction_error": 5.965280353015245e-16,
+      "max_likelihood_error": 1.7462298274040222e-10,
+      "exact_predictions": false
+    },
+    "timings": [
+      {
+        "batch": 1,
+        "histories": 6,
+        "cpu_ms": 0.4458390176296234,
+        "gpu_ms": 2.343850675970316,
+        "speedup": 0.19021647675786912,
+        "kernel_ms": 1.810752034187317
+      },
+      {
+        "batch": 4,
+        "histories": 24,
+        "cpu_ms": 0.6426344625651836,
+        "gpu_ms": 2.292540855705738,
+        "speedup": 0.2803153806248545,
+        "kernel_ms": 1.9123519659042358
+      },
+      {
+        "batch": 8,
+        "histories": 48,
+        "cpu_ms": 0.8983509615063667,
+        "gpu_ms": 2.3453067988157272,
+        "speedup": 0.3830419806739114,
+        "kernel_ms": 1.9154239892959595
+      },
+      {
+        "batch": 50,
+        "histories": 300,
+        "cpu_ms": 3.6062542349100113,
+        "gpu_ms": 3.0987514182925224,
+        "speedup": 1.1637765500070778,
+        "kernel_ms": 2.1149439811706543
+      },
+      {
+        "batch": 200,
+        "histories": 1200,
+        "cpu_ms": 13.103670440614223,
+        "gpu_ms": 4.512029234319925,
+        "speedup": 2.9041634617399086,
+        "kernel_ms": 2.135967969894409
+      },
+      {
+        "batch": 1000,
+        "histories": 6000,
+        "cpu_ms": 67.60907219722867,
+        "gpu_ms": 13.887062203139067,
+        "speedup": 4.868493509156036,
+        "kernel_ms": 2.1212799549102783
+      }
+    ]
+  },
+  "quality": {
+    "reference": {
+      "all_converged": true,
+      "max_rhat": 1.002585005796403,
+      "min_bulk_ess": 2253.4762608319074,
+      "min_tail_ess": 3345.2508757188325,
+      "min_ess_per_second": 2.342409195721759,
+      "sampling_seconds": 962.0335614066571,
+      "median_sampling_seconds": 239.72449648333713,
+      "passing_quantities": 16
+    },
+    "gpu": {
+      "all_converged": true,
+      "max_rhat": 1.002585005796403,
+      "min_bulk_ess": 2253.4762608319074,
+      "min_tail_ess": 3345.2508757188325,
+      "min_ess_per_second": 2.678916313050703,
+      "sampling_seconds": 841.1894951155409,
+      "median_sampling_seconds": 211.66060449322686,
+      "passing_quantities": 16
+    },
+    "posterior_means_pass": true,
+    "max_mean_combined_mcse_z": 4.208388907859984e-13,
+    "max_mean_difference_in_sd": 2.1154468410907216e-15,
+    "prediction_means_pass": true,
+    "max_prediction_mean_difference_in_noise_sd": 2.471204985900984e-15,
+    "min_ess_per_second_ratio_historical_cpu": 1.143658553741827,
+    "max_ess_per_second_ratio_historical_cpu": 1.1436585537418271,
+    "exact_cold_chains": {
+      "42": false,
+      "123": false,
+      "456": false,
+      "789": false
+    },
+    "array_agreement": {
+      "42": {
+        "theta": {
+          "exact": true,
+          "max_absolute_difference": 0.0
+        },
+        "s2": {
+          "exact": false,
+          "max_absolute_difference": 3.2526065174565133e-18
+        },
+        "count": {
+          "exact": true,
+          "max_absolute_difference": 0.0
+        },
+        "predictions": {
+          "exact": false,
+          "max_absolute_difference": 7.003946034256359e-17
+        }
+      },
+      "123": {
+        "theta": {
+          "exact": true,
+          "max_absolute_difference": 0.0
+        },
+        "s2": {
+          "exact": false,
+          "max_absolute_difference": 2.3852447794681098e-18
+        },
+        "count": {
+          "exact": true,
+          "max_absolute_difference": 0.0
+        },
+        "predictions": {
+          "exact": false,
+          "max_absolute_difference": 3.0249240612345574e-17
+        }
+      },
+      "456": {
+        "theta": {
+          "exact": true,
+          "max_absolute_difference": 0.0
+        },
+        "s2": {
+          "exact": false,
+          "max_absolute_difference": 3.686287386450715e-18
+        },
+        "count": {
+          "exact": true,
+          "max_absolute_difference": 0.0
+        },
+        "predictions": {
+          "exact": false,
+          "max_absolute_difference": 3.810970636286548e-17
+        }
+      },
+      "789": {
+        "theta": {
+          "exact": true,
+          "max_absolute_difference": 0.0
+        },
+        "s2": {
+          "exact": false,
+          "max_absolute_difference": 5.692061405548898e-19
+        },
+        "count": {
+          "exact": true,
+          "max_absolute_difference": 0.0
+        },
+        "predictions": {
+          "exact": false,
+          "max_absolute_difference": 1.5612511283791264e-17
+        }
+      }
+    },
+    "all_quality_gates_pass": true
+  },
+  "fresh_cpu": {
+    "backend": "cpu",
+    "mode": "pooled",
+    "seed": 42,
+    "iterations": 40000,
+    "temperatures": 50,
+    "warmup_seconds": 3.7531947968527675,
+    "sampling_seconds": 186.67688704375178,
+    "iterations_per_second": 214.26862550276707,
+    "parameter_names": [
+      "theta",
+      "p",
+      "s0",
+      "sInf",
+      "kappa",
+      "lgamma",
+      "y0",
+      "yInf",
+      "y1",
+      "y2"
+    ],
+    "bounds": [
+      [
+        0.001,
+        0.2
+      ],
+      [
+        0.0,
+        5.0
+      ],
+      [
+        0.0001,
+        0.1
+      ],
+      [
+        0.0001,
+        0.1
+      ],
+      [
+        0.01,
+        0.5
+      ],
+      [
+        -18.0,
+        -1.0
+      ],
+      [
+        1e-05,
+        0.1
+      ],
+      [
+        1e-05,
+        0.1
+      ],
+      [
+        0.001,
+        0.5
+      ],
+      [
+        0.281,
+        5.0
+      ]
+    ],
+    "commit": "7817d9a4f839faf7fc76b2208995dc79442728e8",
+    "source_sha256": {
+      "benchmarks/gpu/history.py": "c01e594edfba4a7ccf97cc34bdd24dfbc42cea9b241b583afd295d378e1f6659",
+      "benchmarks/gpu/cu_history.cu": "782581361ed92780de365fffa2157598cc73c83ed93dc92dda55b622eee2c192",
+      "benchmarks/gpu_calibration.py": "3f2c2deaa0d38733f9fd2f718fb50b484b5c00df5d8f6062d9b7ba01568a585e"
+    }
+  },
+  "gpu_runs": [
+    {
+      "backend": "gpu",
+      "mode": "pooled",
+      "seed": 42,
+      "iterations": 40000,
+      "temperatures": 50,
+      "warmup_seconds": 0.5584163377061486,
+      "sampling_seconds": 211.88139586988837,
+      "iterations_per_second": 188.78014200247432,
+      "parameter_names": [
+        "theta",
+        "p",
+        "s0",
+        "sInf",
+        "kappa",
+        "lgamma",
+        "y0",
+        "yInf",
+        "y1",
+        "y2"
+      ],
+      "bounds": [
+        [
+          0.001,
+          0.2
+        ],
+        [
+          0.0,
+          5.0
+        ],
+        [
+          0.0001,
+          0.1
+        ],
+        [
+          0.0001,
+          0.1
+        ],
+        [
+          0.01,
+          0.5
+        ],
+        [
+          -18.0,
+          -1.0
+        ],
+        [
+          1e-05,
+          0.1
+        ],
+        [
+          1e-05,
+          0.1
+        ],
+        [
+          0.001,
+          0.5
+        ],
+        [
+          0.281,
+          5.0
+        ]
+      ],
+      "commit": "7817d9a4f839faf7fc76b2208995dc79442728e8",
+      "source_sha256": {
+        "benchmarks/gpu/history.py": "c01e594edfba4a7ccf97cc34bdd24dfbc42cea9b241b583afd295d378e1f6659",
+        "benchmarks/gpu/cu_history.cu": "782581361ed92780de365fffa2157598cc73c83ed93dc92dda55b622eee2c192",
+        "benchmarks/gpu_calibration.py": "3f2c2deaa0d38733f9fd2f718fb50b484b5c00df5d8f6062d9b7ba01568a585e"
+      }
+    },
+    {
+      "backend": "gpu",
+      "mode": "pooled",
+      "seed": 123,
+      "iterations": 40000,
+      "temperatures": 50,
+      "warmup_seconds": 0.5402952479198575,
+      "sampling_seconds": 215.0793173322454,
+      "iterations_per_second": 185.97325161773338,
+      "parameter_names": [
+        "theta",
+        "p",
+        "s0",
+        "sInf",
+        "kappa",
+        "lgamma",
+        "y0",
+        "yInf",
+        "y1",
+        "y2"
+      ],
+      "bounds": [
+        [
+          0.001,
+          0.2
+        ],
+        [
+          0.0,
+          5.0
+        ],
+        [
+          0.0001,
+          0.1
+        ],
+        [
+          0.0001,
+          0.1
+        ],
+        [
+          0.01,
+          0.5
+        ],
+        [
+          -18.0,
+          -1.0
+        ],
+        [
+          1e-05,
+          0.1
+        ],
+        [
+          1e-05,
+          0.1
+        ],
+        [
+          0.001,
+          0.5
+        ],
+        [
+          0.281,
+          5.0
+        ]
+      ],
+      "commit": "7817d9a4f839faf7fc76b2208995dc79442728e8",
+      "source_sha256": {
+        "benchmarks/gpu/history.py": "c01e594edfba4a7ccf97cc34bdd24dfbc42cea9b241b583afd295d378e1f6659",
+        "benchmarks/gpu/cu_history.cu": "782581361ed92780de365fffa2157598cc73c83ed93dc92dda55b622eee2c192",
+        "benchmarks/gpu_calibration.py": "3f2c2deaa0d38733f9fd2f718fb50b484b5c00df5d8f6062d9b7ba01568a585e"
+      }
+    },
+    {
+      "backend": "gpu",
+      "mode": "pooled",
+      "seed": 456,
+      "iterations": 40000,
+      "temperatures": 50,
+      "warmup_seconds": 0.5840792041271925,
+      "sampling_seconds": 211.43981311656535,
+      "iterations_per_second": 189.17440102895296,
+      "parameter_names": [
+        "theta",
+        "p",
+        "s0",
+        "sInf",
+        "kappa",
+        "lgamma",
+        "y0",
+        "yInf",
+        "y1",
+        "y2"
+      ],
+      "bounds": [
+        [
+          0.001,
+          0.2
+        ],
+        [
+          0.0,
+          5.0
+        ],
+        [
+          0.0001,
+          0.1
+        ],
+        [
+          0.0001,
+          0.1
+        ],
+        [
+          0.01,
+          0.5
+        ],
+        [
+          -18.0,
+          -1.0
+        ],
+        [
+          1e-05,
+          0.1
+        ],
+        [
+          1e-05,
+          0.1
+        ],
+        [
+          0.001,
+          0.5
+        ],
+        [
+          0.281,
+          5.0
+        ]
+      ],
+      "commit": "7817d9a4f839faf7fc76b2208995dc79442728e8",
+      "source_sha256": {
+        "benchmarks/gpu/history.py": "c01e594edfba4a7ccf97cc34bdd24dfbc42cea9b241b583afd295d378e1f6659",
+        "benchmarks/gpu/cu_history.cu": "782581361ed92780de365fffa2157598cc73c83ed93dc92dda55b622eee2c192",
+        "benchmarks/gpu_calibration.py": "3f2c2deaa0d38733f9fd2f718fb50b484b5c00df5d8f6062d9b7ba01568a585e"
+      }
+    },
+    {
+      "backend": "gpu",
+      "mode": "pooled",
+      "seed": 789,
+      "iterations": 40000,
+      "temperatures": 50,
+      "warmup_seconds": 0.5723469946533442,
+      "sampling_seconds": 202.7889687968418,
+      "iterations_per_second": 197.24445682285523,
+      "parameter_names": [
+        "theta",
+        "p",
+        "s0",
+        "sInf",
+        "kappa",
+        "lgamma",
+        "y0",
+        "yInf",
+        "y1",
+        "y2"
+      ],
+      "bounds": [
+        [
+          0.001,
+          0.2
+        ],
+        [
+          0.0,
+          5.0
+        ],
+        [
+          0.0001,
+          0.1
+        ],
+        [
+          0.0001,
+          0.1
+        ],
+        [
+          0.01,
+          0.5
+        ],
+        [
+          -18.0,
+          -1.0
+        ],
+        [
+          1e-05,
+          0.1
+        ],
+        [
+          1e-05,
+          0.1
+        ],
+        [
+          0.001,
+          0.5
+        ],
+        [
+          0.281,
+          5.0
+        ]
+      ],
+      "commit": "7817d9a4f839faf7fc76b2208995dc79442728e8",
+      "source_sha256": {
+        "benchmarks/gpu/history.py": "c01e594edfba4a7ccf97cc34bdd24dfbc42cea9b241b583afd295d378e1f6659",
+        "benchmarks/gpu/cu_history.cu": "782581361ed92780de365fffa2157598cc73c83ed93dc92dda55b622eee2c192",
+        "benchmarks/gpu_calibration.py": "3f2c2deaa0d38733f9fd2f718fb50b484b5c00df5d8f6062d9b7ba01568a585e"
+      }
+    }
+  ],
+  "small_batch_sampling": {
+    "pooled": {
+      "cpu": 3.5484599759802222,
+      "gpu": 8.899815866723657,
+      "speedup": 0.39871161708501035
+    },
+    "hier": {
+      "cpu": 8.006565344519913,
+      "gpu": 12.315716066397727,
+      "speedup": 0.6501096080288076
+    }
+  },
+  "fresh_cpu_original_exact_arrays": {
+    "theta": true,
+    "s2": true,
+    "predictions": true,
+    "count": true
+  },
+  "fresh_50_temperature_speedup_seed42": 0.8810442572239136,
+  "tests": {
+    "passed": 91,
+    "seconds": 113.57
+  },
+  "actual_call_sizes": {
+    "states": 3000,
+    "temperatures": 50,
+    "seed": 42,
+    "scope": "instrumented early-chain calls, not steady-state timing",
+    "calls": 3288,
+    "mean_batch": 39.71989051094891,
+    "minimum_batch": 1,
+    "maximum_batch": 50,
+    "batch_counts": {
+      "1": 7,
+      "2": 2,
+      "3": 1,
+      "4": 4,
+      "5": 3,
+      "6": 3,
+      "7": 2,
+      "8": 2,
+      "12": 1,
+      "16": 3,
+      "17": 1,
+      "18": 2,
+      "20": 3,
+      "21": 5,
+      "22": 2,
+      "23": 6,
+      "24": 5,
+      "25": 9,
+      "26": 8,
+      "27": 7,
+      "28": 10,
+      "29": 10,
+      "30": 24,
+      "31": 36,
+      "32": 50,
+      "33": 82,
+      "34": 117,
+      "35": 181,
+      "36": 276,
+      "37": 276,
+      "38": 283,
+      "39": 300,
+      "40": 263,
+      "41": 237,
+      "42": 199,
+      "43": 132,
+      "44": 110,
+      "45": 68,
+      "46": 64,
+      "47": 24,
+      "48": 19,
+      "49": 28,
+      "50": 423
+    }
+  },
+  "diagnostic_self_check": "original compared with itself: exact agreement, all gates passed"
+}
