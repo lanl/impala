@@ -1,13 +1,27 @@
 # Performance changes and accuracy gates
 
+Read the [consolidated acceleration report (PDF)](ACCELERATION_SUMMARY.pdf) for
+overall speedups, how they were achieved, accuracy evidence and remaining limits.
+Its [LaTeX source](ACCELERATION_SUMMARY.tex) is versioned alongside the PDF.
+Rebuild from the repository root with the workspace Tectonic installation:
+
+```bash
+XDG_CACHE_HOME=/tmp/impala-tex-cache ../benchmark/tools/tectonic \
+  --outdir docs/performance docs/performance/ACCELERATION_SUMMARY.tex
+```
+
+The report summarizes existing step-1 through step-9 results; no new benchmark
+measurements or numerical changes were made for this document.
+
 Baseline: `6ccd5a1ce8ea4b79755ad4387cf43605b4f5aa0e`, retained by local tag
 `perf-baseline-20260929` and branch `perf/cpu-baseline`.
-Development branch: `perf/cache-material-preparation`.
+Latest GPU-study branch: `perf/gpu-coordination-profile`.
 
 Each optimization gets a separate code commit, an accuracy check against the
 baseline, and a dated result entry in [CHANGELOG.md](CHANGELOG.md). Keep numerical
 and sampler changes separate. Do not regenerate baseline fixtures using optimized
-code. Git tags are local checkpoints; no changes have been pushed upstream.
+code. Git tags identify the recorded checkpoints; historical entries describe
+the state at the time of each experiment.
 
 ## Step 1: cache material-model preparation
 
