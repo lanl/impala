@@ -58,7 +58,19 @@ cu_taylor_cylinder:
   enabled: false
 
 cu_flyer:
-  enabled: false
+  enabled: true
+  obs_file: Cu-Flyer/ofhc-cu-symmetric-impact.txt
+  emulator_file: ../data/Cu/Cu-Flyer/nn_emulator.onnx
+  obs_skiprows: 5
+  obs_time_min: 0.83
+  time_start: 0.5
+  time_end: 1.4
+  
+  subsample_stride: 10
+  sub_time_min: 0.8
+  input_names: ["theta", "p", "s0", "sInf", "kappa", "lgamma", "y0", "yInf", "y1", "y2"]
+  sd_est: 10
+  s2_est: 50
 
 consts_ptw:
   matomic: 63.546
