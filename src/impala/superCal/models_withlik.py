@@ -997,7 +997,7 @@ class ModelF_bigdata(AbstractModel):
                     np.where(self.exp_ind == i)[0],
                 )
                 self.res_array[:, np.where(self.exp_ind == i)[0]] = self.mod(
-                    parmat_array, inds_to_run
+                    parmat_array#, inds_to_run
                 )  # note: this now has a second argument. This is to avoid unnecessary predictions
             return self.res_array
 

@@ -65,7 +65,6 @@ cu_flyer:
   obs_time_min: 0.83
   time_start: 0.5
   time_end: 1.4
-  
   subsample_stride: 10
   sub_time_min: 0.8
   input_names: ["theta", "p", "s0", "sInf", "kappa", "lgamma", "y0", "yInf", "y1", "y2"]
