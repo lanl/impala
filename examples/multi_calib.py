@@ -27,6 +27,11 @@ import json
 import os
 import pickle
 import random
+import sys
+if sys.version_info < (3,11):
+    import tomli as tomllib
+else:
+    import tomllib
 from copy import deepcopy
 from datetime import datetime
 from math import log
@@ -1736,8 +1741,12 @@ def main(args=None):
 
     pooled = args.mode == "pooled"
 
-    with open(args.config, "r", encoding="utf-8") as fh:
-        cfg = yaml.safe_load(fh)
+    if str(args.config)[-5:] == ".toml":
+        with open(args.config, "rb") as fh:
+            cfg = tomllib.load(fh)
+    else:
+        with open(args.config, "r", encoding="utf-8") as fh:
+            cfg = yaml.safe_load(fh)
     if cfg.get("options") is None:
         cfg["options"] = None
     else:
