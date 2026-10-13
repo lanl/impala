@@ -70,10 +70,10 @@ class Taylor_Quinney_Heating(BaseModel):
         # if we work in seconds, it should be changed to ~1.
         self.options = {"edotcrit": 1.0e-6}
 
-    def value(self, stress, edot, dt, Cv, rho):
+    def value(self, T,stress, edot, dt, Cv, rho):
         mp = self.parent.parameters
         cond = edot > mp.edotcrit
-        return cond * mp.chi * stress * edot * dt / (Cv * rho)
+        return T + cond * mp.chi * stress * edot * dt / (Cv * rho)
 
 
 ########################
@@ -841,8 +841,8 @@ class MaterialModel:
         """
         self.state.Cv = self.specific_heat.value()
         self.state.rho = self.density.value()
-        self.state.T += self.heating_model.value(
-            self.state.stress, edot, dt, self.state.Cv, self.state.rho
+        self.state.T = self.heating_model.value(
+            self.state.T, self.state.stress, edot, dt, self.state.Cv, self.state.rho
         )
         self.state.strain = self.state.strain + edot * dt
 
