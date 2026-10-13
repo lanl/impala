@@ -56,6 +56,26 @@ class BaseModel:
 
 
 ########################
+# heating from plastic work
+########################
+class Taylor_Quinney_Heating(BaseModel):
+    """
+    heating from plastic work using Taylor-Quinney coefficient 'chi' above a critical strain rate 'edotcrit'
+    """
+    
+    def __init__(self, parent):
+        BaseModel.__init__(self,parent)
+        self.params = ['chi']
+        # if we are working with microseconds, then this is a reasonable value for edocrit
+        # if we work in seconds, it should be changed to ~1.
+        self.options = {'edotcrit': 1.0e-6}
+
+    def value(self,stress,edot,dt,Cv,rho):
+        mp = self.parent.parameters
+        cond = edot > mp.edotcrit
+        return cond * mp.chi * stress * edot * dt / (Cv * rho)
+
+########################
 # Specific Heat Models
 ########################
 
@@ -537,7 +557,7 @@ class Constant_Yield_Stress(BaseModel):
 
     def __init__(self, parent):
         BaseModel.__init__(self, parent)
-        self.consts = ["yield_stress", "chi"]
+        self.consts = ["yield_stress"]
 
     def value(self, *args):
         return self.parent.parameters.yield_stress * np.ones(
@@ -553,11 +573,7 @@ class JC_Yield_Stress(BaseModel):
     def __init__(self, parent):
         BaseModel.__init__(self, parent)
         self.params = ["A", "B", "C", "n", "m"]
-        self.consts = [
-            "Tref",
-            "edot0",
-            "chi",
-        ]  ## nothing here depends on chi, why is it here?
+        self.consts = ["Tref", "edot0"]
 
     def value(self, edot):
         mp = self.parent.parameters
@@ -594,7 +610,7 @@ class PTW_Yield_Stress(BaseModel):
             "y1",
             "y2",
         ]
-        self.consts = ["rho0", "matomic", "chi"]
+        self.consts = ["rho0", "matomic"]
 
     # @profile
     def value(self, edot):
@@ -650,7 +666,7 @@ class Stein_Flow_Stress(BaseModel):
         # self.params = ["y0", "a", "b", "beta", "n", "ymax"]
         ## params a, b are never used, so drop them:
         self.params = ["y0", "beta", "n", "ymax"]
-        self.consts = ["G0", "epsi", "chi"]
+        self.consts = ["G0", "epsi"]
 
     def value(self, *args):
         mp = self.parent.parameters
@@ -730,6 +746,7 @@ class MaterialModel:
         shear_modulus_model=Constant_Shear_Modulus,
         melt_model=Constant_Melt_Temperature,
         density_model=Constant_Density,
+        heating_model=Taylor_Quinney_Heating,
     ):
         """
         Initialization routine for Material Model.  All of the arguments
@@ -748,6 +765,7 @@ class MaterialModel:
         self.shear_modulus = shear_modulus_model(self)
         self.melt_model = melt_model(self)
         self.density = density_model(self)
+        self.heating_model = heating_model(self)
 
         params = (
             self.flow_stress.params
@@ -755,6 +773,7 @@ class MaterialModel:
             + self.shear_modulus.params
             + self.melt_model.params
             + self.density.params
+            + self.heating_model.params
         )
         consts = set(
             self.flow_stress.consts
@@ -762,6 +781,7 @@ class MaterialModel:
             + self.shear_modulus.consts
             + self.melt_model.consts
             + self.density.consts
+            + self.heating_model.consts
         )
         options = (
             self.flow_stress.options
@@ -769,6 +789,7 @@ class MaterialModel:
             | self.shear_modulus.options
             | self.melt_model.options
             | self.density.options
+            | self.heating_model.options
         )
 
         assert len(set(params)) == len(params), (
@@ -817,25 +838,9 @@ class MaterialModel:
         """
         updates the material state (specific heat, density, T, Tmelt, strain, stress, etc.)
         """
-        chi = self.parameters.chi
         self.state.Cv = self.specific_heat.value()
         self.state.rho = self.density.value()
-        # if we are working with microseconds, then this is a reasonable value
-        # if we work in seconds, it should be changed to ~1.
-        edotcrit = 1.0e-6
-        # if edot > edotcrit:
-        #  self.state.T += chi * self.state.stress * edot * dt / (self.state.Cv * self.state.rho)
-        cond = edot > edotcrit
-        # if any(cond):
-        self.state.T = (
-            self.state.T
-            + cond
-            * chi
-            * self.state.stress
-            * edot
-            * dt
-            / (self.state.Cv * self.state.rho)
-        )
+        self.state.T += self.heating_model.value(self.state.stress,edot,dt,self.state.Cv,self.state.rho)
         self.state.strain = self.state.strain + edot * dt
 
         self.state.Tmelt = self.melt_model.value()
