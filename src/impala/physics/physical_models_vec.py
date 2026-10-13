@@ -62,18 +62,19 @@ class Taylor_Quinney_Heating(BaseModel):
     """
     heating from plastic work using Taylor-Quinney coefficient 'chi' above a critical strain rate 'edotcrit'
     """
-    
+
     def __init__(self, parent):
-        BaseModel.__init__(self,parent)
-        self.params = ['chi']
+        BaseModel.__init__(self, parent)
+        self.params = ["chi"]
         # if we are working with microseconds, then this is a reasonable value for edocrit
         # if we work in seconds, it should be changed to ~1.
-        self.options = {'edotcrit': 1.0e-6}
+        self.options = {"edotcrit": 1.0e-6}
 
-    def value(self,stress,edot,dt,Cv,rho):
+    def value(self, stress, edot, dt, Cv, rho):
         mp = self.parent.parameters
         cond = edot > mp.edotcrit
         return cond * mp.chi * stress * edot * dt / (Cv * rho)
+
 
 ########################
 # Specific Heat Models
@@ -840,7 +841,9 @@ class MaterialModel:
         """
         self.state.Cv = self.specific_heat.value()
         self.state.rho = self.density.value()
-        self.state.T += self.heating_model.value(self.state.stress,edot,dt,self.state.Cv,self.state.rho)
+        self.state.T += self.heating_model.value(
+            self.state.stress, edot, dt, self.state.Cv, self.state.rho
+        )
         self.state.strain = self.state.strain + edot * dt
 
         self.state.Tmelt = self.melt_model.value()
