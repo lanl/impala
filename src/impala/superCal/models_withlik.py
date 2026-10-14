@@ -968,9 +968,7 @@ class ModelF_bigdata(AbstractModel):
         self.vec = np.linspace(
             1, n, n
         )  # define to speed up llik evaluation, change this dimension to n x n, where n = length(yobs)
-        self.vec2 = np.linspace(
-            1, n, n
-        )  # define to speed up llik evaluation
+        self.vec2 = np.linspace(1, n, n)  # define to speed up llik evaluation
         self.inv = np.linspace(
             1, n, n
         )  # define to speed up lik_cov_inv evaluation
@@ -1031,7 +1029,7 @@ class ModelF_bigdata(AbstractModel):
         self.vec2 = self.vec * self.vec * cov["inv"]
         out = -0.5 * cov["ldet"] - 0.5 * (self.vec2 * wt).sum()
         return out
-    
+
     def lik_cov_inv(self, s2vec, wt, inds=None):
         """
         returns a dictionary containing the inverse of the covariance matrix and the log-determinant
