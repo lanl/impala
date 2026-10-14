@@ -37,7 +37,6 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
             "Tmelt0": 1625.0,
             # # Constant Shear Mod.
             "G0": 0.4578,
-            "qs_isothermal": True,
             # # Simple Shear Mod.
             # 'G0'     : 0.50889, # Cold shear
             # 'alpha'  : 0.21
@@ -47,6 +46,7 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
         }
         self.model_ptw_cg0Tm = pmh.MaterialModel(
             flow_stress_model=pmh.PTW_Yield_Stress,
+            qs_isothermal = True
         )
 
     def test_isothermal_lowrate(self):
