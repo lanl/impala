@@ -794,7 +794,13 @@ class MaterialModel:
         # optionally, model quasistatics isothermally. Cutoff assumes we are working in microseconds. If working in seconds, change to ~1
         # by default, models all experiments as adiabatic
         edotcrit = (
-            1.0e-6 if self.parameters.consts.get("qs_isothermal") is True else 0
+            1.0e-6
+            if next(
+                (x for x in self.parameters.consts if x == "qs_isothermal"),
+                None,
+            )
+            is True
+            else 0
         )
 
         cond = edot > edotcrit
