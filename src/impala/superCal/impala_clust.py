@@ -511,7 +511,9 @@ def calibClust(setup):
 
     ## Initialize *Current* Variables
     pred_curr_delta = [None] * setup.nexp  # [i] x [ntemps, nclustmax, ylens[i]]
-    llik_curr_delta = [None] * setup.nexp  # [i] x [ntemps, nclustmax, ntheta[i]]
+    llik_curr_delta = [
+        None
+    ] * setup.nexp  # [i] x [ntemps, nclustmax, ntheta[i]]
     pred_cand_theta = [None] * setup.nexp  # [i] x [ntemps, ylens[i]]
     pred_curr_theta = [None] * setup.nexp  # [i] x [ntemps, ylens[i]]
     llik_cand_theta = [None] * setup.nexp  # [i] x [ntemps, ntheta[i]]

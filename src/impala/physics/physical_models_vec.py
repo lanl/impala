@@ -791,11 +791,11 @@ class MaterialModel:
         self.state.Cv = self.specific_heat.value()
         self.state.rho = self.density.value()
 
-        #optionally, model quasistatics isothermally. Cutoff assumes we are working in microseconds. If working in seconds, change to ~1
-        #by default, models all experiments as adiabatic
+        # optionally, model quasistatics isothermally. Cutoff assumes we are working in microseconds. If working in seconds, change to ~1
+        # by default, models all experiments as adiabatic
         edotcrit = 1.0e-6 if self.parameters.get("qs_isothermal") is True else 0
 
-        cond = (edot > edotcrit)
+        cond = edot > edotcrit
         self.state.T = (
             self.state.T
             + cond
