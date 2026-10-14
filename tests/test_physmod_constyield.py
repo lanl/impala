@@ -17,7 +17,7 @@ class TestConstantYieldStress(unittest.TestCase):
             "Tmelt0": 1356.0,  # K
             "chi": 1.0,
         }
-        self.model_const_y = pmh.MaterialModel()
+        self.model_const_y = pmh.MaterialModel(qs_isothermal=True)
 
     def test_isothermal_lowrate(self):
         """

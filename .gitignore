@@ -167,3 +167,8 @@ dev/
 .ipynb_checkpoints
 
 .vscode/settings.json
+
+
+# copper flyer FLAG sims
+/data/Cu/cu_flyer_training/*
+/data/Cu/flyer_lhs.csv
