@@ -27,10 +27,9 @@ class TestJCYieldStress(unittest.TestCase):
             "Tref": 298.0,  # K
             "edot0": 1.0e-6,  # 1/micro-s
             "chi": 1.0,
-            "qs_isothermal": True,
         }
         self.model_yjc = pmh.MaterialModel(
-            flow_stress_model=pmh.JC_Yield_Stress,
+            flow_stress_model=pmh.JC_Yield_Stress, qs_isothermal=True
         )
 
     def test_isothermal_lowrate(self):

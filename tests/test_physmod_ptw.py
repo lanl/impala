@@ -284,7 +284,6 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
             # Simple Shear Mod.
             "G0": 0.50889,  # Cold shear
             "alpha": 0.21,
-            "qs_isothermal": True,
             # # SG Shear Mod.
             # 'G0'     : 0.4578, # MBar, 300K Shear mod.
             # 'sgB'    : 3.8e-4, # K^-1
@@ -292,6 +291,7 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
         self.model_ptw_ss_cTm = pmh.MaterialModel(
             flow_stress_model=pmh.PTW_Yield_Stress,
             shear_modulus_model=pmh.Simple_Shear_Modulus,
+            qs_isothermal=True,
         )
 
     def test_isothermal_lowrate(self):
@@ -528,6 +528,7 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
         self.model_ptw_sg_cTm = pmh.MaterialModel(
             flow_stress_model=pmh.PTW_Yield_Stress,
             shear_modulus_model=pmh.Stein_Shear_Modulus,
+            qs_isothermal=True,
         )
 
     def test_isothermal_lowrate(self):

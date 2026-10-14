@@ -719,6 +719,7 @@ class MaterialModel:
         shear_modulus_model=Constant_Shear_Modulus,
         melt_model=Constant_Melt_Temperature,
         density_model=Constant_Density,
+        qs_isothermal=False,
     ):
         """
         Initialization routine for Material Model.  All of the arguments
@@ -737,6 +738,7 @@ class MaterialModel:
         self.shear_modulus = shear_modulus_model(self)
         self.melt_model = melt_model(self)
         self.density = density_model(self)
+        self.qs_isothermal = qs_isothermal
 
         params = (
             self.flow_stress.params
@@ -793,17 +795,9 @@ class MaterialModel:
 
         # optionally, model quasistatics isothermally. Cutoff assumes we are working in microseconds. If working in seconds, change to ~1
         # by default, models all experiments as adiabatic
-        edotcrit = (
-            1.0e-6
-            if next(
-                (x for x in self.parameters.consts if x == "qs_isothermal"),
-                None,
-            )
-            is True
-            else 0
-        )
+        edotcrit = 1.0e-6 * self.qs_isothermal
 
-        cond = edot > edotcrit
+        cond = edot > (edotcrit + 1e-10)  # deal with ==1e-6
         self.state.T = (
             self.state.T
             + cond
