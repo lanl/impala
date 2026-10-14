@@ -511,11 +511,11 @@ def calibClust(setup):
 
     ## Initialize *Current* Variables
     pred_curr_delta = [None] * setup.nexp  # [i] x [ntemps, nclustmax, ylens[i]]
-    llik_curr_delta = [None] * setup.nexp  # [i] x [ntemps, nclustmax, ns2[i]]
+    llik_curr_delta = [None] * setup.nexp  # [i] x [ntemps, nclustmax, ntheta[i]]
     pred_cand_theta = [None] * setup.nexp  # [i] x [ntemps, ylens[i]]
     pred_curr_theta = [None] * setup.nexp  # [i] x [ntemps, ylens[i]]
-    llik_cand_theta = [None] * setup.nexp  # [i] x [ntemps, ns2[i]]
-    llik_curr_theta = [None] * setup.nexp  # [i] x [ntemps, ns2[i]]
+    llik_cand_theta = [None] * setup.nexp  # [i] x [ntemps, ntheta[i]]
+    llik_curr_theta = [None] * setup.nexp  # [i] x [ntemps, ntheta[i]]
     llik_cand_theta_ = np.zeros((
         setup.ntemps,
         setup.nclustmax,
@@ -631,7 +631,7 @@ def calibClust(setup):
 
     cluster_cum_prob = np.empty((setup.ntemps, setup.nclustmax))
     cluster_sample_unif = [
-        np.empty((setup.ntemps, setup.ns2[i])) for i in range(setup.nexp)
+        np.empty((setup.ntemps, setup.ntheta[i])) for i in range(setup.nexp)
     ]
 
     ## start MCMC
@@ -656,7 +656,7 @@ def calibClust(setup):
         ##################
         for i in range(setup.nexp):
             cluster_sample_unif[i][:] = uniform(
-                size=(setup.ntemps, setup.ns2[i])
+                size=(setup.ntemps, setup.ntheta[i])
             )
             for j in range(setup.ntheta[i]):
                 # weighting assigned to extant clusters for ij'th within-vectorized experiment
@@ -1056,7 +1056,7 @@ def calibClust(setup):
         eta[m] = sample_eta(
             eta[m - 1],
             ntheta,
-            sum(setup.ns2[i] for i in range(setup.nexp)),
+            sum(setup.ntheta[i] for i in range(setup.nexp)),
             setup.eta_prior_shape,
             setup.eta_prior_rate,
         )

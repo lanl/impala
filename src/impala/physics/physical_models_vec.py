@@ -790,13 +790,12 @@ class MaterialModel:
         chi = self.parameters.chi
         self.state.Cv = self.specific_heat.value()
         self.state.rho = self.density.value()
-        # if we are working with microseconds, then this is a reasonable value
-        # if we work in seconds, it should be changed to ~1.
-        edotcrit = 1.0e-6
-        # if edot > edotcrit:
-        #  self.state.T += chi * self.state.stress * edot * dt / (self.state.Cv * self.state.rho)
-        cond = edot > edotcrit
-        # if any(cond):
+
+        #optionally, model quasistatics isothermally. Cutoff assumes we are working in microseconds. If working in seconds, change to ~1
+        #by default, models all experiments as adiabatic
+        edotcrit = 1.0e-6 if self.parameters.get("qs_isothermal") is True else 0
+
+        cond = (edot > edotcrit)
         self.state.T = (
             self.state.T
             + cond
