@@ -797,7 +797,7 @@ class MaterialModel:
         # by default, models all experiments as adiabatic
         edotcrit = 1.0e-6 * self.qs_isothermal
 
-        cond = edot > (edotcrit - 1e-10)  # deal with ==1e-6
+        cond = edot > (edotcrit - 1e-20)  # deal with ==1e-6
         self.state.T = (
             self.state.T
             + cond
