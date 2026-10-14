@@ -16,6 +16,7 @@ class TestConstantYieldStress(unittest.TestCase):
             "G0": 0.4578,  # MBar
             "Tmelt0": 1356.0,  # K
             "chi": 1.0,
+            "qs_isothermal": True,
         }
         self.model_const_y = pmh.MaterialModel()
 

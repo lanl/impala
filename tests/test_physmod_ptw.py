@@ -37,6 +37,7 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
             "Tmelt0": 1625.0,
             # # Constant Shear Mod.
             "G0": 0.4578,
+            "qs_isothermal": True,
             # # Simple Shear Mod.
             # 'G0'     : 0.50889, # Cold shear
             # 'alpha'  : 0.21
@@ -283,6 +284,7 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
             # Simple Shear Mod.
             "G0": 0.50889,  # Cold shear
             "alpha": 0.21,
+            "qs_isothermal": True,
             # # SG Shear Mod.
             # 'G0'     : 0.4578, # MBar, 300K Shear mod.
             # 'sgB'    : 3.8e-4, # K^-1
