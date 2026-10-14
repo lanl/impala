@@ -45,8 +45,7 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
             # 'sgB'    : 3.8e-4, # K^-1
         }
         self.model_ptw_cg0Tm = pmh.MaterialModel(
-            flow_stress_model=pmh.PTW_Yield_Stress,
-            qs_isothermal = True
+            flow_stress_model=pmh.PTW_Yield_Stress, qs_isothermal=True
         )
 
     def test_isothermal_lowrate(self):
