@@ -677,7 +677,7 @@ class ModelBassPca_func(AbstractModel):
         inverse covariance matrix as well as the log-determinant.
         """
         vec = np.sqrt(wt) * (yobs - pred).flatten()
-        out = -0.5 * (cov["ldet"] * np.sum(wt) + vec.T @ cov["inv"] @ vec)
+        out = -0.5 * (cov["ldet"] + vec.T @ cov["inv"] @ vec)
         return out
 
     # @profile
@@ -944,12 +944,13 @@ class ModelF_bigdata(AbstractModel):
     """Custom Simulator/Emulator Model, modified to better handle a large number of observations"""
 
     def __init__(
-        self, f, input_names, exp_ind=None, s2="gibbs"
+        self, f, input_names, exp_ind=None, s2="gibbs", n=1000
     ):  # not sure if this is vectorized
         """
         f           : user-defined function taking single input with elements x[0] = first element of theta, x[1] = second element of theta, etc. Function must output predictions for all observations
         input_names : list of the names of the inputs to bmod
         s2          : method for handling experiment-specific noise s2; options are 'MH' (Metropolis-Hastings Sampling), 'fix' (fixed at s2_est from addVecExperiments call), and 'gibbs' (Gibbs sampling)
+        n           : length of observation vector
         """
         self.mod = f
         self.input_names = input_names
@@ -965,19 +966,17 @@ class ModelF_bigdata(AbstractModel):
         self.D = None
         self.s2 = s2
         self.vec = np.linspace(
-            1, 16200, 16200
+            1, n, n
         )  # define to speed up llik evaluation, change this dimension to n x n, where n = length(yobs)
-        self.vec2 = np.linspace(
-            1, 16200, 16200
-        )  # define to speed up llik evaluation
+        self.vec2 = np.linspace(1, n, n)  # define to speed up llik evaluation
         self.inv = np.linspace(
-            1, 16200, 16200
+            1, n, n
         )  # define to speed up lik_cov_inv evaluation
         self.m = np.linspace(
-            1, 16200, 16200
+            1, n, n
         )  # define to speed up discrep_sample evaluation
         self.vmat = np.linspace(
-            1, 16200, 16200
+            1, n, NameError
         )  # define to speed up discrep_sample evaluation
         self.constants = None
         self.res_array = None
@@ -1028,7 +1027,7 @@ class ModelF_bigdata(AbstractModel):
         """
         self.vec = yobs.flatten() - pred.flatten()
         self.vec2 = self.vec * self.vec * cov["inv"]
-        out = ((-0.5 * cov["ldet"] - 0.5 * self.vec2) * wt).sum()
+        out = -0.5 * cov["ldet"] - 0.5 * (self.vec2 * wt).sum()
         return out
 
     def lik_cov_inv(self, s2vec, wt, inds=None):

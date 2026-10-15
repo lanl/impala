@@ -748,6 +748,7 @@ class MaterialModel:
         melt_model=Constant_Melt_Temperature,
         density_model=Constant_Density,
         heating_model=Taylor_Quinney_Heating,
+        qs_isothermal=True,
     ):
         """
         Initialization routine for Material Model.  All of the arguments
@@ -767,6 +768,7 @@ class MaterialModel:
         self.melt_model = melt_model(self)
         self.density = density_model(self)
         self.heating_model = heating_model(self)
+        self.qs_isothermal = qs_isothermal
 
         params = (
             self.flow_stress.params
@@ -792,6 +794,9 @@ class MaterialModel:
             | self.density.options
             | self.heating_model.options
         )
+        if qs_isothermal is False:
+            print("deprecated keyword qs_isothermal detected, setting option edotcrit=0")
+            options['edotcrit'] = 0
 
         assert len(set(params)) == len(params), (
             "Some Duplicate Parameters between models"
