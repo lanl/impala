@@ -519,20 +519,27 @@ class CalibSetup:
         self.Sigma0_prior_scale = Sigma0_prior_scale
 
     def setClusterPriors(
-        self, nclustmax=None, eta_prior_shape=2, eta_prior_rate=0.1
+        self,
+        nclustmax=None,
+        eta_prior_shape=2,
+        eta_prior_rate=0.1,
+        scale_proposal=False,
     ):
         """
         Define clustered experiment model hyperparameters
+        This prior has E(eta) = eta_prior_shape/eta_prior_rate, where values > 1 indicate preference toward less clustering and values < 1 indicate preference toward more clustering.
 
         :param nclustmax : maximum number of unique theta values to estimate (i.e., maximum number of clusters)
         :param eta_prior_shape : shape from the gamma prior for the DP concentration parameter eta
         :param eta_prior_rate :  rate from the gamma prior for the DP concentration parameter eta
+        :param scale_proposal: bool indicating whether the proposal variance for theta for each cluster should by the inverse of the number of cluster occupants. This can sometimes help if clusters have very uneven sizes.
         """
         if nclustmax is None:
             nclustmax = max(sum(self.ntheta), 10)
         self.nclustmax = nclustmax
         self.eta_prior_shape = eta_prior_shape
         self.eta_prior_rate = eta_prior_rate
+        self.scale_proposal = scale_proposal
 
     def chol_sample_nper_constraints(self, means, covs, n=1, maxiter=10000):
         """Sample with constraints.  If fail constraints, resample."""

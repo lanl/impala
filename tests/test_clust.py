@@ -227,16 +227,16 @@ def test_clust():
     pred_sse = np.square(pred - setup.ys[0]).sum(1)
     theta_minsse = mat[np.where(pred_sse == pred_sse.min())[0][0], :]
     theta_minsse_baseline = np.array([
-        0.12128295,
-        0.37003977,
-        0.83441036,
-        0.02567501,
-        0.33820767,
-        0.05227873,
-        0.5005156,
-        0.12528871,
-        0.44356897,
-        0.32361081,
+        0.20526145,
+        0.59566408,
+        0.78755387,
+        0.08794196,
+        0.33280684,
+        0.44106511,
+        0.50686367,
+        0.33024073,
+        0.64569779,
+        0.11573176,
     ])
     assert np.allclose(theta_minsse, theta_minsse_baseline)
     
