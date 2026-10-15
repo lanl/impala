@@ -192,8 +192,16 @@ def validate_model_constants_and_bounds(cfg, model_cfg):
     required_params = set(test_model.get_parameter_list())
     required_consts = set(test_model.get_constants_list())
 
-    bounds = set(cfg["bounds_ptw"].keys())
-    consts = set(cfg["consts_ptw"].keys())
+    bounds_dict = cfg.get("bounds")
+    if bounds_dict is None:
+        bounds_dict = cfg.get("bounds_ptw")
+        cfg["bounds"] = cfg.pop("bounds_ptw") # fix for later fcts
+    consts_dict = cfg.get("consts")
+    if consts_dict is None:
+        consts_dict = cfg.get("consts_ptw")
+        cfg["consts"] = cfg.pop("consts_ptw") # fix for later fcts
+    bounds = set(bounds_dict.keys())
+    consts = set(consts_dict.keys())
 
     missing_model_params = sorted(required_params - bounds - consts)
     missing_model_consts = sorted(required_consts - consts)
@@ -202,18 +210,18 @@ def validate_model_constants_and_bounds(cfg, model_cfg):
     if missing_model_params:
         raise ValueError(
             "The selected PTW model choices require these parameters, but they are "
-            f"missing from both bounds_ptw and consts_ptw: {missing_model_params}"
+            f"missing from both bounds and consts: {missing_model_params}"
         )
 
     if missing_model_consts:
         raise ValueError(
             "The selected PTW model choices require these constants, but they are "
-            f"missing from consts_ptw: {missing_model_consts}"
+            f"missing from consts: {missing_model_consts}"
         )
 
     if extra_bounds:
         print(
-            "[WARN] bounds_ptw contains parameters not used by the selected main model: "
+            "[WARN] bounds contains parameters not used by the selected main model: "
             f"{extra_bounds}"
         )
 
@@ -709,7 +717,7 @@ def build_main_model(cfg, dat_all, temps, edots, pooled: bool, model_cfg):
     model = sc.ModelMaterialStrength(
         temps=np.array(temps, dtype=float),
         edots=np.array(edots, dtype=float) * 1e-6,
-        consts=cfg["consts_ptw"],
+        consts=cfg["consts"],
         options=cfg["options"],
         strain_histories=[
             strain_hist_list[j][inds[j]] for j, _ in enumerate(dat_all)
@@ -750,7 +758,7 @@ def build_z_models(cfg, dat_z, temps_z, edots_z, pooled: bool):
             f"got {len(density)} vs {len(dat_all_z)}"
         )
 
-    c = cfg["consts_ptw"]
+    c = cfg["consts"]
 
     consts_ptw_z = [
         {
@@ -832,7 +840,7 @@ def build_setup(
     Adds the main stress-strain block, optional Z-machine blocks, and optional
     Cu flyer emulator block.
     """
-    bounds = cfg["bounds_ptw"]
+    bounds = cfg["bounds"]
     constraint_name = cfg.get("settings", {}).get("constraint_function", "ptw")
     if constraint_name == "basic":
         setup = sc.CalibSetup(bounds, constraints_ptw_basic)
@@ -1689,8 +1697,8 @@ def write_run_files(
         "unsupported_groups_ignored": unsupported_groups,
         "model_spec_main": model_cfg,
         "settings_snapshot": deepcopy(cfg.get("settings", {})),
-        "bounds_ptw": deepcopy(cfg.get("bounds_ptw", {})),
-        "consts_ptw": deepcopy(cfg.get("consts_ptw", {})),
+        "bounds": deepcopy(cfg.get("bounds", {})),
+        "consts": deepcopy(cfg.get("consts", {})),
         "z_density": deepcopy(cfg.get("z_density", [])),
         "pooled_overlay_dir": str(args.pooled_overlay_dir)
         if args.pooled_overlay_dir

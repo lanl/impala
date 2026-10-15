@@ -55,7 +55,7 @@ enabled = false
 [cu_flyer]
 enabled = false
 
-[consts_ptw]
+[consts]
 matomic = 63.546
 rho0 = 8.98
 beta = 0.25
@@ -75,7 +75,7 @@ gamma_1 = 1.27
 gamma_2 = 2.82
 q2 = 0.7
 
-[bounds_ptw]
+[bounds]
 theta = [0.001, 0.2]
 p = [0.0, 5.0]
 s0 = [0.0001, 0.1]
