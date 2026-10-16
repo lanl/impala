@@ -1741,8 +1741,8 @@ def main(args=None):
     if cfg.get("options") is None:
         cfg["options"] = None
     else:
-        for k,v in cfg["options"].items():
-            if v == 'None':
+        for k, v in cfg["options"].items():
+            if v == "None":
                 cfg["options"][k] = None
     print(f'{cfg["options"] = }')
 

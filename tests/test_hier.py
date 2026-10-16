@@ -1,4 +1,5 @@
 import pathlib
+
 import numpy as np
 
 from impala import superCal as sc
@@ -233,12 +234,12 @@ def test_hier():
         0.03336257,
     ])
     assert np.allclose(theta_minsse, theta_minsse_baseline)
-    
+
     test_dir = pathlib.Path(__file__).parent
-    hier_plots = plots.PTW_Plotter(setup,out)
-    fname = test_dir /"test_hier_ptwprediction.pdf"
+    hier_plots = plots.PTW_Plotter(setup, out)
+    fname = test_dir / "test_hier_ptwprediction.pdf"
     fname.unlink(missing_ok=True)
-    hier_plots.ptw_prediction_plots(path=fname,mcmc_use=mcmc_use)
+    hier_plots.ptw_prediction_plots(path=fname, mcmc_use=mcmc_use)
     assert fname.is_file()
 
     fname = test_dir / "test_hier_pairwisetheta.pdf"

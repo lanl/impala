@@ -44,7 +44,7 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
             # 'G0'     : 0.4578, # MBar, 300K Shear mod.
             # 'sgB'    : 3.8e-4, # K^-1
         }
-        self.options = {"edotcrit_chi":1e-6}
+        self.options = {"edotcrit_chi": 1e-6}
         self.model_ptw_cg0Tm = pmh.MaterialModel(
             flow_stress_model=pmh.PTW_Yield_Stress,
         )
@@ -288,7 +288,7 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
             # 'G0'     : 0.4578, # MBar, 300K Shear mod.
             # 'sgB'    : 3.8e-4, # K^-1
         }
-        self.options = {"edotcrit_chi":1e-6}
+        self.options = {"edotcrit_chi": 1e-6}
         self.model_ptw_ss_cTm = pmh.MaterialModel(
             flow_stress_model=pmh.PTW_Yield_Stress,
             shear_modulus_model=pmh.Simple_Shear_Modulus,
@@ -525,7 +525,7 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
             "G0": 0.4578,  # MBar, 300K Shear mod.
             "sgB": 3.8e-4,  # K^-1
         }
-        self.options = {"edotcrit_chi":1e-6}
+        self.options = {"edotcrit_chi": 1e-6}
         self.model_ptw_sg_cTm = pmh.MaterialModel(
             flow_stress_model=pmh.PTW_Yield_Stress,
             shear_modulus_model=pmh.Stein_Shear_Modulus,

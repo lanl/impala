@@ -70,9 +70,9 @@ class Taylor_Quinney_Heating(BaseModel):
         # if we are working with microseconds, then this is a reasonable value for edocrit
         # if we work in seconds, it should be changed to ~1.
         # self.options = {"edotcrit_chi": 1.0e-6} ## old default
-        self.options = {"edotcrit_chi": 0.}
+        self.options = {"edotcrit_chi": 0.0}
 
-    def value(self, T,stress, edot, dt, Cv, rho):
+    def value(self, T, stress, edot, dt, Cv, rho):
         mp = self.parent.parameters
         cond = edot > mp.edotcrit_chi
         return T + cond * mp.chi * stress * edot * dt / (Cv * rho)
@@ -797,11 +797,15 @@ class MaterialModel:
             | self.heating_model.options
         )
         if qs_isothermal is False:
-            print("deprecated keyword qs_isothermal detected, setting option edotcrit_chi=0")
-            options['edotcrit_chi'] = 0
+            print(
+                "deprecated keyword qs_isothermal detected, setting option edotcrit_chi=0"
+            )
+            options["edotcrit_chi"] = 0
         elif qs_isothermal is True:
-            print("deprecated keyword qs_isothermal detected, setting option edotcrit_chi=1e-6")
-            options['edotcrit_chi'] = 1e-6
+            print(
+                "deprecated keyword qs_isothermal detected, setting option edotcrit_chi=1e-6"
+            )
+            options["edotcrit_chi"] = 1e-6
 
         assert len(set(params)) == len(params), (
             "Some Duplicate Parameters between models"
@@ -852,7 +856,12 @@ class MaterialModel:
         self.state.Cv = self.specific_heat.value()
         self.state.rho = self.density.value()
         self.state.T = self.heating_model.value(
-            self.state.T, self.state.stress, edot, dt, self.state.Cv, self.state.rho
+            self.state.T,
+            self.state.stress,
+            edot,
+            dt,
+            self.state.Cv,
+            self.state.rho,
         )
         self.state.strain = self.state.strain + edot * dt
 

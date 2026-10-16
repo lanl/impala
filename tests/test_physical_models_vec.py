@@ -178,8 +178,8 @@ def test_constparams():
         path=str(fname),
     )
     assert fname.is_file()
-    
-    pool_plots = plots.PTW_Plotter(setup_pool_ptw,out)
+
+    pool_plots = plots.PTW_Plotter(setup_pool_ptw, out)
     fname = data_dir / "test_ptw_pairplot2.pdf"
     fname.unlink(missing_ok=True)
     pool_plots.pairwise_theta_plot(path=fname)
