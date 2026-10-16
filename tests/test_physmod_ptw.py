@@ -44,6 +44,7 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
             # 'G0'     : 0.4578, # MBar, 300K Shear mod.
             # 'sgB'    : 3.8e-4, # K^-1
         }
+        self.options = {"edotcrit_chi":1e-6}
         self.model_ptw_cg0Tm = pmh.MaterialModel(
             flow_stress_model=pmh.PTW_Yield_Stress,
         )
@@ -55,7 +56,7 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
         self.model_ptw_cg0Tm.set_history_variables(
             emax=np.array([1.0]), edot=np.array([1e-7]), nhist=1000
         )
-        self.model_ptw_cg0Tm.initialize(self.params, self.consts)
+        self.model_ptw_cg0Tm.initialize(self.params, self.consts, self.options)
         self.model_ptw_cg0Tm.initialize_state(T=np.array([298.0]))
         results_ptw_cg0Tm = self.model_ptw_cg0Tm.compute_state_history()
         # result format
@@ -231,7 +232,7 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
         self.model_ptw_cg0Tm.set_history_variables(
             emax=np.array([0.371143]), edot=np.array([1e-6]), nhist=1000
         )
-        self.model_ptw_cg0Tm.initialize(self.params, self.consts)
+        self.model_ptw_cg0Tm.initialize(self.params, self.consts, self.options)
         self.model_ptw_cg0Tm.initialize_state(T=np.asarray([298.0]))
         results_ptw_cg0Tm = self.model_ptw_cg0Tm.compute_state_history()
         # result format
@@ -287,6 +288,7 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
             # 'G0'     : 0.4578, # MBar, 300K Shear mod.
             # 'sgB'    : 3.8e-4, # K^-1
         }
+        self.options = {"edotcrit_chi":1e-6}
         self.model_ptw_ss_cTm = pmh.MaterialModel(
             flow_stress_model=pmh.PTW_Yield_Stress,
             shear_modulus_model=pmh.Simple_Shear_Modulus,
@@ -299,7 +301,7 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
         self.model_ptw_ss_cTm.set_history_variables(
             emax=np.array([1.0]), edot=np.array([1e-7]), nhist=1000
         )
-        self.model_ptw_ss_cTm.initialize(self.params, self.consts)
+        self.model_ptw_ss_cTm.initialize(self.params, self.consts, self.options)
         self.model_ptw_ss_cTm.initialize_state(T=np.array([298.0]))
         results_ptw_ss_cTm = self.model_ptw_ss_cTm.compute_state_history()
         # result format
@@ -523,6 +525,7 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
             "G0": 0.4578,  # MBar, 300K Shear mod.
             "sgB": 3.8e-4,  # K^-1
         }
+        self.options = {"edotcrit_chi":1e-6}
         self.model_ptw_sg_cTm = pmh.MaterialModel(
             flow_stress_model=pmh.PTW_Yield_Stress,
             shear_modulus_model=pmh.Stein_Shear_Modulus,
@@ -535,7 +538,7 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
         self.model_ptw_sg_cTm.set_history_variables(
             emax=np.array([1.0]), edot=np.array([1e-7]), nhist=1000
         )
-        self.model_ptw_sg_cTm.initialize(self.params, self.consts)
+        self.model_ptw_sg_cTm.initialize(self.params, self.consts, self.options)
         self.model_ptw_sg_cTm.initialize_state(T=np.array([298.0]))
         results_ptw_sg_cTm = self.model_ptw_sg_cTm.compute_state_history()
         # result format

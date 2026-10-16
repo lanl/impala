@@ -60,7 +60,8 @@ class BaseModel:
 ########################
 class Taylor_Quinney_Heating(BaseModel):
     """
-    heating from plastic work using Taylor-Quinney coefficient 'chi' above a critical strain rate 'edotcrit'
+    Heating from plastic work using Taylor-Quinney coefficient 'chi' above a critical strain rate 'edotcrit_chi'
+    By default, edotcrit_chi=0 so that chi is always used independent of the strain rate.
     """
 
     def __init__(self, parent):
@@ -68,11 +69,12 @@ class Taylor_Quinney_Heating(BaseModel):
         self.params = ["chi"]
         # if we are working with microseconds, then this is a reasonable value for edocrit
         # if we work in seconds, it should be changed to ~1.
-        self.options = {"edotcrit": 1.0e-6}
+        # self.options = {"edotcrit_chi": 1.0e-6} ## old default
+        self.options = {"edotcrit_chi": 0.}
 
     def value(self, T,stress, edot, dt, Cv, rho):
         mp = self.parent.parameters
-        cond = edot > mp.edotcrit
+        cond = edot > mp.edotcrit_chi
         return T + cond * mp.chi * stress * edot * dt / (Cv * rho)
 
 
@@ -748,7 +750,7 @@ class MaterialModel:
         melt_model=Constant_Melt_Temperature,
         density_model=Constant_Density,
         heating_model=Taylor_Quinney_Heating,
-        qs_isothermal=True,
+        qs_isothermal=None,
     ):
         """
         Initialization routine for Material Model.  All of the arguments
@@ -795,8 +797,11 @@ class MaterialModel:
             | self.heating_model.options
         )
         if qs_isothermal is False:
-            print("deprecated keyword qs_isothermal detected, setting option edotcrit=0")
-            options['edotcrit'] = 0
+            print("deprecated keyword qs_isothermal detected, setting option edotcrit_chi=0")
+            options['edotcrit_chi'] = 0
+        elif qs_isothermal is True:
+            print("deprecated keyword qs_isothermal detected, setting option edotcrit_chi=1e-6")
+            options['edotcrit_chi'] = 1e-6
 
         assert len(set(params)) == len(params), (
             "Some Duplicate Parameters between models"
