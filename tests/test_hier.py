@@ -204,14 +204,10 @@ def test_hier():
     setup.theta0_start = np.repeat(best_pool.reshape(1, -1), ntemps, axis=0)
     out = sc.calibHier(setup)
 
-    theta_parent = sc.chol_sample_1per_constraints(
+    theta_parent = setup.chol_sample_nper_constraints(
         out.theta0[:, 0],
         out.Sigma0[:, 0],
-        setup.checkConstraints,
-        setup.bounds_mat,
-        setup.bounds.keys(),
-        setup.bounds,
-        setup.constants,
+        n=1,
     )
     mcmc_use = np.arange(2500, 5000, 2)  # burn and thin index
     mat = theta_parent[mcmc_use, :]

@@ -20,6 +20,7 @@ from numpy.random import normal, uniform
 from .impala_noprobit_emu import (
     cov_3d_pcm,
     initfunc_unif,
+    sample_pooled,
     theta_log_prior,
     tran_unif,
 )
@@ -127,29 +128,9 @@ def calibPool(setup):
         for i in range(setup.nexp)
     ]
     # starting values for theta:
-    theta_start0 = initfunc_unif(size=[setup.ntemps, setup.p])
-    good = setup.checkConstraints(
-        tran_unif(theta_start0, setup.bounds_mat, setup.bounds.keys())
+    theta[0] = sample_pooled(
+        (setup.ntemps, setup.p), setup.checkConstraints, setup.bounds
     )
-    maxiter = 1000000
-    j = 0
-    while np.any(np.logical_not(good)):
-        if j >= maxiter:
-            raise ValueError(
-                f"Failed to find samples that fulfill the constraints after {maxiter} iterations."
-            )
-        theta_start0[np.where(np.logical_not(good))] = initfunc_unif(
-            size=[(np.logical_not(good)).sum(), setup.p]
-        )
-        good[np.where(np.logical_not(good))] = setup.checkConstraints(
-            tran_unif(
-                theta_start0[np.where(np.logical_not(good))],
-                setup.bounds_mat,
-                setup.bounds.keys(),
-            )
-        )
-        j += 1
-    theta[0] = theta_start0
 
     s2_which_mat = [
         [
