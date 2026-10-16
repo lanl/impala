@@ -44,8 +44,9 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
             # 'G0'     : 0.4578, # MBar, 300K Shear mod.
             # 'sgB'    : 3.8e-4, # K^-1
         }
+        self.options = {"edotcrit_chi":1e-6}
         self.model_ptw_cg0Tm = pmh.MaterialModel(
-            flow_stress_model=pmh.PTW_Yield_Stress, qs_isothermal=True
+            flow_stress_model=pmh.PTW_Yield_Stress,
         )
 
     def test_isothermal_lowrate(self):
@@ -55,7 +56,7 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
         self.model_ptw_cg0Tm.set_history_variables(
             emax=np.array([1.0]), edot=np.array([1e-7]), nhist=1000
         )
-        self.model_ptw_cg0Tm.initialize(self.params, self.consts)
+        self.model_ptw_cg0Tm.initialize(self.params, self.consts, self.options)
         self.model_ptw_cg0Tm.initialize_state(T=np.array([298.0]))
         results_ptw_cg0Tm = self.model_ptw_cg0Tm.compute_state_history()
         # result format
@@ -208,7 +209,7 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
 
     def test_stress_lowrate(self):
         """
-        PTW, constant g0 and Tm, low rate 1e0/s, FLAG/python comparison within 9.5%.
+        PTW, constant g0 and Tm, low rate 1e0/s, FLAG/python comparison within 9%.
 
         Compare flow stress with 3D single cell uniaxial compression simulation
         performed with FLAG. 2D and 1D produced multiaxial stress states as
@@ -231,7 +232,7 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
         self.model_ptw_cg0Tm.set_history_variables(
             emax=np.array([0.371143]), edot=np.array([1e-6]), nhist=1000
         )
-        self.model_ptw_cg0Tm.initialize(self.params, self.consts)
+        self.model_ptw_cg0Tm.initialize(self.params, self.consts, self.options)
         self.model_ptw_cg0Tm.initialize_state(T=np.asarray([298.0]))
         results_ptw_cg0Tm = self.model_ptw_cg0Tm.compute_state_history()
         # result format
@@ -239,7 +240,7 @@ class TestPTWYieldStress_Constg0Tm(unittest.TestCase):
         # Assess stress at the emax
         stress_emax = results_ptw_cg0Tm[-1, 2][0]
         # Set maximum relative tolerance between FLAG and Python
-        stress_tol = 0.095  # 0.09 getting caught
+        stress_tol = 0.09
         stress_FLAG = 385.751e-5  # Units MBar
         rel_diff = abs(stress_emax - stress_FLAG) / np.mean([
             stress_emax,
@@ -287,10 +288,10 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
             # 'G0'     : 0.4578, # MBar, 300K Shear mod.
             # 'sgB'    : 3.8e-4, # K^-1
         }
+        self.options = {"edotcrit_chi":1e-6}
         self.model_ptw_ss_cTm = pmh.MaterialModel(
             flow_stress_model=pmh.PTW_Yield_Stress,
             shear_modulus_model=pmh.Simple_Shear_Modulus,
-            qs_isothermal=True,
         )
 
     def test_isothermal_lowrate(self):
@@ -300,7 +301,7 @@ class TestPTWYieldStress_SimpShearConstTm(unittest.TestCase):
         self.model_ptw_ss_cTm.set_history_variables(
             emax=np.array([1.0]), edot=np.array([1e-7]), nhist=1000
         )
-        self.model_ptw_ss_cTm.initialize(self.params, self.consts)
+        self.model_ptw_ss_cTm.initialize(self.params, self.consts, self.options)
         self.model_ptw_ss_cTm.initialize_state(T=np.array([298.0]))
         results_ptw_ss_cTm = self.model_ptw_ss_cTm.compute_state_history()
         # result format
@@ -524,10 +525,10 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
             "G0": 0.4578,  # MBar, 300K Shear mod.
             "sgB": 3.8e-4,  # K^-1
         }
+        self.options = {"edotcrit_chi":1e-6}
         self.model_ptw_sg_cTm = pmh.MaterialModel(
             flow_stress_model=pmh.PTW_Yield_Stress,
             shear_modulus_model=pmh.Stein_Shear_Modulus,
-            qs_isothermal=True,
         )
 
     def test_isothermal_lowrate(self):
@@ -537,7 +538,7 @@ class TestPTWYieldStress_SteinShearConstTm(unittest.TestCase):
         self.model_ptw_sg_cTm.set_history_variables(
             emax=np.array([1.0]), edot=np.array([1e-7]), nhist=1000
         )
-        self.model_ptw_sg_cTm.initialize(self.params, self.consts)
+        self.model_ptw_sg_cTm.initialize(self.params, self.consts, self.options)
         self.model_ptw_sg_cTm.initialize_state(T=np.array([298.0]))
         results_ptw_sg_cTm = self.model_ptw_sg_cTm.compute_state_history()
         # result format

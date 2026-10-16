@@ -96,6 +96,12 @@ bounds_ptw:
   y1: [0.001, 0.5]
   y2: [0.281, 5.0]
 
+#options:
+  # option for BGP_PW_Shear_Modulus: default is 0 meaning shear modulue jumps to zero for T>Tmelt
+  # set to 'None' to keep the shear modulus at fixed value shear(T=Tmelt) for T>Tmelt
+  # both 0 and None give the same answer only if const 'alpha'=1
+#  melt_strength: None
+
 settings:
   nsamp: 50
   gamma_log_base: exp

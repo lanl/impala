@@ -645,7 +645,7 @@ def chol_sample_nper(means, covs, n):
 
 
 def chol_sample_1per_constraints(
-    means, covs, cf, bounds_mat, bounds_keys, bounds, consts, maxiter=1000000
+    means, covs, cf, bounds_mat, bounds_keys, bounds, consts, maxiter=10000
 ):
     """Sample with constraints.  If fail constraints, resample."""
     chols = cholesky(covs)
@@ -673,7 +673,7 @@ def chol_sample_1per_constraints(
 
 
 def chol_sample_nper_constraints(
-    means, covs, n, cf, bounds_mat, bounds_keys, bounds, consts, maxiter=1000000
+    means, covs, n, cf, bounds_mat, bounds_keys, bounds, consts, maxiter=10000
 ):
     """Sample with constraints.  If fail constraints, resample."""
     chols = cholesky(covs)
