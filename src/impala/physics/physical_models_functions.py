@@ -220,6 +220,7 @@ def BGP_PW_Shear_Modulus(
     rho: float,
     T: float,
     Tmelt: float,
+    melt_strength: float | None = 0.0,
 ) -> float:
     """
     BPG model provides cold shear, i.e. shear modulus at zero temperature as a function of density.
@@ -243,9 +244,9 @@ def BGP_PW_Shear_Modulus(
             + 2 * gamma_2 / q2 * (np.power(rho_0, -q2) - np.power(rho, -q2))
         )
     )
-    gnow = cold_shear * (1.0 - alpha * (T / Tmelt))
-
-    gnow[np.where(T >= Tmelt)] = 0.0
+    gnow = cold_shear * (1.0 - alpha * np.clip(T / Tmelt, None, 1))
+    if melt_strength is not None:
+        gnow[np.where(T >= Tmelt)] = melt_strength
     gnow[np.where(gnow < 0)] = 0.0
     return gnow
 

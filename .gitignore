@@ -85,6 +85,10 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+*.png
+test*.pdf
+test*.csv
+impala_runs
 
 # Translations
 *.mo
@@ -105,6 +109,10 @@ instance/
 
 # Sphinx documentation
 docs/_build/
+
+# Doxygen documentation
+html
+latex
 
 # PyBuilder
 target/
@@ -165,10 +173,6 @@ dmypy.json
 
 dev/
 .ipynb_checkpoints
+*.bak
 
 .vscode/settings.json
-
-
-# copper flyer FLAG sims
-/data/Cu/cu_flyer_training/*
-/data/Cu/flyer_lhs.csv
