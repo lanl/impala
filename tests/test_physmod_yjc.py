@@ -28,7 +28,7 @@ class TestJCYieldStress(unittest.TestCase):
             "edot0": 1.0e-6,  # 1/micro-s
             "chi": 1.0,
         }
-        self.options = {"edotcrit_chi":1e-6}
+        self.options = {"edotcrit_chi": 1e-6}
         self.model_yjc = pmh.MaterialModel(
             flow_stress_model=pmh.JC_Yield_Stress,
         )

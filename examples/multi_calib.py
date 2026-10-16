@@ -28,7 +28,8 @@ import os
 import pickle
 import random
 import sys
-if sys.version_info < (3,11):
+
+if sys.version_info < (3, 11):
     import tomli as tomllib
 else:
     import tomllib
@@ -195,11 +196,11 @@ def validate_model_constants_and_bounds(cfg, model_cfg):
     bounds_dict = cfg.get("bounds")
     if bounds_dict is None:
         bounds_dict = cfg.get("bounds_ptw")
-        cfg["bounds"] = cfg.pop("bounds_ptw") # fix for later fcts
+        cfg["bounds"] = cfg.pop("bounds_ptw")  # fix for later fcts
     consts_dict = cfg.get("consts")
     if consts_dict is None:
         consts_dict = cfg.get("consts_ptw")
-        cfg["consts"] = cfg.pop("consts_ptw") # fix for later fcts
+        cfg["consts"] = cfg.pop("consts_ptw")  # fix for later fcts
     bounds = set(bounds_dict.keys())
     consts = set(consts_dict.keys())
 
@@ -1758,8 +1759,8 @@ def main(args=None):
     if cfg.get("options") is None:
         cfg["options"] = None
     else:
-        for k,v in cfg["options"].items():
-            if v == 'None':
+        for k, v in cfg["options"].items():
+            if v == "None":
                 cfg["options"][k] = None
     print(f'{cfg["options"] = }')
 
