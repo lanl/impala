@@ -246,30 +246,44 @@ def load_cu_flyer_block(cfg):
         return None, None, None
 
     data_root = expand_home(cfg["paths"]["path_to_data"])
+    flyer_files = flyer_cfg.get("data_files", {})
+    
 
-    obs_file = data_root / flyer_cfg["obs_file"]
+    if isinstance(flyer_files[0], dict):
+        required = {"file"}
+
+        for i, entry in enumerate(flyer_files):
+            missing = required - set(entry)
+            if missing:
+                raise ValueError(f"Entry {i} is missing required keys: {missing}")
+        
+        files = [entry["file"] for entry in flyer_files]
+    
     emulator_file = expand_home(flyer_cfg["emulator_file"])
 
-    if not obs_file.exists():
-        raise FileNotFoundError(f"Missing Cu flyer obs file: {obs_file}")
     if not emulator_file.exists():
         raise FileNotFoundError(
             f"Missing Cu flyer emulator file: {emulator_file}"
         )
+    if not files:
+        raise FileNotFoundError(f"Missing at least one flyer obs file {files}")
 
-    flyer_obs = pd.read_csv(
-        obs_file,
-        sep=r"\s+",
-        engine="python",
-        skiprows=int(flyer_cfg.get("obs_skiprows", 5)),
-        header=None,
-    )
-    flyer_obs = pd.DataFrame(
-        np.asarray(flyer_obs), columns=["Time", "velocity"]
-    )
-    flyer_obs = flyer_obs[
-        flyer_obs["Time"] > float(flyer_cfg.get("obs_time_min", 0.83))
-    ]
+    flyer_obs_all = []
+    for f in files:
+        flyer_obs = pd.read_csv(
+            data_root / f,
+            sep=r"\s+",
+            engine="python",
+            skiprows=int(flyer_cfg.get("obs_skiprows", 5)),
+            header=None,
+        )
+        flyer_obs = pd.DataFrame(
+            np.asarray(flyer_obs), columns=["Time", "velocity"]
+        )
+        flyer_obs = flyer_obs[
+            flyer_obs["Time"] > float(flyer_cfg.get("obs_time_min", 0.83))
+        ]
+        flyer_obs_all.append(flyer_obs)
 
     time_start = float(flyer_cfg.get("time_start", 0.5))
     time_end = float(flyer_cfg.get("time_end", 1.4))
@@ -277,22 +291,26 @@ def load_cu_flyer_block(cfg):
 
     time_grid = np.arange(time_start, time_end, time_step)
 
-    flyer_obs_interp = pd.DataFrame(
-        np.append(
-            time_grid.reshape(-1, 1),
-            np.exp(
-                interp1d(
-                    flyer_obs["Time"],
-                    np.log(flyer_obs["velocity"] + 1e-9),
-                    kind="linear",
-                    fill_value="extrapolate",
-                )(time_grid)
-            ).reshape(-1, 1),
-            axis=1,
-        ),
-        columns=["Time", "velocity"],
-    )
-    flyer_obs_interp[flyer_obs_interp < 0] = 0
+    flyer_obs_interp_all = []
+
+    for df in flyer_obs_all:
+        flyer_obs_interp = pd.DataFrame(
+            np.append(
+                time_grid.reshape(-1, 1),
+                np.exp(
+                    interp1d(
+                        df["Time"],
+                        np.log(df["velocity"] + 1e-9),
+                        kind="linear",
+                        fill_value="extrapolate",
+                    )(time_grid)
+                ).reshape(-1, 1),
+                axis=1,
+            ),
+            columns=["Time", "velocity"],
+        )
+        df[flyer_obs_interp < 0] = 0
+        flyer_obs_interp_all.append(flyer_obs_interp)
 
     sub_stride = int(flyer_cfg.get("subsample_stride", 10))
     sub_tmin = float(flyer_cfg.get("sub_time_min", 0.8))
@@ -303,6 +321,8 @@ def load_cu_flyer_block(cfg):
         (time_grid[sub_inds0] > sub_tmin) & (time_grid[sub_inds0] < sub_tmax)
     ]
     time_grid2 = time_grid[sub_inds]
+
+
 
     input_names = list(
         flyer_cfg.get(
@@ -333,29 +353,40 @@ def load_cu_flyer_block(cfg):
         str(emulator_file), providers=["CPUExecutionProvider"]
     )
     input_name = nn_onnx.get_inputs()[0].name
+    
+    def nn_emu(parmat, inds_to_run=None):
+        parmat_array = np.asarray(parmat, dtype=np.float32)
 
-    def nn_emu_pooled(parmat):
-        parmat_array = np.vstack(parmat).T
-        res = [
-            nn_onnx.run(
-                None,
-                {
-                    input_name: np.append(
-                        np.repeat(time_i, parmat_array.shape[0]).reshape(-1, 1),
-                        parmat_array,
-                        axis=1,
-                    ).astype(np.float32)
-                },
-            )[0].flatten()
-            for time_i in time_grid2
-        ]
-        return np.hstack(res)
+        if inds_to_run is None:
+            selected_times = time_grid2_all
+        else:
+            row_inds, col_inds = inds_to_run
+            parmat_array = parmat_array[row_inds.ravel(), :]
+            selected_times = time_grid2_all[col_inds.ravel()]
+        
+        predictions = np.empty((parmat_array.shape[0], len(selected_times)), dtype=np.float32)
 
-    model_emu = sc.ModelF_bigdata(nn_emu_pooled, input_names=input_names)
-    yobs_flyer = np.asarray(flyer_obs_interp)[:, 1].flatten()[sub_inds]
+        for i, time_j in enumerate(selected_times):
+            onnx_input = np.column_stack([
+                np.full(parmat_array.shape[0], time_j, dtype=np.float32),
+                parmat_array,
+            ]).astype(np.float32)
 
-    print(f"loaded Cu flyer block with {len(yobs_flyer)} observations")
-    return model_emu, yobs_flyer, time_grid2
+            predictions[:, i] = nn_onnx.run(None, {input_name: onnx_input})[0].reshape(-1)
+        
+        return predictions
+
+    
+    model_emu = sc.ModelF_bigdata(nn_emu, input_names=input_names)
+    yobs_flyer_all = []
+    for f in flyer_obs_interp_all:
+        yobs_flyer = np.asarray(f)[:, 1].flatten()[sub_inds]
+        yobs_flyer_all.append(yobs_flyer)
+    model_emu.nexp = len(yobs_flyer_all)
+    time_grid2_all = np.tile(time_grid2, len(yobs_flyer_all))
+
+    print(f"loaded Cu flyer block with {len(yobs_flyer_all)} observations")
+    return model_emu, yobs_flyer_all, time_grid2_all
 
 
 def compute_cu_taylor_point():
@@ -899,16 +930,33 @@ def build_setup(
         yobs_flyer = np.asarray(flyer_yobs, dtype=np.float64)
         n_obs_flyer = yobs_flyer.shape[0]
 
+        yobs_flyer = np.hstack([
+            np.asarray(flyer_yobs_i)
+            for flyer_yobs_i in flyer_yobs
+        ]).astype(np.float64)
+
+        s2_ind_main_flyer = np.hstack([
+            [i] * len(np.asarray(flyer_yobs_i))
+            for i, flyer_yobs_i in enumerate(flyer_yobs)
+        ]).astype(int)
+
+        theta_ind_flyer = s2_ind_main_flyer
+
+        sd_est_flyer = flyer_cfg.get("sd_est", 10.0)
+        if pooled:
+            sd_est_main_flyer = np.full(len(flyer_yobs), sd_est_flyer, dtype=np.float64)
+        else:
+            sd_est_main_flyer = np.array([sd_est_flyer] * len(flyer_yobs), dtype=np.float64)
+
         setup.addVecExperiments(
             yobs=yobs_flyer,
             model=flyer_model,
-            sd_est=np.array(
-                [float(flyer_cfg.get("sd_est", 10.0))], dtype=np.float64
-            ),
+            sd_est=sd_est_main_flyer,
             s2_df=np.array([int(flyer_cfg.get("s2_df", 50))], dtype=int),
-            s2_ind=np.zeros(n_obs_flyer, dtype=int),
-            theta_ind=np.zeros(n_obs_flyer, dtype=int),
+            s2_ind=s2_ind_main_flyer,
+            theta_ind=theta_ind_flyer,
         )
+        
 
     temp_cfg = cfg["settings"]["tempering"]
     setup.setTemperatureLadder(
@@ -943,7 +991,7 @@ def build_setup(
             Sigma0_prior_df=p + pri["Sigma0_prior_df_offset"],
             Sigma0_prior_scale=np.eye(p) * (pri["Sigma0_prior_scale"] ** 2),
         )
-
+    
     return setup
 
 

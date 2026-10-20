@@ -986,7 +986,7 @@ class ModelF_bigdata(AbstractModel):
             parmat[v] for v in self.input_names
         ]).T  # get correct subset/ordering of inputs #changed this eval for the clustered/hier setting to be more efficient
         if pool is True:
-            return np.apply_along_axis(self.mod, 1, parmat_array)
+            return self.mod(parmat_array)
         else:
             # nrep = list(parmat.values())[0].shape[0] // self.nexp
             nrep = next(iter(parmat.values())).shape[0] // self.nexp
@@ -997,7 +997,7 @@ class ModelF_bigdata(AbstractModel):
                     np.where(self.exp_ind == i)[0],
                 )
                 self.res_array[:, np.where(self.exp_ind == i)[0]] = self.mod(
-                    parmat_array#, inds_to_run
+                    parmat_array, inds_to_run
                 )  # note: this now has a second argument. This is to avoid unnecessary predictions
             return self.res_array
 

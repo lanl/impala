@@ -59,7 +59,9 @@ cu_taylor_cylinder:
 
 cu_flyer:
   enabled: true
-  obs_file: Cu-Flyer/ofhc-cu-symmetric-impact.txt
+  data_files:
+    - file: Cu-Flyer/ofhc-cu-symmetric-impact_1.txt
+    - file: Cu-Flyer/ofhc-cu-symmetric-impact_2.txt
   emulator_file: ../data/Cu/Cu-Flyer/nn_emulator.onnx
   obs_skiprows: 5
   obs_time_min: 0.83
