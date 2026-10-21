@@ -229,8 +229,8 @@ def validate_model_constants_and_bounds(cfg, model_cfg):
     fixed_model_params = sorted(required_params & consts)
     calibrated_model_params = sorted(required_params & bounds)
 
-    print("calibrated PTW parameters:", calibrated_model_params)
-    print("fixed PTW parameters:", fixed_model_params)
+    print("calibrated parameters:", calibrated_model_params)
+    print("fixed parameters:", fixed_model_params)
 
 
 # ----------------------------------------------------------------------
