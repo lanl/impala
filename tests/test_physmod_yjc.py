@@ -28,8 +28,9 @@ class TestJCYieldStress(unittest.TestCase):
             "edot0": 1.0e-6,  # 1/micro-s
             "chi": 1.0,
         }
+        self.options = {"edotcrit_chi": 1e-6}
         self.model_yjc = pmh.MaterialModel(
-            flow_stress_model=pmh.JC_Yield_Stress, qs_isothermal=True
+            flow_stress_model=pmh.JC_Yield_Stress,
         )
 
     def test_isothermal_lowrate(self):
@@ -39,7 +40,7 @@ class TestJCYieldStress(unittest.TestCase):
         self.model_yjc.set_history_variables(
             emax=np.array([1.0]), edot=np.array([1e-7]), nhist=1000
         )
-        self.model_yjc.initialize(self.params, self.consts)
+        self.model_yjc.initialize(self.params, self.consts, self.options)
         self.model_yjc.initialize_state(T=np.array([298.0]))
         results_yjc = self.model_yjc.compute_state_history()
         # result format
@@ -169,7 +170,7 @@ class TestJCYieldStress(unittest.TestCase):
         self.model_yjc.set_history_variables(
             emax=np.array([0.28928]), edot=np.array([1e-7]), nhist=1000
         )
-        self.model_yjc.initialize(self.params, self.consts)
+        self.model_yjc.initialize(self.params, self.consts, self.options)
         self.model_yjc.initialize_state(T=np.array([298.0]))
         results_yjc = self.model_yjc.compute_state_history()
         # result format

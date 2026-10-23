@@ -14,8 +14,6 @@ from scipy.stats import invwishart
 
 from .impala_noprobit_emu import (
     chol_sample_1per,
-    chol_sample_1per_constraints,
-    chol_sample_nper_constraints,
     cov_4d_pcm,
     gamma_logpdf,
     initfunc_unif,
@@ -373,7 +371,7 @@ def calibClust(setup):
         good = setup.checkConstraints(
             tran_unif(theta0_start, setup.bounds_mat, setup.bounds.keys())
         )
-        maxiter = 1000000
+        maxiter = 10000
         for j in range(maxiter):
             if np.all(good):
                 break
@@ -461,15 +459,10 @@ def calibClust(setup):
 
     ### Added ability to specify initial value
     if setup.theta_start is None:
-        theta[0] = chol_sample_nper_constraints(
+        theta[0] = setup.chol_sample_nper_constraints(
             theta0[0],
             Sigma0[0],
             setup.nclustmax,
-            setup.checkConstraints,
-            setup.bounds_mat,
-            setup.bounds.keys(),
-            setup.bounds,
-            setup.constants,
         )
     else:
         theta[0] = setup.theta_start
@@ -898,14 +891,10 @@ def calibClust(setup):
             setup.itl,
             np.einsum("t,tlk,tk->tl", ntheta, Sigma0_inv_curr, tbar),
         ) + np.dot(theta0_prior_prec, theta0_prior_mean)
-        theta0[m][:] = chol_sample_1per_constraints(
+        theta0[m][:] = setup.chol_sample_nper_constraints(
             np.einsum("tlk,tk->tl", cc, dd),
             cc,
-            setup.checkConstraints,
-            setup.bounds_mat,
-            setup.bounds.keys(),
-            setup.bounds,
-            setup.constants,
+            n=1,
         )
 
         ###########################
@@ -954,14 +943,10 @@ def calibClust(setup):
             )  # gives better performance for heavily-occupied clusters, 10/5/26
 
         theta_cand = np.stack([
-            chol_sample_1per_constraints(
+            setup.chol_sample_nper_constraints(
                 theta[m][t],
                 cov_theta_cand.S[t],
-                setup.checkConstraints,
-                setup.bounds_mat,
-                setup.bounds.keys(),
-                setup.bounds,
-                setup.constants,
+                n=1,
             )
             for t in range(setup.ntemps)
         ])
@@ -977,15 +962,10 @@ def calibClust(setup):
         )  # these should actually all be good now
         theta_eval[good_values] = theta_cand[good_values]
 
-        theta_cand_empty[:] = chol_sample_nper_constraints(
+        theta_cand_empty[:] = setup.chol_sample_nper_constraints(
             theta0[m],
             Sigma0[m],
             setup.nclustmax,
-            setup.checkConstraints,
-            setup.bounds_mat,
-            setup.bounds.keys(),
-            setup.bounds,
-            setup.constants,
         )
         theta_eval[~theta_ext] = theta_cand_empty[~theta_ext].copy()
         theta[m, ~theta_ext] = theta_eval[
