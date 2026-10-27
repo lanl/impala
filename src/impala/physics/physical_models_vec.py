@@ -507,7 +507,7 @@ class BGP_PW_Shear_Modulus(BaseModel):
     def __init__(self, parent):
         BaseModel.__init__(self, parent)
         self.consts = ["G0", "rho_0", "gamma_1", "gamma_2", "q2", "alpha"]
-        self.options = {"melt_strength": 0.0}
+        self.options = {"melt_strength": 1e-5}
 
     def value(self, *args):
         mp = self.parent.parameters
