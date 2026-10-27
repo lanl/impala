@@ -51,7 +51,31 @@ class BaseModel:
     def __init__(self, parent):
         self.params = []
         self.consts = []
+        self.options = {}
         self.parent = parent
+
+
+########################
+# heating from plastic work
+########################
+class Taylor_Quinney_Heating(BaseModel):
+    """
+    Heating from plastic work using Taylor-Quinney coefficient 'chi' above a critical strain rate 'edotcrit_chi'
+    By default, edotcrit_chi=0 so that chi is always used independent of the strain rate.
+    """
+
+    def __init__(self, parent):
+        BaseModel.__init__(self, parent)
+        self.params = ["chi"]
+        # if we are working with microseconds, then this is a reasonable value for edocrit
+        # if we work in seconds, it should be changed to ~1.
+        # self.options = {"edotcrit_chi": 1.0e-6} ## old default
+        self.options = {"edotcrit_chi": 0.0}
+
+    def value(self, T, stress, edot, dt, Cv, rho):
+        mp = self.parent.parameters
+        cond = edot > mp.edotcrit_chi
+        return T + cond * mp.chi * stress * edot * dt / (Cv * rho)
 
 
 ########################
@@ -483,6 +507,7 @@ class BGP_PW_Shear_Modulus(BaseModel):
     def __init__(self, parent):
         BaseModel.__init__(self, parent)
         self.consts = ["G0", "rho_0", "gamma_1", "gamma_2", "q2", "alpha"]
+        self.options = {"melt_strength": 1e-5}
 
     def value(self, *args):
         mp = self.parent.parameters
@@ -496,6 +521,7 @@ class BGP_PW_Shear_Modulus(BaseModel):
             rho=self.parent.state.rho,
             T=self.parent.state.T,
             Tmelt=self.parent.state.Tmelt,
+            melt_strength=mp.melt_strength,
         )
         return gnow
 
@@ -511,7 +537,7 @@ class Stein_Shear_Modulus(BaseModel):
     def __init__(self, parent):
         BaseModel.__init__(self, parent)
         self.consts = ["G0", "sgB"]
-        self.eta = 1.0
+        self.eta = 1.0  # do we need eta?
 
     def value(self, *args):
         return functions.Stein_Shear_Modulus(
@@ -534,7 +560,7 @@ class Constant_Yield_Stress(BaseModel):
 
     def __init__(self, parent):
         BaseModel.__init__(self, parent)
-        self.consts = ["yield_stress", "chi"]
+        self.consts = ["yield_stress"]
 
     def value(self, *args):
         return self.parent.parameters.yield_stress * np.ones(
@@ -550,11 +576,7 @@ class JC_Yield_Stress(BaseModel):
     def __init__(self, parent):
         BaseModel.__init__(self, parent)
         self.params = ["A", "B", "C", "n", "m"]
-        self.consts = [
-            "Tref",
-            "edot0",
-            "chi",
-        ]  ## nothing here depends on chi, why is it here?
+        self.consts = ["Tref", "edot0"]
 
     def value(self, edot):
         mp = self.parent.parameters
@@ -591,7 +613,7 @@ class PTW_Yield_Stress(BaseModel):
             "y1",
             "y2",
         ]
-        self.consts = ["rho0", "matomic", "chi"]
+        self.consts = ["rho0", "matomic"]
 
     # @profile
     def value(self, edot):
@@ -647,7 +669,7 @@ class Stein_Flow_Stress(BaseModel):
         # self.params = ["y0", "a", "b", "beta", "n", "ymax"]
         ## params a, b are never used, so drop them:
         self.params = ["y0", "beta", "n", "ymax"]
-        self.consts = ["G0", "epsi", "chi"]
+        self.consts = ["G0", "epsi"]
 
     def value(self, *args):
         mp = self.parent.parameters
@@ -669,7 +691,12 @@ class Stein_Flow_Stress(BaseModel):
 
 
 class ModelParameters:
+    """
+    Collects all calibration parameters and constants and their current values
+    """
+
     def update_parameters(self, x):
+        """updates the current values of parameters"""
         if isinstance(x, np.ndarray):
             self.__dict__.update(dict(zip(self.params, x)))
         elif isinstance(x, dict):
@@ -685,6 +712,7 @@ class ModelParameters:
     def __init__(self, parent):
         self.params = []
         self.consts = []
+        self.options = {}
         self.parent = parent
 
 
@@ -704,6 +732,8 @@ class MaterialState:
         self.strain = strain
         self.G = None
         self.parent = parent
+        self.Cv = None
+        self.rho = None
 
 
 ## Material Model Definition
@@ -719,7 +749,7 @@ class MaterialModel:
         shear_modulus_model=Constant_Shear_Modulus,
         melt_model=Constant_Melt_Temperature,
         density_model=Constant_Density,
-        qs_isothermal=False,
+        heating_model=Taylor_Quinney_Heating,
     ):
         """
         Initialization routine for Material Model.  All of the arguments
@@ -738,7 +768,7 @@ class MaterialModel:
         self.shear_modulus = shear_modulus_model(self)
         self.melt_model = melt_model(self)
         self.density = density_model(self)
-        self.qs_isothermal = qs_isothermal
+        self.heating_model = heating_model(self)
 
         params = (
             self.flow_stress.params
@@ -746,6 +776,7 @@ class MaterialModel:
             + self.shear_modulus.params
             + self.melt_model.params
             + self.density.params
+            + self.heating_model.params
         )
         consts = set(
             self.flow_stress.consts
@@ -753,6 +784,15 @@ class MaterialModel:
             + self.shear_modulus.consts
             + self.melt_model.consts
             + self.density.consts
+            + self.heating_model.consts
+        )
+        options = (
+            self.flow_stress.options
+            | self.specific_heat.options
+            | self.shear_modulus.options
+            | self.melt_model.options
+            | self.density.options
+            | self.heating_model.options
         )
 
         assert len(set(params)) == len(params), (
@@ -764,6 +804,7 @@ class MaterialModel:
 
         self.parameters.params = params
         self.parameters.consts = consts
+        self.parameters.options = options
 
         ## call self.set_history_variables() to set these:
         self.emax = None
@@ -788,24 +829,27 @@ class MaterialModel:
         """
         return self.parameters.consts
 
+    def get_options_list(
+        self,
+    ):
+        """
+        List of Options used in the model
+        """
+        return list(self.parameters.options.keys())
+
     def update_state(self, edot, dt):
-        chi = self.parameters.chi
+        """
+        updates the material state (specific heat, density, T, Tmelt, strain, stress, etc.)
+        """
         self.state.Cv = self.specific_heat.value()
         self.state.rho = self.density.value()
-
-        # optionally, model quasistatics isothermally. Cutoff assumes we are working in microseconds. If working in seconds, change to ~1
-        # by default, models all experiments as adiabatic
-        edotcrit = 1.0e-6 * self.qs_isothermal
-
-        cond = edot > (edotcrit - 1e-20)  # deal with ==1e-6
-        self.state.T = (
-            self.state.T
-            + cond
-            * chi
-            * self.state.stress
-            * edot
-            * dt
-            / (self.state.Cv * self.state.rho)
+        self.state.T = self.heating_model.value(
+            self.state.T,
+            self.state.stress,
+            edot,
+            dt,
+            self.state.Cv,
+            self.state.rho,
         )
         self.state.strain = self.state.strain + edot * dt
 
@@ -816,9 +860,9 @@ class MaterialModel:
     def update_parameters(self, x):
         self.parameters.update_parameters(x)
 
-    def initialize(self, parameters, constants):
+    def initialize(self, parameters, constants, options=None):
         """
-        Initialize the model at a given set of parameters, constants
+        Initialize the model at a given set of parameters, constants, and options
         """
         ## if user assumed one or more parameters constant, they would be in the constants var instead;
         ## check for this first:
@@ -843,11 +887,7 @@ class MaterialModel:
             }
         except KeyError:
             print(
-                "{} missing from list of supplied parameters".format(
-                    set(self.parameters.params).difference(
-                        set(parameters.keys())
-                    )
-                )
+                f"{set(self.parameters.params).difference(parameters.keys())} missing from list of supplied parameters"
             )
             raise
         try:
@@ -856,13 +896,14 @@ class MaterialModel:
             )
         except KeyError:
             print(
-                "{} missing from list of supplied constants".format(
-                    set(self.parameters.consts).difference(
-                        set(constants.keys())
-                    )
-                )
+                f"{set(self.parameters.consts).difference(constants.keys())} missing from list of supplied constants"
             )
             raise
+        # use default options:
+        self.parameters.__dict__ |= self.parameters.options
+        # if provided, update with user provided options:
+        if options is not None:
+            self.parameters.__dict__ |= options
 
     def initialize_state(self, T=300.0, stress=0.0, strain=0.0):
         self.state.set_state(T, stress, strain)

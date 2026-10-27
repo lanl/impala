@@ -107,14 +107,10 @@ class PTW_Plotter:
             for i in range(self.setup.nexp)
         ]
 
-        theta_parent = sc.chol_sample_1per_constraints(
+        theta_parent = self.setup.chol_sample_nper_constraints(
             self.out.theta0[sel, 0],
             self.out.Sigma0[sel, 0],
-            self.setup.checkConstraints,
-            self.setup.bounds_mat,
-            self.setup.bounds.keys(),
-            self.setup.bounds,
-            self.setup.constants,
+            n=1,
         )
 
         for i in range(self.setup.nexp):
@@ -528,14 +524,10 @@ class PTW_Plotter:
             highlight = [
                 range(self.setup.ntheta[k]) for k in range(self.setup.nexp)
             ]
-        theta_parent = sc.chol_sample_1per_constraints(
+        theta_parent = self.setup.chol_sample_nper_constraints(
             self.out.theta0[sel, 0],
             self.out.Sigma0[sel, 0],
-            self.setup.checkConstraints,
-            self.setup.bounds_mat,
-            self.setup.bounds.keys(),
-            self.setup.bounds,
-            self.setup.constants,
+            n=1,
         )
         theta_names = list(self.setup.bounds.keys())
         theta0_unst = sc.unnormalize(

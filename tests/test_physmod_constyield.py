@@ -17,7 +17,8 @@ class TestConstantYieldStress(unittest.TestCase):
             "Tmelt0": 1356.0,  # K
             "chi": 1.0,
         }
-        self.model_const_y = pmh.MaterialModel(qs_isothermal=True)
+        self.options = {"edotcrit_chi": 1e-6}
+        self.model_const_y = pmh.MaterialModel()
 
     def test_isothermal_lowrate(self):
         """
@@ -26,7 +27,7 @@ class TestConstantYieldStress(unittest.TestCase):
         self.model_const_y.set_history_variables(
             emax=np.array([1.0]), edot=np.array([1e-7]), nhist=1000
         )
-        self.model_const_y.initialize(self.params, self.consts)
+        self.model_const_y.initialize(self.params, self.consts, self.options)
         self.model_const_y.initialize_state(T=np.array([298.0]))
         results_const_y = self.model_const_y.compute_state_history()
         # result format
