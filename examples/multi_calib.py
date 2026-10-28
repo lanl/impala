@@ -948,11 +948,14 @@ def build_setup(
         else:
             sd_est_main_flyer = np.array([sd_est_flyer] * len(flyer_yobs), dtype=np.float64)
 
+        s2_df_main_default_flyer = int(flyer_cfg.get("s2_df", 50))
+        s2_df_main_flyer = np.full(len(flyer_yobs), s2_df_main_default_flyer, dtype=int)
+
         setup.addVecExperiments(
             yobs=yobs_flyer,
             model=flyer_model,
             sd_est=sd_est_main_flyer,
-            s2_df=np.array([int(flyer_cfg.get("s2_df", 50))], dtype=int),
+            s2_df=s2_df_main_flyer,
             s2_ind=s2_ind_main_flyer,
             theta_ind=theta_ind_flyer,
         )
