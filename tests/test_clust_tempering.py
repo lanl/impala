@@ -114,3 +114,42 @@ def test_clust_tempering_flat_likelihood():
     out = sc.calibClust(setup)
     eta = out.eta[1000:, 0]
     assert abs(eta.mean() - 1.0) < 0.12
+
+
+def test_pooled_mh_s2_with_tempering():
+    """
+    s2 by Metropolis-Hastings on log(s2) with s2_df = 0 (kernel 1/(1 + s2)) and
+    a model that does not depend on theta.  The Jacobian of the log transform
+    must not be tempered, otherwise hot chains target a different family than
+    the swap ratio assumes and the cold chain is biased (about -5.5% here).
+    """
+    from scipy import integrate
+
+    rs = np.random.RandomState(123)
+    n = 20
+    y = rs.normal(0, 0.5, n)
+    SS = (y**2).sum()
+
+    def unnorm(s2):
+        return np.exp(-n / 2 * np.log(s2) - SS / 2 / s2 - np.log1p(s2) + 20)
+
+    Z = integrate.quad(unnorm, 1e-4, 50)[0]
+    exact = integrate.quad(lambda s: s * unnorm(s), 1e-4, 50)[0] / Z
+
+    np.random.seed(2)
+    bounds = {"a": np.array([0, 1])}
+    setup = sc.CalibSetup(bounds, constraint_func="bounds")
+    setup.addVecExperiments(
+        yobs=y,
+        model=sc.ModelF(
+            lambda th: np.zeros(n), input_names=bounds.keys(), s2="MH"
+        ),
+        sd_est=[0.5],
+        s2_df=[0],
+        s2_ind=[0] * n,
+    )
+    setup.setTemperatureLadder(2.0 ** np.arange(4), start_temper=200)
+    setup.setMCMC(nmcmc=20000, decor=100, start_var_ls2=0.1)
+    out = sc.calibPool(setup)
+    s2 = out.s2[0][3000:, 0, 0]
+    assert abs(s2.mean() / exact - 1) < 0.025
