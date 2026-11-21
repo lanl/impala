@@ -15,11 +15,9 @@ from scipy.stats import invwishart
 from .impala_noprobit_emu import (
     chol_sample_1per,
     cov_4d_pcm,
-    gamma_logpdf,
     initfunc_unif,
-    invwishart_logpdf,
-    mvnorm_logpdf,  # , invgamma_logpdf
     mvnorm_logpdf_,
+    s2_swap_kern,
     tran_unif,
 )
 
@@ -119,13 +117,16 @@ def one_step_in_cluster_covariance_update(Sj, mSj, nSj, n, mus, covs):
     return Sj, mSj, nSj
 
 
-# West 1992, dirichletprocess R package
+# Escobar & West 1995 (JASA 90, 577-588); cf. West 1992, dirichletprocess R package
 def sample_eta(curr_eta, nclust, ndat, prior_shape, prior_rate):
     g = beta(curr_eta + 1, ndat)
     aa = prior_shape + nclust
     bb = prior_rate - np.log(g)
+    # Escobar & West (1995), eq. 13: mixture of Gamma(a + k, b - log g) with
+    # probability eps and Gamma(a + k - 1, b - log g) with probability 1 - eps,
+    # where eps / (1 - eps) = (a + k - 1) / (n (b - log g)).
     eps = (aa - 1) / (ndat * bb + aa - 1)
-    sel = (uniform(size=aa.shape) < eps) * 1
+    sel = (uniform(size=aa.shape) >= eps) * 1  # 0 -> a + k, 1 -> a + k - 1
     aaa = np.vstack((aa, aa - 1)).T[np.arange(aa.shape[0]), sel]
     return gamma(shape=aaa, scale=1 / bb)
 
@@ -598,12 +599,11 @@ def calibClust(setup):
     )  # was 10^2, but that is far from uniform when back transforming
     theta0_prior_prec = scipy.linalg.inv(theta0_prior_cov)
     theta0_prior_mean = setup.theta0_prior_mean
-    theta0_prior_ldet = slogdet(theta0_prior_cov)[1]
     tbar = np.empty(theta0[0].shape)
     mat = np.zeros((setup.ntemps, setup.p, setup.p))
     Sigma0_prior_df = setup.Sigma0_prior_df
     Sigma0_prior_scale = setup.Sigma0_prior_scale
-    Sigma0_dfs = Sigma0_prior_df + setup.nclustmax * setup.itl
+    Sigma0_dfs = Sigma0_prior_df + setup.nclustmax * np.ones(setup.ntemps)
     Sigma0_scales = np.empty((setup.ntemps, setup.p, setup.p))
     Sigma0_scales[:] = Sigma0_prior_scale
     Sigma0_ldet_curr = slogdet(Sigma0[0])[1]
@@ -854,18 +854,21 @@ def calibClust(setup):
                 log_s2[i][m] = np.log(setup.sd_est[i] ** 2)
 
                 for t in range(setup.ntemps):
-                    s2_stretched = log_s2[i][m][t, setup.theta_ind[i]]
+                    # same indexing as the Gibbs branches: log_s2 has one entry
+                    # per s2 group (s2_ind), the likelihood for theta j uses the
+                    # observations of theta j (theta_which_mat)
+                    s2_stretched = log_s2[i][m][t, setup.s2_ind[i]]
                     for j in range(setup.ntheta[i]):
                         marg_lik_cov_curr[i][t][j] = setup.models[
                             i
                         ].lik_cov_inv(
-                            np.exp(s2_stretched[s2_which_mat[i][j]]),
+                            np.exp(s2_stretched[theta_which_mat[i][j]]),
                             wt_mat[i][theta_which_mat[i][j]],
                             s2_which_mat[i][j],
                         )
                         llik_curr_theta[i][t][j] = setup.models[i].llik(
-                            setup.ys[i][s2_which_mat[i][j]],
-                            pred_curr_theta[i][t][s2_which_mat[i][j]],
+                            setup.ys[i][theta_which_mat[i][j]],
+                            pred_curr_theta[i][t][theta_which_mat[i][j]],
                             marg_lik_cov_curr[i][t][j],
                             wt_mat[i][theta_which_mat[i][j]],
                         )
@@ -876,8 +879,11 @@ def calibClust(setup):
         ###########################
         ### Gibbs Update Theta0 ###
         ###########################
+        # Only the likelihood is tempered (power posterior): the normal
+        # density of the cluster centres around theta0 enters at full strength
+        # in every chain, as do the priors of theta0, Sigma0, eta and delta.
         cc[:] = np.linalg.inv(
-            np.einsum("t,tpq->tpq", ntheta * setup.itl, Sigma0_inv_curr)
+            np.einsum("t,tpq->tpq", ntheta, Sigma0_inv_curr)
             + theta0_prior_prec,
         )
         tbar[:] = (
@@ -887,9 +893,7 @@ def calibClust(setup):
         )  # must be m-1, have not updated theta in current iteration yet
         tbar[:] /= ntheta.reshape(setup.ntemps, 1)
         dd[:] = +np.einsum(
-            "t,tl->tl",
-            setup.itl,
-            np.einsum("t,tlk,tk->tl", ntheta, Sigma0_inv_curr, tbar),
+            "t,tlk,tk->tl", ntheta, Sigma0_inv_curr, tbar
         ) + np.dot(theta0_prior_prec, theta0_prior_mean)
         theta0[m][:] = setup.chol_sample_nper_constraints(
             np.einsum("tlk,tk->tl", cc, dd),
@@ -902,8 +906,7 @@ def calibClust(setup):
         ###########################
         mat[:] *= 0.0
         mat += np.einsum(
-            "t,tnp,tnq->tpq",
-            setup.itl,
+            "tnp,tnq->tpq",
             (
                 (theta[m - 1] - theta0[m].reshape(setup.ntemps, 1, setup.p))
                 * theta_ext.reshape(setup.ntemps, setup.nclustmax, 1)
@@ -914,7 +917,7 @@ def calibClust(setup):
             ),
         )  # must be m-1, have not updated theta in current iteration yet
         Sigma0_scales[:] = Sigma0_prior_scale + mat
-        Sigma0_dfs[:] = Sigma0_prior_df + theta_ext.sum(axis=1) * setup.itl
+        Sigma0_dfs[:] = Sigma0_prior_df + theta_ext.sum(axis=1)
         for t in range(setup.ntemps):
             Sigma0[m, t] = invwishart.rvs(
                 df=Sigma0_dfs[t], scale=Sigma0_scales[t]
@@ -1015,19 +1018,15 @@ def calibClust(setup):
 
         alpha[:] = -np.inf
         alpha[good_values] = (
-            itl_mat_theta
-            * (
-                llik_cand_theta_
-                - llik_curr_theta_
-                + mvnorm_logpdf_(
-                    theta_eval, theta0[m], Sigma0_inv_curr, Sigma0_ldet_curr
-                )
-                * theta_ext
-                - mvnorm_logpdf_(
-                    theta[m], theta0[m], Sigma0_inv_curr, Sigma0_ldet_curr
-                )
-                * theta_ext
+            itl_mat_theta * (llik_cand_theta_ - llik_curr_theta_)
+            + mvnorm_logpdf_(
+                theta_eval, theta0[m], Sigma0_inv_curr, Sigma0_ldet_curr
             )
+            * theta_ext
+            - mvnorm_logpdf_(
+                theta[m], theta0[m], Sigma0_inv_curr, Sigma0_ldet_curr
+            )
+            * theta_ext
         )[good_values]
         accept[:] = np.log(uniform(size=alpha.shape)) < alpha
         theta[m, accept] = theta_cand[accept]
@@ -1090,81 +1089,34 @@ def calibClust(setup):
                     setup.ntemps, 2 * setup.nswap_per, replace=False
                 ).reshape(-1, 2)
                 sw_alpha[:] = 0.0  # reset swap probability
-                sw_alpha[:] = sw_alpha + (
-                    setup.itl[sw.T[1]] - setup.itl[sw.T[0]]
-                ) * (
-                    -mvnorm_logpdf(
-                        theta0[m][sw.T[1]],
-                        theta0_prior_mean,
-                        theta0_prior_prec,
-                        theta0_prior_ldet,
-                    )
-                    + mvnorm_logpdf(
-                        theta0[m][sw.T[0]],
-                        theta0_prior_mean,
-                        theta0_prior_prec,
-                        theta0_prior_ldet,
-                    )
-                    - invwishart_logpdf(
-                        Sigma0[m][sw.T[1]], Sigma0_prior_df, Sigma0_prior_scale
-                    )
-                    + invwishart_logpdf(
-                        Sigma0[m][sw.T[0]], Sigma0_prior_df, Sigma0_prior_scale
-                    )
-                    - gamma_logpdf(
-                        eta[m][sw.T[1]],
-                        setup.eta_prior_shape,
-                        setup.eta_prior_rate,
-                    )
-                    + gamma_logpdf(
-                        eta[m][sw.T[0]],
-                        setup.eta_prior_shape,
-                        setup.eta_prior_rate,
-                    )
-                )
+                # Only the likelihood (and the s2 prior, which the s2 updates
+                # temper) is tempered.  The clustering prior -- p(theta0), p(Sigma0),
+                # p(eta), p(delta | eta) and the normal density of the cluster
+                # centres -- is the same in every chain, so it cancels here.
                 for i in range(setup.nexp):
                     sw_alpha[:] = sw_alpha + (
                         setup.itl[sw.T[1]] - setup.itl[sw.T[0]]
                     ) * (
                         # for t_0
-                        +setup.s2_prior_kern[i](
+                        +s2_swap_kern(setup, i)(
                             np.exp(log_s2[i][m][sw.T[0]]),
                             setup.ig_a[i],
                             setup.ig_b[i],
                         ).sum(axis=1)
-                        + (
-                            mvnorm_logpdf_(
-                                theta[m, sw.T[0]],
-                                theta0[m, sw.T[0]],
-                                Sigma0_inv_curr[sw.T[0]],
-                                Sigma0_ldet_curr[sw.T[0]],
-                            )
-                            * theta_ext[sw.T[0]]
-                        ).sum(axis=1)
                         + llik_curr_theta[i][sw.T[0]].sum(axis=1)
                         # for t_1
-                        - setup.s2_prior_kern[i](
+                        - s2_swap_kern(setup, i)(
                             np.exp(log_s2[i][m][sw.T[1]]),
                             setup.ig_a[i],
                             setup.ig_b[i],
                         ).sum(axis=1)
-                        - (
-                            mvnorm_logpdf_(
-                                theta[m, sw.T[1]],
-                                theta0[m, sw.T[1]],
-                                Sigma0_inv_curr[sw.T[1]],
-                                Sigma0_ldet_curr[sw.T[1]],
-                            )
-                            * theta_ext[sw.T[1]]
-                        ).sum(axis=1)
                         - llik_curr_theta[i][sw.T[1]].sum(axis=1)
                     )
 
-                for tt in sw[
-                    np.where(
-                        sw[np.log(uniform(size=setup.nswap_per)) < sw_alpha]
-                    )[0]
-                ]:
+                # select the accepted pairs directly (previously
+                # sw[np.where(sw[accepted])[0]], which indexes sw by row numbers
+                # of the accepted subset and so swapped the wrong pairs)
+                for tt in sw[np.log(uniform(size=setup.nswap_per)) < sw_alpha]:
                     count_temper[tt[0], tt[1]] = count_temper[tt[0], tt[1]] + 1
                     eta[m, tt[0]], eta[m, tt[1]] = (
                         eta[m, tt[1]].copy(),
