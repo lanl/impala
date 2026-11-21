@@ -20,6 +20,7 @@ from numpy.random import normal, uniform
 from .impala_noprobit_emu import (
     cov_3d_pcm,
     initfunc_unif,
+    s2_swap_kern,
     sample_pooled,
     theta_log_prior,
     tran_unif,
@@ -600,12 +601,12 @@ def calibPool(setup):
                 )
                 for i in range(setup.nexp):
                     sw_alpha += (setup.itl[sw.T[1]] - setup.itl[sw.T[0]]) * (
-                        setup.s2_prior_kern[i](
+                        s2_swap_kern(setup, i)(
                             np.exp(log_s2[i][m][sw.T[0]]),
                             setup.ig_a[i],
                             setup.ig_b[i],
                         ).sum(axis=1)
-                        - setup.s2_prior_kern[i](
+                        - s2_swap_kern(setup, i)(
                             np.exp(log_s2[i][m][sw.T[1]]),
                             setup.ig_a[i],
                             setup.ig_b[i],

@@ -227,17 +227,19 @@ def test_clust():
 
     pred_sse = np.square(pred - setup.ys[0]).sum(1)
     theta_minsse = mat[np.where(pred_sse == pred_sse.min())[0][0], :]
+    # baseline regenerated after the eta-update fix (Escobar & West mixture
+    # weights) and likelihood-only tempering in calibClust, which change the chain
     theta_minsse_baseline = np.array([
-        0.20526145,
-        0.59566408,
-        0.78755387,
-        0.08794196,
-        0.33280684,
-        0.44106511,
-        0.50686367,
-        0.33024073,
-        0.64569779,
-        0.11573176,
+        0.11252664,
+        0.17641558,
+        0.80657425,
+        0.02428069,
+        0.31698638,
+        0.13090822,
+        0.50573562,
+        0.10521779,
+        0.61930357,
+        0.0584172,
     ])
     assert np.allclose(theta_minsse, theta_minsse_baseline)
 

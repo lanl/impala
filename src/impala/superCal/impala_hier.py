@@ -24,6 +24,7 @@ from .impala_noprobit_emu import (
     invwishart_logpdf,
     mvnorm_logpdf,
     mvnorm_logpdf_,
+    s2_swap_kern,
     tran_unif,
 )
 from .impala_pool import AMcov_pool
@@ -849,7 +850,7 @@ def calibHier(setup):
                         setup.itl[sw.T[1]] - setup.itl[sw.T[0]]
                     ) * (
                         # for t_0
-                        +setup.s2_prior_kern[i](
+                        +s2_swap_kern(setup, i)(
                             np.exp(log_s2[i][m][sw.T[0]]),
                             setup.ig_a[i],
                             setup.ig_b[i],
@@ -862,7 +863,7 @@ def calibHier(setup):
                         ).sum(axis=1)
                         + llik_curr[i][sw.T[0]].sum(axis=1)
                         # for t_1
-                        - setup.s2_prior_kern[i](
+                        - s2_swap_kern(setup, i)(
                             np.exp(log_s2[i][m][sw.T[1]]),
                             setup.ig_a[i],
                             setup.ig_b[i],
