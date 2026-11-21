@@ -221,17 +221,19 @@ def test_hier():
 
     pred_sse = np.square(pred - setup.ys[0]).sum(1)
     theta_minsse = mat[np.where(pred_sse == pred_sse.min())[0][0], :]
+    # baseline regenerated after the tempering-consistency fix in calibHier
+    # (hyperpriors no longer enter the swap ratio), which changes the chain
     theta_minsse_baseline = np.array([
-        0.12125296,
-        0.889518,
-        0.7980942,
-        0.00803078,
-        0.31638529,
-        0.04834673,
-        0.49717085,
-        0.00753855,
-        0.87773007,
-        0.03336257,
+        0.12853127,
+        0.42539201,
+        0.81215234,
+        0.01631357,
+        0.32386442,
+        0.10839125,
+        0.5120487,
+        0.08040948,
+        0.58558863,
+        0.07535544,
     ])
     assert np.allclose(theta_minsse, theta_minsse_baseline)
 

@@ -214,6 +214,7 @@ class CalibSetup:
         self.theta0_prior_cov = None
         self.Sigma0_prior_df = None
         self.Sigma0_prior_scale = None
+        self.hier_scale = "unit"
         self.nclustmax = None
         self.eta_prior_shape = None
         self.eta_prior_rate = None
@@ -501,6 +502,7 @@ class CalibSetup:
         theta0_prior_cov,
         Sigma0_prior_df,
         Sigma0_prior_scale,
+        scale="unit",
     ):
         """
         Define hierachical model hyperparameters, where theta_i ~ N(theta0, Sigma0)
@@ -512,7 +514,25 @@ class CalibSetup:
         :param Sigma0_prior_df :  prior degrees of freedom for the prior for Sigma0, at least 1 + self.p,
             where larger values generally indicate theta_i values closer to theta_0
         :param Sigma0_prior_scale : prior scale for the prior for Sigma0, where smaller values generally indicate theta_i values closer to theta_0
+        :param scale : (optional) the scale on which the hierarchical normal model is defined.
+
+            ``"unit"`` (default, the behaviour of earlier versions): theta_i, theta0 and Sigma0 live on the
+            bounds-normalised [0, 1] scale and theta_i is restricted to the bounds.  The restriction is applied
+            without its normalising constant, so the effective prior on (theta0, Sigma0) is the stated prior
+            multiplied by prod_i P(theta_i in bounds | theta0, Sigma0).  This favours small Sigma0 and theta0
+            away from the bounds, and matters when experiment-level parameters sit near a bound.
+
+            ``"probit"``: the hierarchy is placed on z = probit(u), where u is the [0, 1]-normalised parameter,
+            i.e. z_i ~ N(theta0, Sigma0) with no truncation, so the conjugate Gibbs updates of theta0 and Sigma0
+            are exact.  In this case theta0_prior_mean, theta0_prior_cov and Sigma0_prior_scale are on the probit
+            scale (probit(0.5) = 0; theta0 ~ N(0, I) makes each normalised parameter of theta0 uniform on [0, 1]).
+            Samples of theta and theta0 are still returned on the [0, 1] scale, so post-processing is unchanged;
+            Sigma0 is returned on the probit scale.  Constraints other than the bounds (e.g. PTW parameter
+            constraints) still truncate the hierarchical distribution.
         """
+        if scale not in ("unit", "probit"):
+            raise ValueError(f"scale must be 'unit' or 'probit', got {scale!r}")
+        self.hier_scale = scale
         self.theta0_prior_mean = theta0_prior_mean
         self.theta0_prior_cov = theta0_prior_cov
         self.Sigma0_prior_df = Sigma0_prior_df
@@ -541,8 +561,15 @@ class CalibSetup:
         self.eta_prior_rate = eta_prior_rate
         self.scale_proposal = scale_proposal
 
-    def chol_sample_nper_constraints(self, means, covs, n=1, maxiter=10000):
-        """Sample with constraints.  If fail constraints, resample."""
+    def chol_sample_nper_constraints(
+        self, means, covs, n=1, maxiter=10000, tran=None
+    ):
+        """
+        Sample with constraints.  If fail constraints, resample.
+
+        :param tran: function mapping the sampled values to the native scale
+            (``tran_unif``, the default, for the [0, 1] scale; ``tran_probit`` for the probit scale).
+        """
         if n == 1:
             return chol_sample_1per_constraints(
                 means=means,
@@ -553,6 +580,7 @@ class CalibSetup:
                 bounds=self.bounds,
                 consts=self.constants,
                 maxiter=maxiter,
+                tran=tran,
             )
         return chol_sample_nper_constraints(
             means=means,
@@ -564,6 +592,30 @@ class CalibSetup:
             bounds=self.bounds,
             consts=self.constants,
             maxiter=maxiter,
+            tran=tran,
+        )
+
+    def sample_hier_parent(self, theta0, Sigma0, maxiter=10000):
+        """
+        Draw parameters for a new experiment from the fitted hierarchical
+        distribution, theta_new ~ N(theta0, Sigma0), one draw per row.
+
+        :param theta0: array (n x p) of theta0 samples on the [0, 1] scale, as
+            returned in ``calibHier(...).theta0``.
+        :param Sigma0: array (n x p x p) of Sigma0 samples, as returned by ``calibHier``.
+        :return: array (n x p) on the [0, 1] scale.
+        """
+        if getattr(self, "hier_scale", "unit") == "probit":
+            z = self.chol_sample_nper_constraints(
+                probit(clip_unit(theta0)),
+                Sigma0,
+                n=1,
+                maxiter=maxiter,
+                tran=tran_probit,
+            )
+            return invprobit(z)
+        return self.chol_sample_nper_constraints(
+            theta0, Sigma0, n=1, maxiter=maxiter
         )
 
 
@@ -641,6 +693,11 @@ def tran_probit(th, bounds, names):
     # return dict(zip(names, unnormalize(th, bounds).T)) # If uniform
 
 
+def clip_unit(u, eps=1e-12):
+    """Clip values on the [0, 1] scale away from 0 and 1 (for probit)."""
+    return np.clip(u, eps, 1.0 - eps)
+
+
 def tran_unif(th, bounds, names):
     """
     transforms th from 0-1 scale to the native scale according to the bounds
@@ -698,12 +755,22 @@ def sample_pooled(size, cf, bounds, maxiter=10000):
 
 
 def chol_sample_1per_constraints(
-    means, covs, cf, bounds_mat, bounds_keys, bounds, consts, maxiter=10000
+    means,
+    covs,
+    cf,
+    bounds_mat,
+    bounds_keys,
+    bounds,
+    consts,
+    maxiter=10000,
+    tran=None,
 ):
     """Sample with constraints.  If fail constraints, resample."""
+    if tran is None:
+        tran = tran_unif
     chols = cholesky(covs)
     cand = means + np.einsum("ijk,ik->ij", chols, normal(size=means.shape))
-    good = cf(tran_unif(cand, bounds_mat, bounds_keys), bounds, consts)
+    good = cf(tran(cand, bounds_mat, bounds_keys), bounds, consts)
     for j in range(maxiter):
         if np.all(good):
             break
@@ -715,7 +782,7 @@ def chol_sample_1per_constraints(
             normal(size=((np.logical_not(good)).sum(), means.shape[1])),
         )
         good[np.logical_not(good)] = cf(
-            tran_unif(cand[np.logical_not(good)], bounds_mat, bounds_keys),
+            tran(cand[np.logical_not(good)], bounds_mat, bounds_keys),
             bounds,
         )
     if j + 1 == maxiter:
@@ -726,15 +793,26 @@ def chol_sample_1per_constraints(
 
 
 def chol_sample_nper_constraints(
-    means, covs, n, cf, bounds_mat, bounds_keys, bounds, consts, maxiter=10000
+    means,
+    covs,
+    n,
+    cf,
+    bounds_mat,
+    bounds_keys,
+    bounds,
+    consts,
+    maxiter=10000,
+    tran=None,
 ):
     """Sample with constraints.  If fail constraints, resample."""
+    if tran is None:
+        tran = tran_unif
     chols = cholesky(covs)
     cand = means.reshape(means.shape[0], 1, means.shape[1]) + np.einsum(
         "ijk,ink->inj", chols, normal(size=(means.shape[0], n, means.shape[1]))
     )
     for i in range(cand.shape[0]):
-        goodi = cf(tran_unif(cand[i], bounds_mat, bounds_keys), bounds, consts)
+        goodi = cf(tran(cand[i], bounds_mat, bounds_keys), bounds, consts)
         for j in range(maxiter):
             if np.all(goodi):
                 break
@@ -744,7 +822,7 @@ def chol_sample_nper_constraints(
                 normal(size=((np.logical_not(goodi)).sum(), means.shape[1])),
             )
             goodi[np.where(np.logical_not(goodi))[0]] = cf(
-                tran_unif(
+                tran(
                     cand[i, np.where(np.logical_not(goodi))[0]],
                     bounds_mat,
                     bounds_keys,

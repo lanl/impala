@@ -156,10 +156,9 @@ def ptw_prediction_plots_hier(
         for i in range(setup.nexp)
     ]
 
-    theta_parent = setup.chol_sample_nper_constraints(
+    theta_parent = setup.sample_hier_parent(
         calib_out.theta0[mcmc_use, 0],
         calib_out.Sigma0[mcmc_use, 0],
-        n=1,
     )
 
     for i in range(setup.nexp):
@@ -434,10 +433,9 @@ def pairwise_theta_plot_hier(
     lty = ["solid", "dotted", "dashed", "dashdot"]
     if highlight is None:
         highlight = [range(setup.ntheta[k]) for k in range(setup.nexp)]
-    theta_parent = setup.chol_sample_nper_constraints(
+    theta_parent = setup.sample_hier_parent(
         calib_out.theta0[mcmc_use, 0],
         calib_out.Sigma0[mcmc_use, 0],
-        n=1,
     )
     theta_names = list(setup.bounds.keys())
     theta0_unst = sc.unnormalize(
@@ -991,10 +989,9 @@ def total_temperature_swaps(out, setup):
 
 def save_parent_strength(setup, ptw_mod, calib_out, mcmc_use, path):
     """writes the parent distribution to file 'path'."""
-    theta_parent = setup.chol_sample_nper_constraints(
+    theta_parent = setup.sample_hier_parent(
         calib_out.theta0[mcmc_use, 0],
         calib_out.Sigma0[mcmc_use, 0],
-        n=1,
     )
     sc.unnormalize(theta_parent, setup.bounds_mat)
 
