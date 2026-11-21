@@ -189,7 +189,11 @@ def test_hier():
         theta_ind=s2_ind,
     )
     setup.setTemperatureLadder(
-        1.05 ** np.arange(ntemps), start_temper=2000
+        1.05 ** np.arange(ntemps),
+        start_temper=2000,
+        # exact-value regression baseline below was generated with the
+        # random-pair swap scheme of earlier versions
+        swap_scheme="random",
     )  # temperature ladder, typically (1 + step)**np.arange(ntemps)
     setup.setMCMC(
         nmcmc=5000, decor=100

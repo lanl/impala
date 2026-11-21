@@ -31,7 +31,8 @@ np.seterr(under="ignore")
 
 OutCalibPool = namedtuple(
     "OutCalibPool",
-    "theta s2 count count_s2 count_decor cov_theta_cand cov_ls2_cand pred_curr discrep_vars llik theta_native",
+    "theta s2 count count_s2 count_decor cov_theta_cand cov_ls2_cand pred_curr discrep_vars llik theta_native temperature_ladder swap_rejection round_trips",
+    defaults=(None, None, None),
 )
 
 
@@ -112,6 +113,10 @@ def calibPool(setup):
     Some changes include:, allowing weights, allowing custom initializations, adding truncated gibbs sampling for measurement errors
     """
     t0 = time.time()
+    # working copy of the inverse-temperature ladder; adapted in place during
+    # burn-in when setup.adapt_ladder is True (see tempering.py)
+    sched = setup.make_swap_scheduler()
+    itl = sched.itl
     theta = np.empty([setup.nmcmc, setup.ntemps, setup.p])
     # where p=number of parameters
     log_s2 = [
@@ -159,7 +164,7 @@ def calibPool(setup):
 
     # itl = inverse tempering ladder, i.e. sequence of inverse temperatures, which are the power that the likelyhood is raised to
     itl_mat = [  # matrix of temperatures for use with alpha calculation--to skip nested for loops.
-        (np.ones((setup.ns2[i], setup.ntemps)) * setup.itl).T
+        (np.ones((setup.ns2[i], setup.ntemps)) * itl).T
         for i in range(setup.nexp)
     ]
 
@@ -263,7 +268,7 @@ def calibPool(setup):
                         setup.ys[i],
                         pred_curr[i][t],
                         marg_lik_cov_curr[i][t],
-                        setup.itl[t],
+                        itl[t],
                         wt_mat[i],
                     )
                     discrep_curr[i][t] = (
@@ -331,7 +336,7 @@ def calibPool(setup):
         alpha[:] = -np.inf
         # (probability 0 on log-scale = -inf)
         # multiply log of a ratio (llik_diff) by inverse temperature ladder:
-        alpha[good_values] = setup.itl[good_values] * (llik_diff)
+        alpha[good_values] = itl[good_values] * (llik_diff)
         for t in np.where(np.log(uniform(size=setup.ntemps)) < alpha)[0]:
             theta[m, t] = theta_cand[t].copy()
             lpr_curr[t] = lpr_cand[t]
@@ -388,7 +393,7 @@ def calibPool(setup):
                     - (llik_curr.sum(axis=0) + lpr_curr)
                 )[good_values]
                 alpha[good_values] = (
-                    setup.itl[good_values] * (llik_diff)
+                    itl[good_values] * (llik_diff)
                 )  # + tsq_diff) + 0.5 * tsq_diff # last is for proposal, since this is an independence sampler step
                 for t in np.where(np.log(uniform(size=setup.ntemps)) < alpha)[
                     0
@@ -556,21 +561,21 @@ def calibPool(setup):
                     )
 
                 llik_diffi = llik_candi - llik_curr[i]
-                alpha_s2 = setup.itl * (llik_diffi)
+                alpha_s2 = itl * (llik_diffi)
                 alpha_s2 += (
-                    setup.itl
+                    itl
                     * setup.s2_prior_kern[i](
                         np.exp(ls2_candi), setup.ig_a[i], setup.ig_b[i]
                     ).sum(axis=1)
                 )  # ldhc_kern(np.exp(ls2_cand[i])).sum(axis=1)#ldig_kern(np.exp(ls2_cand[i]),setup.ig_a[i],setup.ig_b[i]).sum(axis=1)
-                alpha_s2 += setup.itl * ls2_candi.sum(axis=1)
+                alpha_s2 += itl * ls2_candi.sum(axis=1)
                 alpha_s2 -= (
-                    setup.itl
+                    itl
                     * setup.s2_prior_kern[i](
                         np.exp(log_s2[i][m - 1]), setup.ig_a[i], setup.ig_b[i]
                     ).sum(axis=1)
                 )  # ldhc_kern(np.exp(log_s2[i][m-1])).sum(axis=1)#ldig_kern(np.exp(log_s2[i][m-1]),setup.ig_a[i],setup.ig_b[i]).sum(axis=1)
-                alpha_s2 -= setup.itl * log_s2[i][m - 1].sum(axis=1)
+                alpha_s2 -= itl * log_s2[i][m - 1].sum(axis=1)
 
                 runif = np.log(uniform(size=setup.ntemps))
                 for t in np.where(runif < alpha_s2)[0]:
@@ -587,19 +592,19 @@ def calibPool(setup):
         #######################
         if m > setup.start_temper and setup.ntemps > 1:
             for _ in range(setup.nswap):
-                sw = np.random.choice(
-                    setup.ntemps, 2 * setup.nswap_per, replace=False
-                ).reshape(-1, 2)
-                sw_alpha[:] = 0.0  # Log Probability of Swap
-                sw_alpha += (setup.itl[sw.T[1]] - setup.itl[sw.T[0]]) * (
+                sw = sched.pairs()
+                if len(sw) == 0:
+                    continue
+                sw_alpha = np.zeros(len(sw))  # log probability of swap
+                sw_alpha += (itl[sw.T[1]] - itl[sw.T[0]]) * (
                     llik_curr[:, sw.T[0]].sum(axis=0)
                     - llik_curr[:, sw.T[1]].sum(axis=0)
                 )
-                sw_alpha += (setup.itl[sw.T[1]] - setup.itl[sw.T[0]]) * (
+                sw_alpha += (itl[sw.T[1]] - itl[sw.T[0]]) * (
                     lpr_curr[sw.T[0]] - lpr_curr[sw.T[1]]
                 )
                 for i in range(setup.nexp):
-                    sw_alpha += (setup.itl[sw.T[1]] - setup.itl[sw.T[0]]) * (
+                    sw_alpha += (itl[sw.T[1]] - itl[sw.T[0]]) * (
                         setup.s2_prior_kern[i](
                             np.exp(log_s2[i][m][sw.T[0]]),
                             setup.ig_a[i],
@@ -612,9 +617,7 @@ def calibPool(setup):
                         ).sum(axis=1)
                     )
                     if setup.models[i].nd > 0:
-                        sw_alpha += (
-                            setup.itl[sw.T[1]] - setup.itl[sw.T[0]]
-                        ) * (
+                        sw_alpha += (itl[sw.T[1]] - itl[sw.T[0]]) * (
                             -0.5
                             * (discrep_vars[i][m][sw.T[0]] ** 2).sum(axis=1)
                             / setup.models[i].discrep_tau
@@ -622,11 +625,9 @@ def calibPool(setup):
                             * (discrep_vars[i][m][sw.T[1]] ** 2).sum(axis=1)
                             / setup.models[i].discrep_tau
                         )
-                for tt in sw[
-                    np.where(np.log(uniform(size=setup.nswap_per)) < sw_alpha)[
-                        0
-                    ]
-                ]:
+                accepted = np.log(uniform(size=len(sw))) < sw_alpha
+                sched.record(sw, sw_alpha, accepted)
+                for tt in sw[accepted]:
                     for i in range(setup.nexp):
                         log_s2[i][m][tt[0]], log_s2[i][m][tt[1]] = (
                             log_s2[i][m][tt[1]].copy(),
@@ -667,6 +668,13 @@ def calibPool(setup):
                         lpr_curr[tt[0]],
                     )
 
+        if m > setup.start_temper and setup.ntemps > 1 and sched.maybe_adapt(m):
+            # ladder changed: rebuild arrays derived from it
+            itl_mat = [
+                (np.ones((setup.ns2[i], setup.ntemps)) * itl).T
+                for i in range(setup.nexp)
+            ]
+
         llik[m] = llik_curr[:, 0].sum()
         # print('\rCalibration MCMC {:.01%} Complete'.format(m / setup.nmcmc), end='')
 
@@ -691,6 +699,9 @@ def calibPool(setup):
         discrep_vars,
         llik,
         theta_native,
+        itl.copy(),
+        sched.rejection_rates(),
+        sched.round_trips,
     )
     return out
 

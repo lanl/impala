@@ -85,7 +85,13 @@ def test_friedman_fit():
     )
 
     # temperature ladder, typically (1 + step) ** np.arange(ntemps)
-    setup.setTemperatureLadder(1.05 ** np.arange(20))
+    # This test applies a KS test to autocorrelated MCMC draws, so its outcome
+    # depends on the dependence structure of the chain, not only on the
+    # posterior.  It is pinned to the swap scheme it was written against.
+    # With deterministic even/odd swaps and a ladder this dense (swaps are
+    # accepted ~97% of the time), each replica returns to the cold chain every
+    # 2 * ntemps / nswap = 8 iterations, which aliases with thin = 5 below.
+    setup.setTemperatureLadder(1.05 ** np.arange(20), swap_scheme="random")
 
     # MCMC number of iterations, and how often to take a decorrelation step.
     setup.setMCMC(nmcmc=15000, decor=100)
