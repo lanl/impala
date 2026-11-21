@@ -73,6 +73,12 @@ def test_constparams():
     we check that the "best" parameters are within 1 permille of the values
     used to generate the artifical data, as well as that the keys of "params"
     match the keys of the calibrated parameters."""
+    # Seed so the result does not depend on which tests ran earlier in the same
+    # process (e.g. under pytest-xdist).  With only 2000 iterations an unlucky
+    # stream can leave the cold chain stuck after it receives a much better
+    # state by a swap, and the KDE in the pairs plot then fails on the
+    # (near-)constant draws.
+    np.random.seed(0)
     test_dir = Path(__file__).parent
     data_dir = test_dir / "data"
 
