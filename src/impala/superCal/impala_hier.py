@@ -34,7 +34,8 @@ np.seterr(under="ignore")
 
 OutCalibHier = namedtuple(
     "OutCalibHier",
-    "theta s2 count count_s2 count_decor2 cov_theta_cand cov_ls2_cand count_temper pred_curr theta0 Sigma0",  # llik theta_native theta0_native theta_parent_native',
+    "theta s2 count count_s2 count_decor2 cov_theta_cand cov_ls2_cand count_temper pred_curr theta0 Sigma0 temperature_ladder swap_rejection round_trips",  # llik theta_native theta0_native theta_parent_native',
+    defaults=(None, None, None),
 )
 
 
@@ -129,6 +130,10 @@ def calibHier(setup):
     estimation of separate s2 values within an experiment, adding truncated gibbs sampling for measurement errors
     """
     t0 = time.time()
+    # working copy of the inverse-temperature ladder; adapted in place during
+    # burn-in when setup.adapt_ladder is True (see tempering.py)
+    sched = setup.make_swap_scheduler()
+    itl = sched.itl
     theta0 = np.zeros([setup.nmcmc, setup.ntemps, setup.p])
     theta0 += 0.0
     Sigma0 = np.zeros([setup.nmcmc, setup.ntemps, setup.p, setup.p])
@@ -214,12 +219,12 @@ def calibHier(setup):
     llik_curr = [None] * setup.nexp  # [i], ntheta[i] x ntemps
     llik_cand = [None] * setup.nexp  # [i], ntheta[i] x ntemps
     itl_mat = [  # matrix of temperatures for use with alpha calculation--to skip nested for loops.
-        (np.ones((setup.ntheta[i], setup.ntemps)) * setup.itl).T
+        (np.ones((setup.ntheta[i], setup.ntemps)) * itl).T
         for i in range(setup.nexp)
     ]
 
     itl_mat_s2 = [
-        np.ones((setup.ntemps, setup.ns2[i])) * setup.itl.reshape(-1, 1)
+        np.ones((setup.ntemps, setup.ns2[i])) * itl.reshape(-1, 1)
         for i in range(setup.nexp)
     ]
 
@@ -296,7 +301,7 @@ def calibHier(setup):
     Sigma0_prior_scale = (
         setup.Sigma0_prior_scale
     )  # np.eye(setup.p)*1**2#/setup.p
-    Sigma0_dfs = Sigma0_prior_df + ntheta * setup.itl
+    Sigma0_dfs = Sigma0_prior_df + ntheta * itl
 
     Sigma0_ldet_curr = slogdet(Sigma0[0])[1]
     Sigma0_inv_curr = np.linalg.inv(Sigma0[0])
@@ -636,21 +641,21 @@ def calibHier(setup):
                     # llik_candi[t] = setup.models[i].llik(setup.ys[i], pred_curr[i][t], marg_lik_cov_candi[t])
 
                 llik_diffi = llik_candi - llik_curr[i]
-                alpha_s2 = setup.itl * (llik_diffi)
+                alpha_s2 = itl * (llik_diffi)
                 alpha_s2 += (
-                    setup.itl
+                    itl
                     * setup.s2_prior_kern[i](
                         np.exp(ls2_candi), setup.ig_a[i], setup.ig_b[i]
                     ).sum(axis=1)
                 )  # ldhc_kern(np.exp(ls2_cand[i])).sum(axis=1)#ldig_kern(np.exp(ls2_cand[i]),setup.ig_a[i],setup.ig_b[i]).sum(axis=1)
-                alpha_s2 += setup.itl * ls2_candi.sum(axis=1)
+                alpha_s2 += itl * ls2_candi.sum(axis=1)
                 alpha_s2 -= (
-                    setup.itl
+                    itl
                     * setup.s2_prior_kern[i](
                         np.exp(log_s2[i][m - 1]), setup.ig_a[i], setup.ig_b[i]
                     ).sum(axis=1)
                 )  # ldhc_kern(np.exp(log_s2[i][m-1])).sum(axis=1)#ldig_kern(np.exp(log_s2[i][m-1]),setup.ig_a[i],setup.ig_b[i]).sum(axis=1)
-                alpha_s2 -= setup.itl * log_s2[i][m - 1].sum(axis=1)
+                alpha_s2 -= itl * log_s2[i][m - 1].sum(axis=1)
 
                 runif = np.log(uniform(size=setup.ntemps))
                 for t in np.where(runif < alpha_s2)[0]:
@@ -666,7 +671,7 @@ def calibHier(setup):
         ### Gibbs update theta0 ###
         ###########################
         cc = np.linalg.inv(
-            np.einsum("t,tpq->tpq", ntheta * setup.itl, Sigma0_inv_curr)
+            np.einsum("t,tpq->tpq", ntheta * itl, Sigma0_inv_curr)
             + theta0_prior_prec,
         )
         tbar = 0.0
@@ -675,7 +680,7 @@ def calibHier(setup):
         tbar /= ntheta
         dd = +np.einsum(
             "t,tl->tl",
-            setup.itl,
+            itl,
             np.einsum("tlk,tk->tl", ntheta * Sigma0_inv_curr, tbar),
         ) + np.dot(theta0_prior_prec, theta0_prior_mean)
         theta0[m][:] = setup.chol_sample_nper_constraints(
@@ -694,9 +699,7 @@ def calibHier(setup):
                 theta[i][m] - theta0[m].reshape(setup.ntemps, 1, setup.p),
                 theta[i][m] - theta0[m].reshape(setup.ntemps, 1, setup.p),
             )
-        Sigma0_scales = Sigma0_prior_scale + np.einsum(
-            "t,tml->tml", setup.itl, mat
-        )
+        Sigma0_scales = Sigma0_prior_scale + np.einsum("t,tml->tml", itl, mat)
         for t in range(setup.ntemps):
             Sigma0[m, t] = invwishart.rvs(
                 df=Sigma0_dfs[t], scale=Sigma0_scales[t]
@@ -784,14 +787,14 @@ def calibHier(setup):
                 alpha_tot = (
                     sum(alpha).T
                     - 0.5
-                    * setup.itl
+                    * itl
                     * np.diag(
                         (theta0_cand - theta0_prior_mean)
                         @ theta0_prior_prec
                         @ (theta0_cand - theta0_prior_mean).T
                     )
                     + 0.5
-                    * setup.itl
+                    * itl
                     * np.diag(
                         (theta0[m] - theta0_prior_mean)
                         @ theta0_prior_prec
@@ -818,13 +821,11 @@ def calibHier(setup):
         #######################
         if m > setup.start_temper and setup.ntemps > 1:
             for _ in range(setup.nswap):
-                sw = np.random.choice(
-                    setup.ntemps, 2 * setup.nswap_per, replace=False
-                ).reshape(-1, 2)
-                sw_alpha[:] = 0.0  # reset swap probability
-                sw_alpha[:] = sw_alpha + (
-                    setup.itl[sw.T[1]] - setup.itl[sw.T[0]]
-                ) * (
+                sw = sched.pairs()
+                if len(sw) == 0:
+                    continue
+                sw_alpha = np.zeros(len(sw))  # log probability of swap
+                sw_alpha[:] = sw_alpha + (itl[sw.T[1]] - itl[sw.T[0]]) * (
                     +mvnorm_logpdf(
                         theta0[m][sw.T[0]],
                         theta0_prior_mean,
@@ -845,9 +846,7 @@ def calibHier(setup):
                     )
                 )
                 for i in range(setup.nexp):
-                    sw_alpha[:] = sw_alpha + (
-                        setup.itl[sw.T[1]] - setup.itl[sw.T[0]]
-                    ) * (
+                    sw_alpha[:] = sw_alpha + (itl[sw.T[1]] - itl[sw.T[0]]) * (
                         # for t_0
                         +setup.s2_prior_kern[i](
                             np.exp(log_s2[i][m][sw.T[0]]),
@@ -875,9 +874,9 @@ def calibHier(setup):
                         ).sum(axis=1)
                         - llik_curr[i][sw.T[1]].sum(axis=1)
                     )
-                for tt in sw[
-                    np.where(np.log(uniform(size=setup.nswap_per)) < sw_alpha)
-                ]:
+                accepted = np.log(uniform(size=len(sw))) < sw_alpha
+                sched.record(sw, sw_alpha, accepted)
+                for tt in sw[accepted]:
                     count_temper[tt[0], tt[1]] = count_temper[tt[0], tt[1]] + 1
                     for i in range(setup.nexp):
                         theta[i][m, tt[0]], theta[i][m, tt[1]] = (
@@ -914,6 +913,17 @@ def calibHier(setup):
                     )
                 # if np.exp(log_s2[i][m,0,0])>1:
                 #    print('a')
+        if m > setup.start_temper and setup.ntemps > 1 and sched.maybe_adapt(m):
+            # ladder changed: rebuild arrays derived from it
+            itl_mat = [
+                (np.ones((setup.ntheta[i], setup.ntemps)) * itl).T
+                for i in range(setup.nexp)
+            ]
+            itl_mat_s2 = [
+                np.ones((setup.ntemps, setup.ns2[i])) * itl.reshape(-1, 1)
+                for i in range(setup.nexp)
+            ]
+            Sigma0_dfs = Sigma0_prior_df + ntheta * itl
         # print('\rCalibration MCMC {:.01%} Complete'.format(m / setup.nmcmc), end='')
 
     t1 = time.time()
@@ -939,5 +949,8 @@ def calibHier(setup):
         pred_curr,
         theta0,
         Sigma0,
+        itl.copy(),
+        sched.rejection_rates(),
+        sched.round_trips,
     )  # , llik, theta_native, theta0_native, theta_parent_native)
     return out

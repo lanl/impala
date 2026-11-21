@@ -312,7 +312,8 @@ class AMcov_clust:
 
 OutCalibClust = namedtuple(
     "OutCalibClust",
-    "theta theta_hist s2 count count_temper pred_curr theta0 Sigma0 delta eta nclustmax theta_am",
+    "theta theta_hist s2 count count_temper pred_curr theta0 Sigma0 delta eta nclustmax theta_am temperature_ladder swap_rejection round_trips",
+    defaults=(None, None, None),
 )
 
 ## DP Cluster Calibration
@@ -334,6 +335,10 @@ def calibClust(setup):
     estimation of separate s2 values within an experiment, adding truncated gibbs sampling for measurement errors
     """
     t0 = time.time()
+    # working copy of the inverse-temperature ladder; adapted in place during
+    # burn-in when setup.adapt_ladder is True (see tempering.py)
+    sched = setup.make_swap_scheduler()
+    itl = sched.itl
 
     ## Constants Declaration
 
@@ -353,11 +358,11 @@ def calibClust(setup):
     temps = np.arange(setup.ntemps)
 
     # matrix of repeated inverse temperatures of dimension [ntemps, nclustmax]
-    itl_mat_theta = (np.ones((setup.ntemps, setup.nclustmax)).T * setup.itl).T
+    itl_mat_theta = (np.ones((setup.ntemps, setup.nclustmax)).T * itl).T
 
     # repeated inverse temperatures of dimension [i] x [ntemps, ns2[i]]
     itl_mat_s2 = [
-        np.ones((setup.ntemps, setup.ns2[i])) * setup.itl.reshape(-1, 1)
+        np.ones((setup.ntemps, setup.ns2[i])) * itl.reshape(-1, 1)
         for i in range(setup.nexp)
     ]
 
@@ -603,7 +608,7 @@ def calibClust(setup):
     mat = np.zeros((setup.ntemps, setup.p, setup.p))
     Sigma0_prior_df = setup.Sigma0_prior_df
     Sigma0_prior_scale = setup.Sigma0_prior_scale
-    Sigma0_dfs = Sigma0_prior_df + setup.nclustmax * setup.itl
+    Sigma0_dfs = Sigma0_prior_df + setup.nclustmax * itl
     Sigma0_scales = np.empty((setup.ntemps, setup.p, setup.p))
     Sigma0_scales[:] = Sigma0_prior_scale
     Sigma0_ldet_curr = slogdet(Sigma0[0])[1]
@@ -665,7 +670,7 @@ def calibClust(setup):
                         +np.log(
                             clust_mem_count + djs
                         )  # this line doesnt match paper? ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                        + llik_curr_delta[i][:, :, j] * setup.itl.reshape(-1, 1)
+                        + llik_curr_delta[i][:, :, j] * itl.reshape(-1, 1)
                     )
                 # ---fix for numerical stability in np.exp
                 cluster_cum_prob -= cluster_cum_prob.max(axis=1).reshape(-1, 1)
@@ -877,7 +882,7 @@ def calibClust(setup):
         ### Gibbs Update Theta0 ###
         ###########################
         cc[:] = np.linalg.inv(
-            np.einsum("t,tpq->tpq", ntheta * setup.itl, Sigma0_inv_curr)
+            np.einsum("t,tpq->tpq", ntheta * itl, Sigma0_inv_curr)
             + theta0_prior_prec,
         )
         tbar[:] = (
@@ -888,7 +893,7 @@ def calibClust(setup):
         tbar[:] /= ntheta.reshape(setup.ntemps, 1)
         dd[:] = +np.einsum(
             "t,tl->tl",
-            setup.itl,
+            itl,
             np.einsum("t,tlk,tk->tl", ntheta, Sigma0_inv_curr, tbar),
         ) + np.dot(theta0_prior_prec, theta0_prior_mean)
         theta0[m][:] = setup.chol_sample_nper_constraints(
@@ -903,7 +908,7 @@ def calibClust(setup):
         mat[:] *= 0.0
         mat += np.einsum(
             "t,tnp,tnq->tpq",
-            setup.itl,
+            itl,
             (
                 (theta[m - 1] - theta0[m].reshape(setup.ntemps, 1, setup.p))
                 * theta_ext.reshape(setup.ntemps, setup.nclustmax, 1)
@@ -914,7 +919,7 @@ def calibClust(setup):
             ),
         )  # must be m-1, have not updated theta in current iteration yet
         Sigma0_scales[:] = Sigma0_prior_scale + mat
-        Sigma0_dfs[:] = Sigma0_prior_df + theta_ext.sum(axis=1) * setup.itl
+        Sigma0_dfs[:] = Sigma0_prior_df + theta_ext.sum(axis=1) * itl
         for t in range(setup.ntemps):
             Sigma0[m, t] = invwishart.rvs(
                 df=Sigma0_dfs[t], scale=Sigma0_scales[t]
@@ -1086,13 +1091,11 @@ def calibClust(setup):
         #######################
         if m > setup.start_temper and setup.ntemps > 1:
             for _ in range(setup.nswap):
-                sw = np.random.choice(
-                    setup.ntemps, 2 * setup.nswap_per, replace=False
-                ).reshape(-1, 2)
-                sw_alpha[:] = 0.0  # reset swap probability
-                sw_alpha[:] = sw_alpha + (
-                    setup.itl[sw.T[1]] - setup.itl[sw.T[0]]
-                ) * (
+                sw = sched.pairs()
+                if len(sw) == 0:
+                    continue
+                sw_alpha = np.zeros(len(sw))  # log probability of swap
+                sw_alpha[:] = sw_alpha + (itl[sw.T[1]] - itl[sw.T[0]]) * (
                     -mvnorm_logpdf(
                         theta0[m][sw.T[1]],
                         theta0_prior_mean,
@@ -1123,9 +1126,7 @@ def calibClust(setup):
                     )
                 )
                 for i in range(setup.nexp):
-                    sw_alpha[:] = sw_alpha + (
-                        setup.itl[sw.T[1]] - setup.itl[sw.T[0]]
-                    ) * (
+                    sw_alpha[:] = sw_alpha + (itl[sw.T[1]] - itl[sw.T[0]]) * (
                         # for t_0
                         +setup.s2_prior_kern[i](
                             np.exp(log_s2[i][m][sw.T[0]]),
@@ -1160,11 +1161,9 @@ def calibClust(setup):
                         - llik_curr_theta[i][sw.T[1]].sum(axis=1)
                     )
 
-                for tt in sw[
-                    np.where(
-                        sw[np.log(uniform(size=setup.nswap_per)) < sw_alpha]
-                    )[0]
-                ]:
+                accepted = np.log(uniform(size=len(sw))) < sw_alpha
+                sched.record(sw, sw_alpha, accepted)
+                for tt in sw[accepted]:
                     count_temper[tt[0], tt[1]] = count_temper[tt[0], tt[1]] + 1
                     eta[m, tt[0]], eta[m, tt[1]] = (
                         eta[m, tt[1]].copy(),
@@ -1223,6 +1222,13 @@ def calibClust(setup):
                         theta_ext[tt[1]].copy(),
                         theta_ext[tt[0]].copy(),
                     )
+        if m > setup.start_temper and setup.ntemps > 1 and sched.maybe_adapt(m):
+            # ladder changed: rebuild arrays derived from it
+            itl_mat_theta = (np.ones((setup.ntemps, setup.nclustmax)).T * itl).T
+            itl_mat_s2 = [
+                np.ones((setup.ntemps, setup.ns2[i])) * itl.reshape(-1, 1)
+                for i in range(setup.nexp)
+            ]
         print(
             f"\rCalibration MCMC {m / setup.nmcmc:.01%} Complete",
             end="",
@@ -1248,6 +1254,9 @@ def calibClust(setup):
         eta,
         setup.nclustmax,
         cov_theta_cand,
+        itl.copy(),
+        sched.rejection_rates(),
+        sched.round_trips,
     )
     return out
 

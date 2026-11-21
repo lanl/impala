@@ -204,6 +204,9 @@ class CalibSetup:
         self.theta0_start = None  # optional
         self.theta_start = None  # optional
         self.nswap_per = None
+        self.swap_scheme = "deo"
+        self.adapt_ladder = False
+        self.adapt_ladder_until = None
         self.start_temper = None
         self.start_var_theta = None
         self.start_tau_theta = None
@@ -442,18 +445,62 @@ class CalibSetup:
         else:
             self.s2_prior_kern.append(ldig_kern)
 
-    def setTemperatureLadder(self, temperature_ladder, start_temper=1000):
+    def setTemperatureLadder(
+        self,
+        temperature_ladder,
+        start_temper=1000,
+        swap_scheme="deo",
+        adapt_ladder=False,
+        adapt_ladder_until=None,
+    ):
         """
         Define an array of temperatures to use for parallel tempering
 
         :param temperature_ladder : numpy array of increasing temperatures all above 1, e.g., 1.05**np.arange(50)
-        :param start_temper : (optional) MCnC iteration at which to start the parallel tempering, default = 1000
+        :param start_temper : (optional) MCMC iteration at which to start the parallel tempering, default = 1000
+        :param swap_scheme : (optional) how swap pairs are chosen in each swap round.  ``"deo"`` (default)
+            uses deterministic even/odd swaps between adjacent temperatures (non-reversible parallel
+            tempering, Syed et al. 2022); ``"seo"`` picks the even/odd parity at random; ``"random"``
+            reproduces the scheme of earlier impala versions (random disjoint pairs from the whole ladder).
+        :param adapt_ladder : (optional) if True, re-space the temperatures during burn-in so that the swap
+            rejection rate is the same between every pair of neighbouring temperatures (Syed et al. 2022,
+            Algorithm 4).  The coldest and hottest temperatures are kept fixed.  Default False.
+        :param adapt_ladder_until : (optional) last MCMC iteration at which the ladder may change.  Defaults
+            to ``nburn`` from ``setMCMC`` if it is positive, otherwise ``nmcmc // 2``.  Discard samples up to
+            this iteration as burn-in.  The adapted ladder is returned in the output as ``temperature_ladder``.
         """
-        self.tl = temperature_ladder
+        from .tempering import SWAP_SCHEMES
+
+        if swap_scheme not in SWAP_SCHEMES:
+            raise ValueError(
+                f"swap_scheme must be one of {SWAP_SCHEMES}, got {swap_scheme!r}"
+            )
+        if adapt_ladder and swap_scheme == "random":
+            raise ValueError(
+                "adapt_ladder=True needs adjacent swaps; use swap_scheme='deo' or 'seo'"
+            )
+        self.tl = np.asarray(temperature_ladder, dtype=float)
         self.itl = 1 / self.tl
         self.ntemps = len(self.tl)
         self.nswap_per = floor(self.ntemps // 2)
         self.start_temper = start_temper
+        self.swap_scheme = swap_scheme
+        self.adapt_ladder = adapt_ladder
+        self.adapt_ladder_until = adapt_ladder_until
+
+    def make_swap_scheduler(self):
+        """Create the swap scheduler used by the samplers (see ``tempering.py``)."""
+        from .tempering import SwapScheduler
+
+        until = self.adapt_ladder_until
+        if until is None:
+            until = self.nburn if self.nburn > 0 else self.nmcmc // 2
+        return SwapScheduler(
+            self.itl,
+            scheme=getattr(self, "swap_scheme", "deo"),
+            adapt=getattr(self, "adapt_ladder", False),
+            adapt_until=until,
+        )
 
     def setMCMC(
         self,
