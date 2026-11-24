@@ -21,8 +21,6 @@ from .impala_noprobit_emu import (
     chol_sample_1per,
     cov_4d_pcm,
     initfunc_unif,
-    invwishart_logpdf,
-    mvnorm_logpdf,
     mvnorm_logpdf_,
     tran_unif,
 )
@@ -287,7 +285,6 @@ def calibHier(setup):
     theta0_prior_mean = setup.theta0_prior_mean  # np.repeat(0.5, setup.p)
     theta0_prior_cov = setup.theta0_prior_cov  # np.eye(setup.p)*1**2
     theta0_prior_prec = scipy.linalg.inv(theta0_prior_cov)
-    theta0_prior_ldet = slogdet(theta0_prior_cov)[1]
 
     tbar = np.empty(theta0[0].shape)
     mat = np.zeros((setup.ntemps, setup.p, setup.p))
@@ -781,17 +778,19 @@ def calibHier(setup):
                         )[good_values[i]]
                     )
                 # now sum over alpha (for each temperature), add alpha for theta0 to prior, accept or reject
+                # Log acceptance ratio for each temperature: sum over experiments
+                # and over the theta_i within each experiment, plus the theta0
+                # prior (counted once, and not tempered, consistent with the Gibbs
+                # update of theta0).
                 alpha_tot = (
-                    sum(alpha).T
+                    sum(a.sum(axis=1) for a in alpha)
                     - 0.5
-                    * setup.itl
                     * np.diag(
                         (theta0_cand - theta0_prior_mean)
                         @ theta0_prior_prec
                         @ (theta0_cand - theta0_prior_mean).T
                     )
                     + 0.5
-                    * setup.itl
                     * np.diag(
                         (theta0[m] - theta0_prior_mean)
                         @ theta0_prior_prec
@@ -799,9 +798,7 @@ def calibHier(setup):
                     )
                 )
 
-                accept_tot = np.log(uniform(size=setup.ntemps)) < alpha_tot.sum(
-                    axis=0
-                )
+                accept_tot = np.log(uniform(size=setup.ntemps)) < alpha_tot
                 # Where accept, make changes
                 theta0[m][accept_tot, :] = theta0_cand[accept_tot, :]
                 for i in range(setup.nexp):
@@ -822,28 +819,9 @@ def calibHier(setup):
                     setup.ntemps, 2 * setup.nswap_per, replace=False
                 ).reshape(-1, 2)
                 sw_alpha[:] = 0.0  # reset swap probability
-                sw_alpha[:] = sw_alpha + (
-                    setup.itl[sw.T[1]] - setup.itl[sw.T[0]]
-                ) * (
-                    +mvnorm_logpdf(
-                        theta0[m][sw.T[0]],
-                        theta0_prior_mean,
-                        theta0_prior_prec,
-                        theta0_prior_ldet,
-                    )
-                    - mvnorm_logpdf(
-                        theta0[m][sw.T[1]],
-                        theta0_prior_mean,
-                        theta0_prior_prec,
-                        theta0_prior_ldet,
-                    )
-                    + invwishart_logpdf(
-                        Sigma0[m][sw.T[0]], Sigma0_prior_df, Sigma0_prior_scale
-                    )
-                    - invwishart_logpdf(
-                        Sigma0[m][sw.T[1]], Sigma0_prior_df, Sigma0_prior_scale
-                    )
-                )
+                # The hyperpriors p(theta0) p(Sigma0) are not tempered (the Gibbs
+                # updates of theta0 and Sigma0 use them at full strength in every
+                # chain), so they cancel in the swap ratio and must not appear here.
                 for i in range(setup.nexp):
                     sw_alpha[:] = sw_alpha + (
                         setup.itl[sw.T[1]] - setup.itl[sw.T[0]]
