@@ -19,13 +19,9 @@ from scipy.stats import invwishart
 
 from .impala_noprobit_emu import (
     chol_sample_1per,
-    clip_unit,
     cov_4d_pcm,
     initfunc_unif,
-    invprobit,
     mvnorm_logpdf_,
-    probit,
-    tran_probit,
     tran_unif,
 )
 from .impala_pool import AMcov_pool
@@ -131,11 +127,6 @@ def calibHier(setup):
     estimation of separate s2 values within an experiment, adding truncated gibbs sampling for measurement errors
     """
     t0 = time.time()
-    # Scale of the hierarchical normal model (see CalibSetup.setHierPriors).
-    # With "probit", theta and theta0 are sampled as z = probit(u), u in [0, 1],
-    # so theta_i ~ N(theta0, Sigma0) is not truncated by the bounds.
-    latent = getattr(setup, "hier_scale", "unit") == "probit"
-    to_native = tran_probit if latent else tran_unif
     theta0 = np.zeros([setup.nmcmc, setup.ntemps, setup.p])
     theta0 += 0.0
     Sigma0 = np.zeros([setup.nmcmc, setup.ntemps, setup.p, setup.p])
@@ -194,8 +185,6 @@ def calibHier(setup):
                 )
             )
             j += 1
-    if latent:
-        theta0_start = probit(clip_unit(theta0_start))
     theta0[0] = theta0_start
     Sigma0[0] = setup.Sigma0_prior_scale / (
         setup.Sigma0_prior_df - setup.p - 1
@@ -239,10 +228,9 @@ def calibHier(setup):
             theta0[0],
             Sigma0[0],
             setup.ntheta[i],
-            tran=to_native,
         )
         pred_curr[i] = setup.models[i].eval(
-            to_native(
+            tran_unif(
                 theta[i][0].reshape(setup.ntemps * setup.ntheta[i], setup.p),
                 setup.bounds_mat,
                 setup.bounds.keys(),
@@ -359,7 +347,7 @@ def calibHier(setup):
             setup.models[i].step()
             if setup.models[i].stochastic:  # update emulator
                 pred_curr[i] = setup.models[i].eval(
-                    to_native(
+                    tran_unif(
                         theta[i][m].reshape(
                             setup.ntemps * setup.ntheta[i], setup.p
                         ),
@@ -397,7 +385,7 @@ def calibHier(setup):
             )
             # Check constraints
             good_values_mat[i][:] = setup.checkConstraints(
-                to_native(
+                tran_unif(
                     theta_cand_mat[i], setup.bounds_mat, setup.bounds.keys()
                 )
             )
@@ -409,7 +397,7 @@ def calibHier(setup):
                 good_values_mat[i]
             ]
             pred_cand[i][:] = setup.models[i].eval(
-                to_native(
+                tran_unif(
                     theta_eval_mat[i], setup.bounds_mat, setup.bounds.keys()
                 ),
                 pool=False,
@@ -691,7 +679,6 @@ def calibHier(setup):
             np.einsum("tlk,tk->tl", cc, dd),
             cc,
             n=1,
-            tran=to_native,
         )
 
         ###########################
@@ -723,7 +710,7 @@ def calibHier(setup):
                 theta0_cand = theta0[m].copy()
                 theta0_cand[:, k] += z
                 good_values_theta0 = setup.checkConstraints(
-                    to_native(
+                    tran_unif(
                         theta0_cand, setup.bounds_mat, setup.bounds.keys()
                     )
                 )
@@ -739,7 +726,7 @@ def calibHier(setup):
                     )
                     # Compute constraint flags
                     good_values_mat[i][:] = setup.checkConstraints(
-                        to_native(
+                        tran_unif(
                             theta_cand_mat[i],
                             setup.bounds_mat,
                             setup.bounds.keys(),
@@ -756,7 +743,7 @@ def calibHier(setup):
                         * good_values_theta0
                     ).T
                     pred_cand[i][:] = setup.models[i].eval(
-                        to_native(
+                        tran_unif(
                             theta_eval_mat[i],
                             setup.bounds_mat,
                             setup.bounds.keys(),
@@ -917,11 +904,6 @@ def calibHier(setup):
     count_temper = (
         count_temper + count_temper.T - np.diag(np.diag(count_temper))
     )
-    if latent:
-        # return theta and theta0 on the [0, 1] scale like the "unit" model, so
-        # post-processing is unchanged; Sigma0 stays on the probit scale
-        theta = [invprobit(th) for th in theta]
-        theta0 = invprobit(theta0)
     # theta_reshape = [np.swapaxes(t,1,2) for t in theta]
     out = OutCalibHier(
         theta,

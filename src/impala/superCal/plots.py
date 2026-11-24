@@ -107,9 +107,10 @@ class PTW_Plotter:
             for i in range(self.setup.nexp)
         ]
 
-        theta_parent = self.setup.sample_hier_parent(
+        theta_parent = self.setup.chol_sample_nper_constraints(
             self.out.theta0[sel, 0],
             self.out.Sigma0[sel, 0],
+            n=1,
         )
 
         for i in range(self.setup.nexp):
@@ -523,9 +524,10 @@ class PTW_Plotter:
             highlight = [
                 range(self.setup.ntheta[k]) for k in range(self.setup.nexp)
             ]
-        theta_parent = self.setup.sample_hier_parent(
+        theta_parent = self.setup.chol_sample_nper_constraints(
             self.out.theta0[sel, 0],
             self.out.Sigma0[sel, 0],
+            n=1,
         )
         theta_names = list(self.setup.bounds.keys())
         theta0_unst = sc.unnormalize(
