@@ -92,8 +92,9 @@ def test_no_tilt_when_bounds_are_slack():
     res = hier_truncation_weights(setup, _out(th0, s0), mcmc_use=np.arange(nd))
     assert res["ess_frac"] > 0.99
     assert res["tilt_nats"] < 1e-6
-    assert np.allclose(res["theta0_sd_raw"], res["theta0_sd_reweighted"],
-                       rtol=1e-3)
+    assert np.allclose(
+        res["theta0_sd_raw"], res["theta0_sd_reweighted"], rtol=1e-3
+    )
 
 
 def test_reweighting_widens_sigma0_when_bounds_bind():
