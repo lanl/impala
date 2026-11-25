@@ -2,6 +2,8 @@
 """Impala postprocessing and plotting scripts"""
 
 ####################################
+import warnings
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -9,7 +11,7 @@ import seaborn as sns
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.lines import Line2D
 from scipy.interpolate import interp1d
-from scipy.stats import gaussian_kde, rankdata
+from scipy.stats import gaussian_kde, multivariate_normal, norm, rankdata
 
 from impala import superCal as sc
 
@@ -1210,3 +1212,149 @@ def get_outcome_predictions_impala(setup, theta_input, disc_input=None):
         "constraints_satisfied": CONSTRAINTS,
     }
     return RESULTS
+
+
+####################################
+### Hierarchical truncation diagnostic
+####################################
+
+
+def _log_box_prob(mean, cov):
+    """
+    log P(theta in [0, 1]^p | theta ~ N(mean, cov)).
+
+    Uses the closed form when cov is diagonal, Genz's algorithm otherwise.
+    """
+    p = len(mean)
+    if p == 1:
+        sd = np.sqrt(cov[0, 0])
+        val = norm.cdf((1.0 - mean[0]) / sd) - norm.cdf(-mean[0] / sd)
+        return np.log(max(val, 1e-300))
+    off = cov - np.diag(np.diag(cov))
+    if not np.any(np.abs(off) > 1e-12 * max(np.abs(cov).max(), 1.0)):
+        sd = np.sqrt(np.diag(cov))
+        val = norm.cdf((1.0 - mean) / sd) - norm.cdf(-mean / sd)
+        return float(np.log(np.maximum(val, 1e-300)).sum())
+    val = multivariate_normal.cdf(
+        np.ones(p), mean=mean, cov=cov, lower_limit=np.zeros(p)
+    )
+    return float(np.log(max(val, 1e-300)))
+
+
+def weighted_quantile(x, q, weights):
+    """Weighted quantiles of a 1-d sample; q may be scalar or array-like."""
+    x = np.asarray(x, dtype=float)
+    weights = np.asarray(weights, dtype=float)
+    order = np.argsort(x)
+    x, weights = x[order], weights[order]
+    cw = np.cumsum(weights) - 0.5 * weights
+    cw /= weights.sum()
+    return np.interp(q, cw, x)
+
+
+def hier_truncation_weights(setup, calib_out, mcmc_use=None, temperature=0):
+    """
+    Diagnose (and, when feasible, undo) the contraction that the hierarchy's
+    truncation to the bounds induces on theta0 and Sigma0.
+
+    ``calibHier`` is a correct sampler for the joint density
+
+        p(theta0) p(Sigma0) prod_i N(theta_i; theta0, Sigma0) 1{theta_i in B}
+
+    but integrating out theta leaves the effective hyperprior equal to the
+    stated one times prod_i P(theta_i in B | theta0, Sigma0).  That factor
+    rewards a central theta0 and a small Sigma0, so the hierarchy looks tighter
+    than the prior you wrote down.  The intended model -- theta_i truncated
+    normal, normalising constant included -- is recovered by reweighting the
+    saved draws with
+
+        w  proportional to  P(B | theta0, Sigma0) ** (-n),
+
+    where n = sum(setup.ntheta) is the total number of experiment-level theta_i.
+
+    Read ``ess_frac`` first:
+
+    * near 1: the bounds are not binding for this run and the uncorrected
+      output needs no adjustment.
+    * moderate: the reweighted summaries below are usable.
+    * small: the output is materially contracted AND reweighting cannot repair
+      it, because the chain never visited the region the corrected posterior
+      wants.  Treat the reported hyperprior as an approximation, or reduce the
+      number of parameters sitting against a bound.
+
+    The size of the tilt is ``n * |log P(B)|`` in nats; it grows with both the
+    number of experiments and the dimension, and is only large when parameters
+    sit near the bounds.
+
+    :param setup: the CalibSetup passed to calibHier.
+    :param calib_out: the object calibHier returned.
+    :param mcmc_use: iterations to use (e.g. ``np.arange(nburn, nmcmc)``).
+        Defaults to the second half of the chain.
+    :param temperature: temperature index; 0 (the default) is the cold chain.
+    :return: dict with ``weights`` (normalised, one per used draw), ``ess``,
+        ``ess_frac``, ``log_box_prob``, ``n_theta``, ``tilt_nats``, and
+        ``theta0_mean`` / ``theta0_sd`` / ``sigma0_diag_median`` each given
+        both ``_raw`` and ``_reweighted``.
+
+    .. note::
+        The weights account for the bounds only.  With a ``constraint_func``
+        other than ``"bounds"`` the true normalising constant is smaller still,
+        so the correction is partial and a warning is issued.
+    """
+    theta0 = np.asarray(calib_out.theta0)
+    Sigma0 = np.asarray(calib_out.Sigma0)
+    if mcmc_use is None:
+        mcmc_use = np.arange(theta0.shape[0] // 2, theta0.shape[0])
+    mcmc_use = np.atleast_1d(np.asarray(mcmc_use))
+
+    th0 = theta0[mcmc_use, temperature]
+    S0 = Sigma0[mcmc_use, temperature]
+    n_theta = int(sum(setup.ntheta))
+
+    if getattr(setup, "_constraint_func", None) is not sc.cf_bounds:
+        warnings.warn(
+            "hier_truncation_weights accounts for the bounds only; this setup "
+            "uses a custom constraint_func, so the correction is partial.",
+            stacklevel=2,
+        )
+
+    lp = np.empty(len(mcmc_use))
+    for j in range(len(mcmc_use)):
+        try:
+            lp[j] = _log_box_prob(th0[j], S0[j])
+        except (np.linalg.LinAlgError, ValueError):
+            lp[j] = np.nan
+    ok = np.isfinite(lp)
+    if not np.all(ok):
+        warnings.warn(
+            f"{int((~ok).sum())} of {len(ok)} draws gave an unusable box "
+            "probability and were dropped from the diagnostic.",
+            stacklevel=2,
+        )
+    th0, S0, lp = th0[ok], S0[ok], lp[ok]
+
+    lw = -n_theta * lp
+    w = np.exp(lw - lw.max())
+    w /= w.sum()
+    ess = 1.0 / np.sum(w**2)
+
+    s0diag = np.array([np.diag(s) for s in S0])
+    return {
+        "weights": w,
+        "ess": float(ess),
+        "ess_frac": float(ess / len(w)),
+        "log_box_prob": lp,
+        "n_theta": n_theta,
+        "tilt_nats": float(n_theta * np.abs(np.median(lp))),
+        "theta0_mean_raw": th0.mean(0),
+        "theta0_mean_reweighted": (w[:, None] * th0).sum(0),
+        "theta0_sd_raw": th0.std(0),
+        "theta0_sd_reweighted": np.sqrt(
+            (w[:, None] * (th0 - (w[:, None] * th0).sum(0)) ** 2).sum(0)
+        ),
+        "sigma0_diag_median_raw": np.median(s0diag, axis=0),
+        "sigma0_diag_median_reweighted": np.array([
+            weighted_quantile(s0diag[:, k], 0.5, w)
+            for k in range(s0diag.shape[1])
+        ]),
+    }

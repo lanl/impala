@@ -3,23 +3,26 @@
 
 ####################################
 import time
+import warnings
 from collections import namedtuple
 from math import sqrt
 
 import numpy as np
-import scipy
-from numpy.linalg import slogdet
 from numpy.random import beta, choice, gamma, uniform
-from scipy.stats import invwishart
 
+from .impala_copula import (
+    CopulaHyper,
+    draw_gamma0,
+    hier_logpdf,
+    hyper_from_legacy,
+    implied_theta_cov,
+)
 from .impala_noprobit_emu import (
+    cf_bounds,
     chol_sample_1per,
     cov_4d_pcm,
-    gamma_logpdf,
     initfunc_unif,
-    invwishart_logpdf,
-    mvnorm_logpdf,  # , invgamma_logpdf
-    mvnorm_logpdf_,
+    s2_swap_kern,
     tran_unif,
 )
 
@@ -119,13 +122,16 @@ def one_step_in_cluster_covariance_update(Sj, mSj, nSj, n, mus, covs):
     return Sj, mSj, nSj
 
 
-# West 1992, dirichletprocess R package
+# Escobar & West 1995 (JASA 90, 577-588); cf. West 1992, dirichletprocess R package
 def sample_eta(curr_eta, nclust, ndat, prior_shape, prior_rate):
     g = beta(curr_eta + 1, ndat)
     aa = prior_shape + nclust
     bb = prior_rate - np.log(g)
+    # Escobar & West (1995), eq. 13: mixture of Gamma(a + k, b - log g) with
+    # probability eps and Gamma(a + k - 1, b - log g) with probability 1 - eps,
+    # where eps / (1 - eps) = (a + k - 1) / (n (b - log g)).
     eps = (aa - 1) / (ndat * bb + aa - 1)
-    sel = (uniform(size=aa.shape) < eps) * 1
+    sel = (uniform(size=aa.shape) >= eps) * 1  # 0 -> a + k, 1 -> a + k - 1
     aaa = np.vstack((aa, aa - 1)).T[np.arange(aa.shape[0]), sel]
     return gamma(shape=aaa, scale=1 / bb)
 
@@ -312,7 +318,7 @@ class AMcov_clust:
 
 OutCalibClust = namedtuple(
     "OutCalibClust",
-    "theta theta_hist s2 count count_temper pred_curr theta0 Sigma0 delta eta nclustmax theta_am",
+    "theta theta_hist s2 count count_temper pred_curr theta0 Sigma0 delta eta nclustmax theta_am v v_hist gamma0 rho copula",
 )
 
 ## DP Cluster Calibration
@@ -361,11 +367,61 @@ def calibClust(setup):
         for i in range(setup.nexp)
     ]
 
+    ###################################
+    ### Copula hierarchy parameters ###
+    ###################################
+    # The hierarchy over cluster-level theta lives on a latent Gaussian scale
+    # and is mapped onto the box by a copula, so theta has the box as its exact
+    # support and needs no truncation.  See impala_copula for the model and for
+    # the translation of the legacy hyperprior knobs.
+    margin_a = getattr(setup, "margin_a", None)
+    margin_b = getattr(setup, "margin_b", None)
+    rho_prior_a = getattr(setup, "rho_prior_a", None)
+    rho_prior_b = getattr(setup, "rho_prior_b", None)
+    if (margin_a is None or margin_b is None) and (
+        setup.theta0_prior_mean is not None
+    ):
+        margin_a, margin_b, _rho_center, clamped = hyper_from_legacy(
+            setup.theta0_prior_mean,
+            setup.theta0_prior_cov,
+            setup.Sigma0_prior_df,
+            setup.Sigma0_prior_scale,
+        )
+        if np.any(clamped):
+            which = np.where(clamped)[0].tolist()
+            warnings.warn(
+                "The hierarchical prior requested more marginal spread than a "
+                "Beta with a, b >= 1 can give for its mean, in coordinate(s) "
+                f"{which}; the margin was capped at the flattest such Beta "
+                "(uniform where the mean is 0.5). Going further would pile "
+                "prior mass at both bounds.",
+                stacklevel=2,
+            )
+    if rho_prior_a is None or rho_prior_b is None:
+        rho_prior_a, rho_prior_b = 1.0, 1.0
+    copula = CopulaHyper(
+        setup.p,
+        a=margin_a,
+        b=margin_b,
+        rho_a=rho_prior_a,
+        rho_b=rho_prior_b,
+    )
+    # The bounds are the copula's support and never need rejection.  A custom
+    # constraint_func carves a region out of the box and does.
+    cf_setup = None if setup._constraint_func is cf_bounds else setup
+    # the hierarchy is not tempered in calibClust; see the gamma0 update
+    itl_untempered = np.ones(setup.ntemps)
+
+    gamma0 = np.empty([setup.nmcmc, setup.ntemps, setup.p])
+    rho = np.empty([setup.nmcmc, setup.ntemps, setup.p])
+
     ## Parameter Declaration
     ### Added ability to specify initial value
-    theta0 = np.empty([setup.nmcmc, setup.ntemps, setup.p])
     if setup.theta0_start is not None:
-        theta0_start = setup.theta0_start
+        theta0_start = np.broadcast_to(
+            np.asarray(setup.theta0_start, dtype=float),
+            (setup.ntemps, setup.p),
+        ).copy()
     else:
         theta0_start = initfunc_unif(size=[setup.ntemps, setup.p])
         good = setup.checkConstraints(
@@ -389,7 +445,8 @@ def calibClust(setup):
             raise ValueError(
                 f"Failed to find samples that fulfill the constraints after {maxiter} iterations."
             )
-    theta0[0] = theta0_start
+    gamma0[0] = copula.from_theta(theta0_start)
+    rho[0] = copula.rho_a / (copula.rho_a + copula.rho_b)  # prior mean
 
     s2_which_mat = [
         [np.where(s2_ind_mat[i][:, j])[0] for j in range(setup.ntheta[i])]
@@ -417,11 +474,6 @@ def calibClust(setup):
             print(
                 "Gibbs sampling for s2 only valid if weights are the same for all observations with same s2. Reverting to fixed s2. "
             )
-
-    Sigma0 = np.empty([setup.nmcmc, setup.ntemps, setup.p, setup.p])
-    Sigma0[0] = setup.Sigma0_prior_scale / (
-        setup.Sigma0_prior_df - setup.p - 1
-    )  # Changed initialization
 
     # initialize delta, the cluster membership indicator (for each experiment)
     delta = [
@@ -455,31 +507,49 @@ def calibClust(setup):
     # initialize Theta
     theta_long_shape = (setup.ntemps * setup.nclustmax, setup.p)
     theta_wide_shape = (setup.ntemps, setup.nclustmax, setup.p)
+    # v holds the latent (unbounded) cluster parameters that the sampler moves;
+    # theta is the derived box-valued parameter, kept for the emulator and for
+    # every downstream consumer of the output.
+    v = np.empty((setup.nmcmc, setup.ntemps, setup.nclustmax, setup.p))
     theta = np.empty((setup.nmcmc, setup.ntemps, setup.nclustmax, setup.p))
 
     ### Added ability to specify initial value
     if setup.theta_start is None:
-        theta[0] = setup.chol_sample_nper_constraints(
-            theta0[0],
-            Sigma0[0],
-            setup.nclustmax,
+        # Draw from the hierarchy, redrawing any theta a custom
+        # constraint_func rejects.  The bounds cannot be violated, so with
+        # constraint_func="bounds" this accepts immediately.
+        v[0] = copula.parent_draw(
+            gamma0[0],
+            rho[0],
+            n=setup.nclustmax,
+            setup=cf_setup,
+            latent=True,
         )
     else:
-        theta[0] = setup.theta_start
+        v[0] = copula.from_theta(setup.theta_start)
+    theta[0] = copula.to_theta(v[0])
 
+    v_hist = [
+        np.empty((setup.nmcmc, setup.ntemps, setup.ntheta[i], setup.p))
+        for i in range(setup.nexp)
+    ]
     theta_hist = [
         np.empty((setup.nmcmc, setup.ntemps, setup.ntheta[i], setup.p))
         for i in range(setup.nexp)
     ]
     theta_cand = np.empty(theta_wide_shape)
-    theta_cand_empty = np.empty(theta_wide_shape)
+    v_cand_empty = np.empty(theta_wide_shape)
     for i in range(setup.nexp):
+        v_hist[i][0] = v[0, theta_unravel[i], delta[i][0].ravel()].reshape(
+            setup.ntemps, setup.ntheta[i], setup.p
+        )
         theta_hist[i][0] = theta[
             0, theta_unravel[i], delta[i][0].ravel()
         ].reshape(
             setup.ntemps, setup.ntheta[i], setup.p
         )  ### edited ns2 -> ntheta
     theta_eval = np.empty(theta_wide_shape)
+    v_eval = np.empty(theta_wide_shape)
     theta_ext = np.zeros(
         (setup.ntemps, setup.nclustmax), dtype=bool
     )  # array of (current) extant theta locs
@@ -591,25 +661,8 @@ def calibClust(setup):
         tau_start=setup.start_tau_theta,
     )
 
-    ## Initialize Theta0 and Sigma0 related variables
-    ## Initialize Theta0 and Sigma0 related variables
-    theta0_prior_cov = (
-        setup.theta0_prior_cov
-    )  # was 10^2, but that is far from uniform when back transforming
-    theta0_prior_prec = scipy.linalg.inv(theta0_prior_cov)
-    theta0_prior_mean = setup.theta0_prior_mean
-    theta0_prior_ldet = slogdet(theta0_prior_cov)[1]
-    tbar = np.empty(theta0[0].shape)
-    mat = np.zeros((setup.ntemps, setup.p, setup.p))
-    Sigma0_prior_df = setup.Sigma0_prior_df
-    Sigma0_prior_scale = setup.Sigma0_prior_scale
-    Sigma0_dfs = Sigma0_prior_df + setup.nclustmax * setup.itl
-    Sigma0_scales = np.empty((setup.ntemps, setup.p, setup.p))
-    Sigma0_scales[:] = Sigma0_prior_scale
-    Sigma0_ldet_curr = slogdet(Sigma0[0])[1]
-    Sigma0_inv_curr = np.linalg.inv(Sigma0[0])
-    cc = np.empty((setup.ntemps, setup.p, setup.p))
-    dd = np.empty((setup.ntemps, setup.p))
+    ## The copula hierarchy has no theta0/Sigma0 scaffolding: gamma0 is drawn
+    ## from a conjugate normal and rho from an exact one-dimensional grid draw.
     ## Initialize Counters
     count_temper = np.zeros([setup.ntemps, setup.ntemps])
     count = np.zeros(setup.ntemps)
@@ -854,18 +907,21 @@ def calibClust(setup):
                 log_s2[i][m] = np.log(setup.sd_est[i] ** 2)
 
                 for t in range(setup.ntemps):
-                    s2_stretched = log_s2[i][m][t, setup.theta_ind[i]]
+                    # same indexing as the Gibbs branches: log_s2 has one entry
+                    # per s2 group (s2_ind), the likelihood for theta j uses the
+                    # observations of theta j (theta_which_mat)
+                    s2_stretched = log_s2[i][m][t, setup.s2_ind[i]]
                     for j in range(setup.ntheta[i]):
                         marg_lik_cov_curr[i][t][j] = setup.models[
                             i
                         ].lik_cov_inv(
-                            np.exp(s2_stretched[s2_which_mat[i][j]]),
+                            np.exp(s2_stretched[theta_which_mat[i][j]]),
                             wt_mat[i][theta_which_mat[i][j]],
                             s2_which_mat[i][j],
                         )
                         llik_curr_theta[i][t][j] = setup.models[i].llik(
-                            setup.ys[i][s2_which_mat[i][j]],
-                            pred_curr_theta[i][t][s2_which_mat[i][j]],
+                            setup.ys[i][theta_which_mat[i][j]],
+                            pred_curr_theta[i][t][theta_which_mat[i][j]],
                             marg_lik_cov_curr[i][t][j],
                             wt_mat[i][theta_which_mat[i][j]],
                         )
@@ -874,53 +930,37 @@ def calibClust(setup):
                 print("TODO: fill in s2 sampling without gibbs")
 
         ###########################
-        ### Gibbs Update Theta0 ###
+        ### Gibbs update gamma0 ###
         ###########################
-        cc[:] = np.linalg.inv(
-            np.einsum("t,tpq->tpq", ntheta * setup.itl, Sigma0_inv_curr)
-            + theta0_prior_prec,
-        )
-        tbar[:] = (
-            theta[m - 1] * theta_ext.reshape(setup.ntemps, setup.nclustmax, 1)
-        ).sum(
-            axis=1
-        )  # must be m-1, have not updated theta in current iteration yet
-        tbar[:] /= ntheta.reshape(setup.ntemps, 1)
-        dd[:] = +np.einsum(
-            "t,tl->tl",
-            setup.itl,
-            np.einsum("t,tlk,tk->tl", ntheta, Sigma0_inv_curr, tbar),
-        ) + np.dot(theta0_prior_prec, theta0_prior_mean)
-        theta0[m][:] = setup.chol_sample_nper_constraints(
-            np.einsum("tlk,tk->tl", cc, dd),
-            cc,
-            n=1,
+        # Only occupied clusters belong to the hierarchy, and which ones are
+        # occupied differs by temperature, so the draws are masked by
+        # theta_ext.  Must use m-1: theta has not been updated this iteration.
+        #
+        # Only the likelihood is tempered (power posterior): the hierarchy
+        # enters at full strength in every chain, as do the priors of gamma0,
+        # rho, eta and delta.  Tempering the hierarchy here would have no
+        # consistent stationary distribution, because unoccupied clusters are
+        # refreshed from that same density untempered and the delta update
+        # moves centres between occupied and unoccupied without an N^(beta-1)
+        # correction.  calibHier does temper its hierarchy, which is consistent
+        # there because every theta_i is always occupied.
+        v_curr = [v[m - 1]]
+        mask_curr = [theta_ext]
+        gamma0[m][:] = draw_gamma0(
+            v_curr,
+            rho[m - 1],
+            itl_untempered,
+            copula=copula,
+            setup=cf_setup,
+            mask_list=mask_curr,
         )
 
-        ###########################
-        ### Gibbs update Sigma0 ###
-        ###########################
-        mat[:] *= 0.0
-        mat += np.einsum(
-            "t,tnp,tnq->tpq",
-            setup.itl,
-            (
-                (theta[m - 1] - theta0[m].reshape(setup.ntemps, 1, setup.p))
-                * theta_ext.reshape(setup.ntemps, setup.nclustmax, 1)
-            ),
-            (
-                (theta[m - 1] - theta0[m].reshape(setup.ntemps, 1, setup.p))
-                * theta_ext.reshape(setup.ntemps, setup.nclustmax, 1)
-            ),
-        )  # must be m-1, have not updated theta in current iteration yet
-        Sigma0_scales[:] = Sigma0_prior_scale + mat
-        Sigma0_dfs[:] = Sigma0_prior_df + theta_ext.sum(axis=1) * setup.itl
-        for t in range(setup.ntemps):
-            Sigma0[m, t] = invwishart.rvs(
-                df=Sigma0_dfs[t], scale=Sigma0_scales[t]
-            )
-        Sigma0_ldet_curr[:] = np.linalg.slogdet(Sigma0[m])[1]
-        Sigma0_inv_curr[:] = np.linalg.inv(Sigma0[m])
+        ########################
+        ### Gibbs update rho ###
+        ########################
+        rho[m][:] = copula.draw_rho(
+            v_curr, gamma0[m], itl_untempered, mask_list=mask_curr
+        )
 
         ###################
         ### Draw Thetas ###
@@ -928,11 +968,14 @@ def calibClust(setup):
 
         llik_cand_theta_[:] = 0.0
         llik_curr_theta_[:] = 0.0
+        v[m] = v[m - 1].copy()
         theta[m] = theta[m - 1].copy()
+        v_eval[:] = v[m - 1].copy()
         theta_eval[:] = theta[m - 1].copy()
         pred_cand_theta = pred_curr_theta.copy()
 
-        cov_theta_cand.update(theta_hist, m, curr_delta)
+        # the adaptive proposal now lives on the latent scale
+        cov_theta_cand.update(v_hist, m, curr_delta)
         ### This can sometimes help if clusters have very uneven sizes and large clusters don't accept enough.
         if setup.scale_proposal:
             cov_theta_cand.S = (
@@ -942,14 +985,15 @@ def calibClust(setup):
                 ]
             )  # gives better performance for heavily-occupied clusters, 10/5/26
 
-        theta_cand = np.stack([
-            setup.chol_sample_nper_constraints(
-                theta[m][t],
-                cov_theta_cand.S[t],
-                n=1,
-            )
+        # Random-walk on the latent scale; every candidate is inside the box
+        # by construction, so only a custom constraint_func can reject one.
+        v_cand = np.stack([
+            chol_sample_1per(
+                v[m][t][None, ...], cov_theta_cand.S[t][None, ...]
+            )[0]
             for t in range(setup.ntemps)
         ])
+        theta_cand = copula.to_theta(v_cand)
         good_values[:] = setup.checkConstraints(
             tran_unif(
                 theta_cand.reshape(theta_long_shape),
@@ -957,20 +1001,24 @@ def calibClust(setup):
                 setup.bounds.keys(),
             ),
             setup.bounds,
-        ).reshape(
-            setup.ntemps, setup.nclustmax
-        )  # these should actually all be good now
+        ).reshape(setup.ntemps, setup.nclustmax)
+        v_eval[good_values] = v_cand[good_values]
         theta_eval[good_values] = theta_cand[good_values]
 
-        theta_cand_empty[:] = setup.chol_sample_nper_constraints(
-            theta0[m],
-            Sigma0[m],
-            setup.nclustmax,
+        # Unoccupied clusters are refreshed straight from the hierarchy.
+        v_cand_empty[:] = copula.parent_draw(
+            gamma0[m],
+            rho[m],
+            n=setup.nclustmax,
+            setup=cf_setup,
+            latent=True,
         )
-        theta_eval[~theta_ext] = theta_cand_empty[~theta_ext].copy()
-        theta[m, ~theta_ext] = theta_eval[
-            ~theta_ext
-        ].copy()  # Automatically update for non-occupied clusters, don't want to impact accept/reject of other thetas later on
+        v_eval[~theta_ext] = v_cand_empty[~theta_ext].copy()
+        theta_eval[~theta_ext] = copula.to_theta(v_eval[~theta_ext])
+        # Automatically update for non-occupied clusters, don't want to impact
+        # accept/reject of other thetas later on
+        v[m, ~theta_ext] = v_eval[~theta_ext].copy()
+        theta[m, ~theta_ext] = theta_eval[~theta_ext].copy()
 
         ### Generate candidate theta evals for all clusters. This often turns out to be faster than separate by experiment
         for i in range(setup.nexp):
@@ -1015,27 +1063,21 @@ def calibClust(setup):
 
         alpha[:] = -np.inf
         alpha[good_values] = (
-            itl_mat_theta
-            * (
-                llik_cand_theta_
-                - llik_curr_theta_
-                + mvnorm_logpdf_(
-                    theta_eval, theta0[m], Sigma0_inv_curr, Sigma0_ldet_curr
-                )
-                * theta_ext
-                - mvnorm_logpdf_(
-                    theta[m], theta0[m], Sigma0_inv_curr, Sigma0_ldet_curr
-                )
-                * theta_ext
-            )
+            itl_mat_theta * (llik_cand_theta_ - llik_curr_theta_)
+            + hier_logpdf(v_eval, gamma0[m], rho[m]) * theta_ext
+            - hier_logpdf(v[m], gamma0[m], rho[m]) * theta_ext
         )[good_values]
         accept[:] = np.log(uniform(size=alpha.shape)) < alpha
+        v[m, accept] = v_cand[accept]
         theta[m, accept] = theta_cand[accept]
-        theta[m, ~theta_ext] = theta_eval[
-            ~theta_ext
-        ].copy()  # Automatically update for non-occupied clusters
+        # Automatically update for non-occupied clusters
+        v[m, ~theta_ext] = v_eval[~theta_ext].copy()
+        theta[m, ~theta_ext] = theta_eval[~theta_ext].copy()
 
         for i in range(setup.nexp):
+            v_hist[i][m] = v[m, theta_unravel[i], delta[i][m].ravel()].reshape(
+                setup.ntemps, setup.ntheta[i], setup.p
+            )
             theta_hist[i][m] = theta[
                 m, theta_unravel[i], delta[i][m].ravel()
             ].reshape(setup.ntemps, setup.ntheta[i], setup.p)  # CHANGED
@@ -1090,81 +1132,35 @@ def calibClust(setup):
                     setup.ntemps, 2 * setup.nswap_per, replace=False
                 ).reshape(-1, 2)
                 sw_alpha[:] = 0.0  # reset swap probability
-                sw_alpha[:] = sw_alpha + (
-                    setup.itl[sw.T[1]] - setup.itl[sw.T[0]]
-                ) * (
-                    -mvnorm_logpdf(
-                        theta0[m][sw.T[1]],
-                        theta0_prior_mean,
-                        theta0_prior_prec,
-                        theta0_prior_ldet,
-                    )
-                    + mvnorm_logpdf(
-                        theta0[m][sw.T[0]],
-                        theta0_prior_mean,
-                        theta0_prior_prec,
-                        theta0_prior_ldet,
-                    )
-                    - invwishart_logpdf(
-                        Sigma0[m][sw.T[1]], Sigma0_prior_df, Sigma0_prior_scale
-                    )
-                    + invwishart_logpdf(
-                        Sigma0[m][sw.T[0]], Sigma0_prior_df, Sigma0_prior_scale
-                    )
-                    - gamma_logpdf(
-                        eta[m][sw.T[1]],
-                        setup.eta_prior_shape,
-                        setup.eta_prior_rate,
-                    )
-                    + gamma_logpdf(
-                        eta[m][sw.T[0]],
-                        setup.eta_prior_shape,
-                        setup.eta_prior_rate,
-                    )
-                )
+                # Only the likelihood (and the s2 prior, which the s2 updates
+                # temper) is tempered.  The clustering prior -- p(gamma0),
+                # p(rho), p(eta), p(delta | eta) and the hierarchy of the
+                # cluster centres -- is the same in every chain, so it cancels
+                # here.
                 for i in range(setup.nexp):
                     sw_alpha[:] = sw_alpha + (
                         setup.itl[sw.T[1]] - setup.itl[sw.T[0]]
                     ) * (
                         # for t_0
-                        +setup.s2_prior_kern[i](
+                        +s2_swap_kern(setup, i)(
                             np.exp(log_s2[i][m][sw.T[0]]),
                             setup.ig_a[i],
                             setup.ig_b[i],
                         ).sum(axis=1)
-                        + (
-                            mvnorm_logpdf_(
-                                theta[m, sw.T[0]],
-                                theta0[m, sw.T[0]],
-                                Sigma0_inv_curr[sw.T[0]],
-                                Sigma0_ldet_curr[sw.T[0]],
-                            )
-                            * theta_ext[sw.T[0]]
-                        ).sum(axis=1)
                         + llik_curr_theta[i][sw.T[0]].sum(axis=1)
                         # for t_1
-                        - setup.s2_prior_kern[i](
+                        - s2_swap_kern(setup, i)(
                             np.exp(log_s2[i][m][sw.T[1]]),
                             setup.ig_a[i],
                             setup.ig_b[i],
                         ).sum(axis=1)
-                        - (
-                            mvnorm_logpdf_(
-                                theta[m, sw.T[1]],
-                                theta0[m, sw.T[1]],
-                                Sigma0_inv_curr[sw.T[1]],
-                                Sigma0_ldet_curr[sw.T[1]],
-                            )
-                            * theta_ext[sw.T[1]]
-                        ).sum(axis=1)
                         - llik_curr_theta[i][sw.T[1]].sum(axis=1)
                     )
 
-                for tt in sw[
-                    np.where(
-                        sw[np.log(uniform(size=setup.nswap_per)) < sw_alpha]
-                    )[0]
-                ]:
+                # select the accepted pairs directly (previously
+                # sw[np.where(sw[accepted])[0]], which indexes sw by row numbers
+                # of the accepted subset and so swapped the wrong pairs)
+                for tt in sw[np.log(uniform(size=setup.nswap_per)) < sw_alpha]:
                     count_temper[tt[0], tt[1]] = count_temper[tt[0], tt[1]] + 1
                     eta[m, tt[0]], eta[m, tt[1]] = (
                         eta[m, tt[1]].copy(),
@@ -1174,26 +1170,26 @@ def calibClust(setup):
                         theta[m, tt[1]].copy(),
                         theta[m, tt[0]].copy(),
                     )
-                    theta0[m, tt[0]], theta0[m, tt[1]] = (
-                        theta0[m, tt[1]].copy(),
-                        theta0[m, tt[0]].copy(),
+                    v[m, tt[0]], v[m, tt[1]] = (
+                        v[m, tt[1]].copy(),
+                        v[m, tt[0]].copy(),
                     )
-                    Sigma0[m, tt[0]], Sigma0[m, tt[1]] = (
-                        Sigma0[m, tt[1]].copy(),
-                        Sigma0[m, tt[0]].copy(),
+                    gamma0[m, tt[0]], gamma0[m, tt[1]] = (
+                        gamma0[m, tt[1]].copy(),
+                        gamma0[m, tt[0]].copy(),
                     )
-                    Sigma0_inv_curr[tt[0]], Sigma0_inv_curr[tt[1]] = (
-                        Sigma0_inv_curr[tt[1]].copy(),
-                        Sigma0_inv_curr[tt[0]].copy(),
-                    )
-                    Sigma0_ldet_curr[tt[0]], Sigma0_ldet_curr[tt[1]] = (
-                        Sigma0_ldet_curr[tt[1]].copy(),
-                        Sigma0_ldet_curr[tt[0]].copy(),
+                    rho[m, tt[0]], rho[m, tt[1]] = (
+                        rho[m, tt[1]].copy(),
+                        rho[m, tt[0]].copy(),
                     )
                     for i in range(setup.nexp):
                         theta_hist[i][m, tt[0]], theta_hist[i][m, tt[1]] = (
                             theta_hist[i][m, tt[1]].copy(),
                             theta_hist[i][m, tt[0]].copy(),
+                        )
+                        v_hist[i][m, tt[0]], v_hist[i][m, tt[1]] = (
+                            v_hist[i][m, tt[1]].copy(),
+                            v_hist[i][m, tt[0]].copy(),
                         )
                         delta[i][m, tt[0]], delta[i][m, tt[1]] = (
                             delta[i][m, tt[1]].copy(),
@@ -1235,6 +1231,14 @@ def calibClust(setup):
         count_temper + count_temper.T - np.diag(np.diag(count_temper))
     )
     s2 = [np.exp(log_s2[i]) for i in range(len(log_s2))]
+    # theta0 is the copula image of the latent parent: the median of a new
+    # cluster's theta, still a point in the unit box, so it can be pushed
+    # through the emulator exactly as before.  Sigma0 is no longer a sampled
+    # parameter -- it is reported as the implied theta-scale spread of a new
+    # cluster's theta, which is what its diagonal was being read as.  To draw a
+    # parent theta use copula.parent_draw(gamma0, rho).
+    theta0 = copula.to_theta(gamma0)
+    Sigma0 = implied_theta_cov(copula, gamma0, rho)
     out = OutCalibClust(
         theta,
         theta_hist,
@@ -1248,6 +1252,11 @@ def calibClust(setup):
         eta,
         setup.nclustmax,
         cov_theta_cand,
+        v,
+        v_hist,
+        gamma0,
+        rho,
+        copula,
     )
     return out
 

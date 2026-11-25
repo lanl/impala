@@ -213,10 +213,11 @@ def test_clust():
     setup.theta0_start = np.repeat(best_pool.reshape(1, -1), ntemps, axis=0)
     out = sc.calibClust(setup)
 
-    theta_parent = setup.chol_sample_nper_constraints(
-        out.theta0[:, 0],
-        out.Sigma0[:, 0],
-        n=1,
+    # A brand-new cluster's theta, drawn from the copula hierarchy.  Its
+    # support is the box by construction; a custom constraint_func still
+    # carves a region out of the box, hence setup.
+    theta_parent = out.copula.parent_draw(
+        out.gamma0[:, 0], out.rho[:, 0], setup=setup
     )
     mcmc_use = np.arange(1000, 2000, 2)  # burn and thin index
     mat = theta_parent[mcmc_use, :]
@@ -227,19 +228,39 @@ def test_clust():
 
     pred_sse = np.square(pred - setup.ys[0]).sum(1)
     theta_minsse = mat[np.where(pred_sse == pred_sse.min())[0][0], :]
+    # Baseline regenerated for the copula hierarchy (which replaced the normal
+    # hierarchy truncated to the box), for likelihood-only tempering, and for
+    # the eta-update fix (Escobar & West mixture weights) and s2 swap kernel
+    # that came with the clustered-tempering work.  All of them change the
+    # chain.
     theta_minsse_baseline = np.array([
-        0.20526145,
-        0.59566408,
-        0.78755387,
-        0.08794196,
-        0.33280684,
-        0.44106511,
-        0.50686367,
-        0.33024073,
-        0.64569779,
-        0.11573176,
+        0.37153938,
+        0.10221730,
+        0.73177826,
+        0.10540985,
+        0.29117212,
+        0.63549175,
+        0.37826484,
+        0.46235670,
+        0.89856735,
+        0.71531148,
     ])
     assert np.allclose(theta_minsse, theta_minsse_baseline)
+    # Fit quality, which is what the exact values above are a proxy for: the
+    # best parent draw must stay well below a typical one.  The thresholds are
+    # loose on purpose.  These three experiments pool into roughly one cluster,
+    # so there is almost nothing for rho to learn from and it stays near its
+    # prior; the parent predictive is then about as wide as the prior allows
+    # and the best of ~500 draws from it is a noisy statistic.  A broken
+    # sampler gives a ratio near 1, which this still catches.
+    assert pred_sse.min() < 1e-3
+    assert pred_sse.min() < 0.15 * np.median(pred_sse)
+
+    # theta0 is the copula image of the latent parent, so it is still a point
+    # in the unit box and still usable wherever the old theta0 was.
+    assert out.theta0.shape == (setup.nmcmc, setup.ntemps, setup.p)
+    assert np.all((out.theta0 > 0.0) & (out.theta0 < 1.0))
+    assert np.all((out.rho > 0.0) & (out.rho < 1.0))
 
     test_dir = pathlib.Path(__file__).parent
     clust_plots = plots.PTW_Plotter(setup, out)

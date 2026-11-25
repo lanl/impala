@@ -107,10 +107,12 @@ class PTW_Plotter:
             for i in range(self.setup.nexp)
         ]
 
-        theta_parent = self.setup.chol_sample_nper_constraints(
-            self.out.theta0[sel, 0],
-            self.out.Sigma0[sel, 0],
-            n=1,
+        # The copula hierarchy draws a parent theta directly; its support is
+        # the box by construction, so no rejection sampling is needed.
+        theta_parent = self.out.copula.parent_draw(
+            self.out.gamma0[sel, 0],
+            self.out.rho[sel, 0],
+            setup=self.setup,
         )
 
         for i in range(self.setup.nexp):
@@ -524,10 +526,12 @@ class PTW_Plotter:
             highlight = [
                 range(self.setup.ntheta[k]) for k in range(self.setup.nexp)
             ]
-        theta_parent = self.setup.chol_sample_nper_constraints(
-            self.out.theta0[sel, 0],
-            self.out.Sigma0[sel, 0],
-            n=1,
+        # The copula hierarchy draws a parent theta directly; its support is
+        # the box by construction, so no rejection sampling is needed.
+        theta_parent = self.out.copula.parent_draw(
+            self.out.gamma0[sel, 0],
+            self.out.rho[sel, 0],
+            setup=self.setup,
         )
         theta_names = list(self.setup.bounds.keys())
         theta0_unst = sc.unnormalize(

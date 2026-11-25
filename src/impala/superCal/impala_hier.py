@@ -9,21 +9,26 @@
 ###############
 
 import time
+import warnings
 from collections import namedtuple
 
 import numpy as np
-import scipy
-from numpy.linalg import slogdet
 from numpy.random import uniform
-from scipy.stats import invwishart
 
+from .impala_copula import (
+    CopulaHyper,
+    draw_gamma0,
+    hier_logpdf,
+    hyper_from_legacy,
+    implied_theta_cov,
+    latent_start_var,
+)
 from .impala_noprobit_emu import (
+    cf_bounds,
     chol_sample_1per,
     cov_4d_pcm,
     initfunc_unif,
-    invwishart_logpdf,
-    mvnorm_logpdf,
-    mvnorm_logpdf_,
+    s2_swap_kern,
     tran_unif,
 )
 from .impala_pool import AMcov_pool
@@ -34,7 +39,7 @@ np.seterr(under="ignore")
 
 OutCalibHier = namedtuple(
     "OutCalibHier",
-    "theta s2 count count_s2 count_decor2 cov_theta_cand cov_ls2_cand count_temper pred_curr theta0 Sigma0",  # llik theta_native theta0_native theta_parent_native',
+    "theta s2 count count_s2 count_decor2 cov_theta_cand cov_ls2_cand count_temper pred_curr theta0 Sigma0 v gamma0 rho copula",  # llik theta_native theta0_native theta_parent_native',
 )
 
 
@@ -129,17 +134,76 @@ def calibHier(setup):
     estimation of separate s2 values within an experiment, adding truncated gibbs sampling for measurement errors
     """
     t0 = time.time()
-    theta0 = np.zeros([setup.nmcmc, setup.ntemps, setup.p])
-    theta0 += 0.0
-    Sigma0 = np.zeros([setup.nmcmc, setup.ntemps, setup.p, setup.p])
-    Sigma0 += 0.0
-    ntheta = np.sum(setup.ntheta)
+
+    ###################################
+    ### Copula hierarchy parameters ###
+    ###################################
+    # The hierarchy lives on a latent Gaussian scale and is mapped onto the
+    # box by a copula, so theta_i has the box as its exact support and needs
+    # no truncation.  See impala_copula for the model.  The legacy knobs
+    # (theta0_prior_mean/cov, Sigma0_prior_df/scale) are translated onto the
+    # copula's (a, b, rho) parameterisation so existing run scripts keep
+    # working; set margin_a/margin_b or rho_prior_a/rho_prior_b on the setup
+    # to bypass the translation.
+    margin_a = getattr(setup, "margin_a", None)
+    margin_b = getattr(setup, "margin_b", None)
+    rho_prior_a = getattr(setup, "rho_prior_a", None)
+    rho_prior_b = getattr(setup, "rho_prior_b", None)
+    if (margin_a is None or margin_b is None) and (
+        setup.theta0_prior_mean is not None
+    ):
+        margin_a, margin_b, _rho_center, clamped = hyper_from_legacy(
+            setup.theta0_prior_mean,
+            setup.theta0_prior_cov,
+            setup.Sigma0_prior_df,
+            setup.Sigma0_prior_scale,
+        )
+        if np.any(clamped):
+            which = np.where(clamped)[0].tolist()
+            warnings.warn(
+                "The hierarchical prior requested more marginal spread than a "
+                "Beta with a, b >= 1 can give for its mean, in coordinate(s) "
+                f"{which}; the margin was capped at the flattest such Beta "
+                "(uniform where the mean is 0.5). Going further would pile "
+                "prior mass at both bounds.",
+                stacklevel=2,
+            )
+        # rho -- how the marginal variance splits between the parent and the
+        # between-experiment spread -- is left uniform rather than centred on
+        # the legacy split (_rho_center).  The old model learned Sigma0 freely,
+        # so pinning rho from the legacy numbers would add information it never
+        # had, and an extreme centre turns any concentration into a sharp
+        # prior.  Set rho_prior_a/rho_prior_b, e.g. from
+        # impala_copula.rho_prior_from_center, to encode a pooling belief.
+    if rho_prior_a is None or rho_prior_b is None:
+        rho_prior_a, rho_prior_b = 1.0, 1.0
+    copula = CopulaHyper(
+        setup.p,
+        a=margin_a,
+        b=margin_b,
+        rho_a=rho_prior_a,
+        rho_b=rho_prior_b,
+    )
+    # The bounds are the copula's support, so they never need rejection.  A
+    # custom constraint_func carves a region out of the box and does: the model
+    # keeps 1{theta0 in C} for the parent, as the truncated hierarchy did.
+    cf_setup = None if setup._constraint_func is cf_bounds else setup
+
+    gamma0 = np.zeros([setup.nmcmc, setup.ntemps, setup.p])
+    rho = np.zeros([setup.nmcmc, setup.ntemps, setup.p])
     log_s2 = [
         np.zeros([setup.nmcmc, setup.ntemps, setup.ns2[i]]) + 0.0
         for i in range(setup.nexp)
     ]
     for i in range(setup.nexp):
         log_s2[i][0] = np.log(setup.sd_est[i] ** 2)
+    # v holds the latent (unbounded) parameters that the sampler moves; theta
+    # is the derived box-valued parameter, kept for the emulator and for every
+    # downstream consumer of the output.
+    v = [
+        np.zeros([setup.nmcmc, setup.ntemps, setup.ntheta[i], setup.p]) + 0.0
+        for i in range(setup.nexp)
+    ]
     theta = [
         np.zeros([setup.nmcmc, setup.ntemps, setup.ntheta[i], setup.p]) + 0.0
         for i in range(setup.nexp)
@@ -161,9 +225,15 @@ def calibHier(setup):
         for i in range(setup.nexp)
     ]
 
-    theta0 = np.empty([setup.nmcmc, setup.ntemps, setup.p])
+    # The copula's support is the box, so the bounds never need rejection
+    # sampling.  A custom constraint_func still does: it carves a region out of
+    # the box (PTW's orderings, for instance), and the starting values have to
+    # sit inside it or the first model evaluation fails.
     if setup.theta0_start is not None:
-        theta0_start = setup.theta0_start
+        theta0_start = np.broadcast_to(
+            np.asarray(setup.theta0_start, dtype=float),
+            (setup.ntemps, setup.p),
+        ).copy()
     else:
         theta0_start = initfunc_unif(size=[setup.ntemps, setup.p])
         good = setup.checkConstraints(
@@ -187,10 +257,8 @@ def calibHier(setup):
                 )
             )
             j += 1
-    theta0[0] = theta0_start
-    Sigma0[0] = setup.Sigma0_prior_scale / (
-        setup.Sigma0_prior_df - setup.p - 1
-    )  # initialize at prior mean
+    gamma0[0] = copula.from_theta(theta0_start)
+    rho[0] = copula.rho_a / (copula.rho_a + copula.rho_b)  # prior mean
 
     wt_mat = [None] * setup.nexp
     for i in range(setup.nexp):
@@ -226,11 +294,41 @@ def calibHier(setup):
     marg_lik_cov_curr = [None] * setup.nexp
 
     for i in range(setup.nexp):
-        theta[i][0] = setup.chol_sample_nper_constraints(
-            theta0[0],
-            Sigma0[0],
-            setup.ntheta[i],
+        # Draw the latent start from the hierarchy, redrawing any theta that a
+        # custom constraint_func rejects.  The bounds themselves cannot be
+        # violated, so with constraint_func="bounds" this accepts immediately.
+        nrow = setup.ntemps * setup.ntheta[i]
+        g_rep = np.repeat(gamma0[0], setup.ntheta[i], axis=0)
+        sd_rep = np.repeat(np.sqrt(1.0 - rho[0]), setup.ntheta[i], axis=0)
+        v_flat = g_rep + sd_rep * np.random.normal(size=(nrow, setup.p))
+        good = setup.checkConstraints(
+            tran_unif(
+                copula.to_theta(v_flat),
+                setup.bounds_mat,
+                setup.bounds.keys(),
+            )
         )
+        maxiter = 10000
+        j = 0
+        while np.any(np.logical_not(good)):
+            if j >= maxiter:
+                raise ValueError(
+                    f"Failed to find samples that fulfill the constraints after {maxiter} iterations."
+                )
+            bad = np.where(np.logical_not(good))[0]
+            v_flat[bad] = g_rep[bad] + sd_rep[bad] * np.random.normal(
+                size=(bad.size, setup.p)
+            )
+            good[bad] = setup.checkConstraints(
+                tran_unif(
+                    copula.to_theta(v_flat[bad]),
+                    setup.bounds_mat,
+                    setup.bounds.keys(),
+                )
+            )
+            j += 1
+        v[i][0] = v_flat.reshape(v[i][0].shape)
+        theta[i][0] = copula.to_theta(v[i][0])
         pred_curr[i] = setup.models[i].eval(
             tran_unif(
                 theta[i][0].reshape(setup.ntemps * setup.ntheta[i], setup.p),
@@ -269,7 +367,8 @@ def calibHier(setup):
         np.array([setup.ntheta[i] for i in range(setup.nexp)]),
         setup.ntemps,
         setup.p,
-        start_var=setup.start_var_theta,
+        # the adaptive proposal now lives on the latent scale
+        start_var=latent_start_var(setup.start_var_theta),
         start_adapt_iter=setup.start_adapt_iter,
         tau_start=setup.start_tau_theta,
     )
@@ -283,23 +382,6 @@ def calibHier(setup):
         )
         for i in range(setup.nexp)
     ]
-
-    theta0_prior_mean = setup.theta0_prior_mean  # np.repeat(0.5, setup.p)
-    theta0_prior_cov = setup.theta0_prior_cov  # np.eye(setup.p)*1**2
-    theta0_prior_prec = scipy.linalg.inv(theta0_prior_cov)
-    theta0_prior_ldet = slogdet(theta0_prior_cov)[1]
-
-    tbar = np.empty(theta0[0].shape)
-    mat = np.zeros((setup.ntemps, setup.p, setup.p))
-
-    Sigma0_prior_df = setup.Sigma0_prior_df  # setup.p
-    Sigma0_prior_scale = (
-        setup.Sigma0_prior_scale
-    )  # np.eye(setup.p)*1**2#/setup.p
-    Sigma0_dfs = Sigma0_prior_df + ntheta * setup.itl
-
-    Sigma0_ldet_curr = slogdet(Sigma0[0])[1]
-    Sigma0_inv_curr = np.linalg.inv(Sigma0[0])
 
     count_temper = np.zeros([setup.ntemps, setup.ntemps])
     count = [
@@ -343,6 +425,7 @@ def calibHier(setup):
     ## start MCMC
     for m in pbar(range(1, setup.nmcmc)):
         for i in range(setup.nexp):
+            v[i][m] = v[i][m - 1].copy()
             theta[i][m] = theta[i][
                 m - 1
             ].copy()  # current set to previous, will change if accepted
@@ -372,9 +455,13 @@ def calibHier(setup):
         #####################
         ### Update Thetas ###
         #####################
-        cov_theta_cand.update(theta, m)
+        # The adaptive proposal moves the latent v; theta is the copula image
+        # of v, so every candidate is inside the box automatically and only a
+        # custom constraint_func can reject one.
+        cov_theta_cand.update(v, m)
 
-        theta_cand = cov_theta_cand.gen_cand(theta, m)
+        v_cand = cov_theta_cand.gen_cand(v, m)
+        theta_cand = [copula.to_theta(v_cand[i]) for i in range(setup.nexp)]
 
         for i in range(setup.nexp):
             # Find new candidate values for theta
@@ -421,22 +508,17 @@ def calibHier(setup):
                 # - 0.5 * (sse_cand[i][good_values[i]] - sse_curr[i][good_values[i]])
                 llik_cand[i][good_values[i]]
                 - llik_curr[i][good_values[i]]
-                + mvnorm_logpdf_(
-                    theta_cand[i],
-                    theta0[m - 1],
-                    Sigma0_inv_curr,
-                    Sigma0_ldet_curr,
-                )[good_values[i]]
-                - mvnorm_logpdf_(
-                    theta[i][m - 1],
-                    theta0[m - 1],
-                    Sigma0_inv_curr,
-                    Sigma0_ldet_curr,
-                )[good_values[i]]
+                + hier_logpdf(v_cand[i], gamma0[m - 1], rho[m - 1])[
+                    good_values[i]
+                ]
+                - hier_logpdf(v[i][m - 1], gamma0[m - 1], rho[m - 1])[
+                    good_values[i]
+                ]
             )
             # MCMC Accept
             accept[i][:] = np.log(uniform(size=alpha[i].shape)) < alpha[i]
             # Where accept, make changes
+            v[i][m][accept[i]] = v_cand[i][accept[i]].copy()
             theta[i][m][accept[i]] = theta_cand[i][accept[i]].copy()
 
             for t in range(setup.ntemps):
@@ -643,14 +725,18 @@ def calibHier(setup):
                         np.exp(ls2_candi), setup.ig_a[i], setup.ig_b[i]
                     ).sum(axis=1)
                 )  # ldhc_kern(np.exp(ls2_cand[i])).sum(axis=1)#ldig_kern(np.exp(ls2_cand[i]),setup.ig_a[i],setup.ig_b[i]).sum(axis=1)
-                alpha_s2 += setup.itl * ls2_candi.sum(axis=1)
+                # Jacobian of the random walk on log(s2).  It comes from the change
+                # of variables, not from the target, so it is not tempered: each chain
+                # targets [p(s2) L]^beta in s2, as the Gibbs updates and the swap
+                # ratio assume.
+                alpha_s2 += ls2_candi.sum(axis=1)
                 alpha_s2 -= (
                     setup.itl
                     * setup.s2_prior_kern[i](
                         np.exp(log_s2[i][m - 1]), setup.ig_a[i], setup.ig_b[i]
                     ).sum(axis=1)
                 )  # ldhc_kern(np.exp(log_s2[i][m-1])).sum(axis=1)#ldig_kern(np.exp(log_s2[i][m-1]),setup.ig_a[i],setup.ig_b[i]).sum(axis=1)
-                alpha_s2 -= setup.itl * log_s2[i][m - 1].sum(axis=1)
+                alpha_s2 -= log_s2[i][m - 1].sum(axis=1)
 
                 runif = np.log(uniform(size=setup.ntemps))
                 for t in np.where(runif < alpha_s2)[0]:
@@ -663,67 +749,54 @@ def calibHier(setup):
                 cov_ls2_cand[i].update_tau(m)
 
         ###########################
-        ### Gibbs update theta0 ###
+        ### Gibbs update gamma0 ###
         ###########################
-        cc = np.linalg.inv(
-            np.einsum("t,tpq->tpq", ntheta * setup.itl, Sigma0_inv_curr)
-            + theta0_prior_prec,
-        )
-        tbar = 0.0
-        for i in range(setup.nexp):
-            tbar += theta[i][m].sum(axis=1)
-        tbar /= ntheta
-        dd = +np.einsum(
-            "t,tl->tl",
+        # Conjugate normal, independent across coordinates: the latent parent
+        # replaces theta0 and needs no rejection sampling.
+        v_curr = [v[i][m] for i in range(setup.nexp)]
+        gamma0[m][:] = draw_gamma0(
+            v_curr,
+            rho[m - 1],
             setup.itl,
-            np.einsum("tlk,tk->tl", ntheta * Sigma0_inv_curr, tbar),
-        ) + np.dot(theta0_prior_prec, theta0_prior_mean)
-        theta0[m][:] = setup.chol_sample_nper_constraints(
-            np.einsum("tlk,tk->tl", cc, dd),
-            cc,
-            n=1,
+            copula=copula,
+            setup=cf_setup,
         )
 
-        ###########################
-        ### Gibbs update Sigma0 ###
-        ###########################
-        mat *= 0.0
-        for i in range(setup.nexp):
-            mat += np.einsum(
-                "tnp,tnq->tpq",
-                theta[i][m] - theta0[m].reshape(setup.ntemps, 1, setup.p),
-                theta[i][m] - theta0[m].reshape(setup.ntemps, 1, setup.p),
-            )
-        Sigma0_scales = Sigma0_prior_scale + np.einsum(
-            "t,tml->tml", setup.itl, mat
-        )
-        for t in range(setup.ntemps):
-            Sigma0[m, t] = invwishart.rvs(
-                df=Sigma0_dfs[t], scale=Sigma0_scales[t]
-            )
-        Sigma0_ldet_curr[:] = np.linalg.slogdet(Sigma0[m])[1]
-        Sigma0_inv_curr[:] = np.linalg.inv(Sigma0[m])
+        ########################
+        ### Gibbs update rho ###
+        ########################
+        # Exact one-dimensional draw on a grid; replaces the inverse-Wishart
+        # draw of Sigma0.  rho_k is the pooling strength in coordinate k.
+        rho[m][:] = copula.draw_rho(v_curr, gamma0[m], setup.itl)
 
         ################################
         ### Joint Decorrelation Step ###
         ################################
         if m % setup.decor == 0:
             for k in range(setup.p):
+                # The shared shift is applied on the latent scale, where it
+                # leaves the hierarchy term invariant exactly as before.
                 z = np.random.normal() * 0.1
-                theta0_cand = theta0[m].copy()
-                theta0_cand[:, k] += z
-                good_values_theta0 = setup.checkConstraints(
-                    tran_unif(
-                        theta0_cand, setup.bounds_mat, setup.bounds.keys()
+                gamma0_cand = gamma0[m].copy()
+                gamma0_cand[:, k] += z
+                if cf_setup is None:
+                    good_values_theta0 = np.ones(setup.ntemps, dtype=bool)
+                else:
+                    good_values_theta0 = setup.checkConstraints(
+                        tran_unif(
+                            copula.to_theta(gamma0_cand),
+                            setup.bounds_mat,
+                            setup.bounds.keys(),
+                        )
                     )
-                )
                 for i in range(setup.nexp):
                     # Find new candidate values for theta
-                    theta_cand[i][:] = theta[i][m].copy()
+                    v_cand[i][:] = v[i][m].copy()
+                    v_cand[i][:, :, k] += z
+                    theta_cand[i][:] = copula.to_theta(v_cand[i])
                     theta_eval_mat[i][:] = theta[i][m].reshape(
                         setup.ntheta[i] * setup.ntemps, setup.p
                     )
-                    theta_cand[i][:, :, k] += z
                     theta_cand_mat[i][:] = theta_cand[i].reshape(
                         setup.ntheta[i] * setup.ntemps, setup.p
                     )
@@ -767,44 +840,29 @@ def calibHier(setup):
                         llik_cand[i][good_values[i]]
                         - llik_curr[i][good_values[i]]
                     ) + itl_mat[i][good_values[i]] * (
-                        +mvnorm_logpdf_(
-                            theta_cand[i],
-                            theta0_cand,
-                            Sigma0_inv_curr,
-                            Sigma0_ldet_curr,
-                        )[good_values[i]]
-                        - mvnorm_logpdf_(
-                            theta[i][m],
-                            theta0[m],
-                            Sigma0_inv_curr,
-                            Sigma0_ldet_curr,
-                        )[good_values[i]]
+                        +hier_logpdf(v_cand[i], gamma0_cand, rho[m])[
+                            good_values[i]
+                        ]
+                        - hier_logpdf(v[i][m], gamma0[m], rho[m])[
+                            good_values[i]
+                        ]
                     )
-                # now sum over alpha (for each temperature), add alpha for theta0 to prior, accept or reject
+                # now sum over alpha (for each temperature), add alpha for the
+                # parent prior, accept or reject.  Log acceptance ratio for each
+                # temperature: sum over experiments and over the theta_i within
+                # each experiment, plus the gamma0 prior (counted once, and not
+                # tempered, consistent with the Gibbs update of gamma0).
                 alpha_tot = (
-                    sum(alpha).T
-                    - 0.5
-                    * setup.itl
-                    * np.diag(
-                        (theta0_cand - theta0_prior_mean)
-                        @ theta0_prior_prec
-                        @ (theta0_cand - theta0_prior_mean).T
-                    )
-                    + 0.5
-                    * setup.itl
-                    * np.diag(
-                        (theta0[m] - theta0_prior_mean)
-                        @ theta0_prior_prec
-                        @ (theta0[m] - theta0_prior_mean).T
-                    )
+                    sum(a.sum(axis=1) for a in alpha)
+                    - 0.5 * (gamma0_cand**2 / rho[m]).sum(axis=1)
+                    + 0.5 * (gamma0[m] ** 2 / rho[m]).sum(axis=1)
                 )
 
-                accept_tot = np.log(uniform(size=setup.ntemps)) < alpha_tot.sum(
-                    axis=0
-                )
+                accept_tot = np.log(uniform(size=setup.ntemps)) < alpha_tot
                 # Where accept, make changes
-                theta0[m][accept_tot, :] = theta0_cand[accept_tot, :]
+                gamma0[m][accept_tot, :] = gamma0_cand[accept_tot, :]
                 for i in range(setup.nexp):
+                    v[i][m][accept_tot] = v_cand[i][accept_tot].copy()
                     theta[i][m][accept_tot] = theta_cand[i][accept_tot].copy()
                     pred_curr[i][accept_tot, :] = pred_cand[i][
                         accept_tot, :
@@ -822,56 +880,35 @@ def calibHier(setup):
                     setup.ntemps, 2 * setup.nswap_per, replace=False
                 ).reshape(-1, 2)
                 sw_alpha[:] = 0.0  # reset swap probability
-                sw_alpha[:] = sw_alpha + (
-                    setup.itl[sw.T[1]] - setup.itl[sw.T[0]]
-                ) * (
-                    +mvnorm_logpdf(
-                        theta0[m][sw.T[0]],
-                        theta0_prior_mean,
-                        theta0_prior_prec,
-                        theta0_prior_ldet,
-                    )
-                    - mvnorm_logpdf(
-                        theta0[m][sw.T[1]],
-                        theta0_prior_mean,
-                        theta0_prior_prec,
-                        theta0_prior_ldet,
-                    )
-                    + invwishart_logpdf(
-                        Sigma0[m][sw.T[0]], Sigma0_prior_df, Sigma0_prior_scale
-                    )
-                    - invwishart_logpdf(
-                        Sigma0[m][sw.T[1]], Sigma0_prior_df, Sigma0_prior_scale
-                    )
-                )
+                # The hyperpriors p(gamma0) p(rho) are not tempered (the Gibbs
+                # updates of gamma0 and rho use them at full strength in every
+                # chain), so they cancel in the swap ratio and must not appear here.
                 for i in range(setup.nexp):
                     sw_alpha[:] = sw_alpha + (
                         setup.itl[sw.T[1]] - setup.itl[sw.T[0]]
                     ) * (
                         # for t_0
-                        +setup.s2_prior_kern[i](
+                        +s2_swap_kern(setup, i)(
                             np.exp(log_s2[i][m][sw.T[0]]),
                             setup.ig_a[i],
                             setup.ig_b[i],
                         ).sum(axis=1)
-                        + mvnorm_logpdf_(
-                            theta[i][m][sw.T[0]],
-                            theta0[m, sw.T[0]],
-                            Sigma0_inv_curr[sw.T[0]],
-                            Sigma0_ldet_curr[sw.T[0]],
+                        + hier_logpdf(
+                            v[i][m][sw.T[0]],
+                            gamma0[m, sw.T[0]],
+                            rho[m, sw.T[0]],
                         ).sum(axis=1)
                         + llik_curr[i][sw.T[0]].sum(axis=1)
                         # for t_1
-                        - setup.s2_prior_kern[i](
+                        - s2_swap_kern(setup, i)(
                             np.exp(log_s2[i][m][sw.T[1]]),
                             setup.ig_a[i],
                             setup.ig_b[i],
                         ).sum(axis=1)
-                        - mvnorm_logpdf_(
-                            theta[i][m][sw.T[1]],
-                            theta0[m, sw.T[1]],
-                            Sigma0_inv_curr[sw.T[1]],
-                            Sigma0_ldet_curr[sw.T[1]],
+                        - hier_logpdf(
+                            v[i][m][sw.T[1]],
+                            gamma0[m, sw.T[1]],
+                            rho[m, sw.T[1]],
                         ).sum(axis=1)
                         - llik_curr[i][sw.T[1]].sum(axis=1)
                     )
@@ -883,6 +920,10 @@ def calibHier(setup):
                         theta[i][m, tt[0]], theta[i][m, tt[1]] = (
                             theta[i][m, tt[1]].copy(),
                             theta[i][m, tt[0]].copy(),
+                        )
+                        v[i][m, tt[0]], v[i][m, tt[1]] = (
+                            v[i][m, tt[1]].copy(),
+                            v[i][m, tt[0]].copy(),
                         )
                         log_s2[i][m][tt[0]], log_s2[i][m][tt[1]] = (
                             log_s2[i][m][tt[1]].copy(),
@@ -896,21 +937,13 @@ def calibHier(setup):
                             llik_curr[i][tt[1]].copy(),
                             llik_curr[i][tt[0]].copy(),
                         )
-                    theta0[m, tt[0]], theta0[m, tt[1]] = (
-                        theta0[m, tt[1]].copy(),
-                        theta0[m, tt[0]].copy(),
+                    gamma0[m, tt[0]], gamma0[m, tt[1]] = (
+                        gamma0[m, tt[1]].copy(),
+                        gamma0[m, tt[0]].copy(),
                     )
-                    Sigma0[m, tt[0]], Sigma0[m, tt[1]] = (
-                        Sigma0[m, tt[1]].copy(),
-                        Sigma0[m, tt[0]].copy(),
-                    )
-                    Sigma0_inv_curr[tt[0]], Sigma0_inv_curr[tt[1]] = (
-                        Sigma0_inv_curr[tt[1]].copy(),
-                        Sigma0_inv_curr[tt[0]].copy(),
-                    )
-                    Sigma0_ldet_curr[tt[0]], Sigma0_ldet_curr[tt[1]] = (
-                        Sigma0_ldet_curr[tt[1]].copy(),
-                        Sigma0_ldet_curr[tt[0]].copy(),
+                    rho[m, tt[0]], rho[m, tt[1]] = (
+                        rho[m, tt[1]].copy(),
+                        rho[m, tt[0]].copy(),
                     )
                 # if np.exp(log_s2[i][m,0,0])>1:
                 #    print('a')
@@ -926,6 +959,14 @@ def calibHier(setup):
     count_temper = (
         count_temper + count_temper.T - np.diag(np.diag(count_temper))
     )
+    # theta0 is the copula image of the latent parent: the median of a new
+    # experiment's theta, still a point in the unit box, so it can be pushed
+    # through the emulator exactly as before.  Sigma0 is no longer a sampled
+    # parameter -- it is reported as the implied theta-scale spread of a new
+    # experiment's theta, which is what its diagonal was being read as.  To
+    # draw a parent theta use copula.parent_draw(gamma0, rho).
+    theta0 = copula.to_theta(gamma0)
+    Sigma0 = implied_theta_cov(copula, gamma0, rho)
     # theta_reshape = [np.swapaxes(t,1,2) for t in theta]
     out = OutCalibHier(
         theta,
@@ -939,5 +980,9 @@ def calibHier(setup):
         pred_curr,
         theta0,
         Sigma0,
+        v,
+        gamma0,
+        rho,
+        copula,
     )  # , llik, theta_native, theta0_native, theta_parent_native)
     return out

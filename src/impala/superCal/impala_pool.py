@@ -20,6 +20,7 @@ from numpy.random import normal, uniform
 from .impala_noprobit_emu import (
     cov_3d_pcm,
     initfunc_unif,
+    s2_swap_kern,
     sample_pooled,
     theta_log_prior,
     tran_unif,
@@ -563,14 +564,18 @@ def calibPool(setup):
                         np.exp(ls2_candi), setup.ig_a[i], setup.ig_b[i]
                     ).sum(axis=1)
                 )  # ldhc_kern(np.exp(ls2_cand[i])).sum(axis=1)#ldig_kern(np.exp(ls2_cand[i]),setup.ig_a[i],setup.ig_b[i]).sum(axis=1)
-                alpha_s2 += setup.itl * ls2_candi.sum(axis=1)
+                # Jacobian of the random walk on log(s2).  It comes from the change
+                # of variables, not from the target, so it is not tempered: each chain
+                # targets [p(s2) L]^beta in s2, as the Gibbs updates and the swap
+                # ratio assume.
+                alpha_s2 += ls2_candi.sum(axis=1)
                 alpha_s2 -= (
                     setup.itl
                     * setup.s2_prior_kern[i](
                         np.exp(log_s2[i][m - 1]), setup.ig_a[i], setup.ig_b[i]
                     ).sum(axis=1)
                 )  # ldhc_kern(np.exp(log_s2[i][m-1])).sum(axis=1)#ldig_kern(np.exp(log_s2[i][m-1]),setup.ig_a[i],setup.ig_b[i]).sum(axis=1)
-                alpha_s2 -= setup.itl * log_s2[i][m - 1].sum(axis=1)
+                alpha_s2 -= log_s2[i][m - 1].sum(axis=1)
 
                 runif = np.log(uniform(size=setup.ntemps))
                 for t in np.where(runif < alpha_s2)[0]:
@@ -600,12 +605,12 @@ def calibPool(setup):
                 )
                 for i in range(setup.nexp):
                     sw_alpha += (setup.itl[sw.T[1]] - setup.itl[sw.T[0]]) * (
-                        setup.s2_prior_kern[i](
+                        s2_swap_kern(setup, i)(
                             np.exp(log_s2[i][m][sw.T[0]]),
                             setup.ig_a[i],
                             setup.ig_b[i],
                         ).sum(axis=1)
-                        - setup.s2_prior_kern[i](
+                        - s2_swap_kern(setup, i)(
                             np.exp(log_s2[i][m][sw.T[1]]),
                             setup.ig_a[i],
                             setup.ig_b[i],
