@@ -185,21 +185,46 @@ def hier_logpdf(v, gam0, rho):
     return -0.5 * (d * d / var + np.log(var) + 1.8378770664093453).sum(axis=-1)
 
 
-def _latent_moments(v_list, gam0=None):
-    """Totals over every experiment-level theta: (count, sum, sum of squares)."""
+def _latent_moments(v_list, gam0=None, mask_list=None):
+    """Totals over the latents the hierarchy applies to.
+
+    :param v_list: list of (ntemps, nj, p) arrays.
+    :param mask_list: optional list of (ntemps, nj) boolean arrays selecting
+        which latents count.  calibClust needs this: only occupied clusters
+        belong to the hierarchy, and which ones are occupied differs by
+        temperature and changes every iteration.
+    :return: ``(count, sum, sum of squares)``.  ``count`` is a scalar without a
+        mask and an (ntemps,) array with one.
+    """
     tot = 0
     vsum = 0.0
     sse = 0.0
-    for v in v_list:
-        tot += v.shape[1]
-        vsum = vsum + v.sum(axis=1)
-        if gam0 is not None:
-            d = v - gam0[:, None, :]
-            sse = sse + (d * d).sum(axis=1)
+    for idx, v in enumerate(v_list):
+        if mask_list is None:
+            tot += v.shape[1]
+            vsum = vsum + v.sum(axis=1)
+            if gam0 is not None:
+                d = v - gam0[:, None, :]
+                sse = sse + (d * d).sum(axis=1)
+        else:
+            mask = mask_list[idx]
+            w = mask[..., None]
+            tot = tot + mask.sum(axis=1)
+            vsum = vsum + (v * w).sum(axis=1)
+            if gam0 is not None:
+                d = (v - gam0[:, None, :]) * w
+                sse = sse + (d * d).sum(axis=1)
     return tot, vsum, sse
 
 
-def draw_gamma0(v_list, rho, itl, copula=None, setup=None, maxiter=10000):
+def _count_for(n, shape):
+    """Broadcast a scalar or per-temperature count to ``shape``."""
+    return np.reshape(n, shape) if np.ndim(n) else n
+
+
+def draw_gamma0(
+    v_list, rho, itl, copula=None, setup=None, mask_list=None, maxiter=10000
+):
     """Conjugate normal draw of gamma0, vectorised over temperatures.
 
     When ``setup`` carries a custom ``constraint_func``, the model includes
@@ -215,11 +240,13 @@ def draw_gamma0(v_list, rho, itl, copula=None, setup=None, maxiter=10000):
     :param itl: (ntemps,) inverse temperatures.
     :param copula: the :class:`CopulaHyper`; required when ``setup`` is given.
     :param setup: the CalibSetup, when its constraint region must be honoured.
+    :param mask_list: see :func:`_latent_moments`; selects which latents the
+        hierarchy applies to (calibClust's occupied clusters).
     :return: (ntemps, p)
     """
-    n, vsum, _ = _latent_moments(v_list)
+    n, vsum, _ = _latent_moments(v_list, mask_list=mask_list)
     w = itl[:, None] / (1.0 - rho)
-    prec = 1.0 / rho + n * w
+    prec = 1.0 / rho + _count_for(n, (-1, 1)) * w
     mu = (w * vsum) / prec
     sd = 1.0 / np.sqrt(prec)
     out = mu + np.random.normal(size=mu.shape) * sd
@@ -293,22 +320,25 @@ class CopulaHyper:
     def from_theta(self, theta):
         return from_theta(theta, self.a, self.b)
 
-    def draw_rho(self, v_list, gam0, itl):
+    def draw_rho(self, v_list, gam0, itl, mask_list=None):
         """Exact grid draw of rho, vectorised over temperatures.
 
         :param v_list: list over experiments of (ntemps, ntheta[i], p) latents.
         :param gam0: (ntemps, p)
         :param itl: (ntemps,)
+        :param mask_list: see :func:`_latent_moments`.
         :return: (ntemps, p)
         """
-        n, _, sse = _latent_moments(v_list, gam0)
+        n, _, sse = _latent_moments(v_list, gam0, mask_list=mask_list)
         g = self.grid  # (ngrid, 1, 1)
         it = itl[None, :, None]
+        nn = _count_for(n, (1, -1, 1))
         lp = (
             self._lg_prior
             - 0.5 * np.log(g)
             - 0.5 * (gam0[None, :, :] ** 2) / g
-            + it * (-0.5 * n * np.log1p(-g) - 0.5 * sse[None, :, :] / (1.0 - g))
+            + it
+            * (-0.5 * nn * np.log1p(-g) - 0.5 * sse[None, :, :] / (1.0 - g))
         )
         lp -= lp.max(axis=0, keepdims=True)
         w = np.exp(lp)
@@ -323,7 +353,9 @@ class CopulaHyper:
         )
         return out.clip(1e-6, 1.0 - 1e-6)
 
-    def parent_draw(self, gam0, rho, n=1, setup=None, maxiter=10000):
+    def parent_draw(
+        self, gam0, rho, n=1, setup=None, latent=False, maxiter=10000
+    ):
         """Draw theta for a new experiment from the current parent.
 
         Replaces ``chol_sample_nper_constraints(theta0, Sigma0, n)``.  The
@@ -336,6 +368,8 @@ class CopulaHyper:
         :param gam0: (..., p)
         :param rho: (..., p), broadcastable against ``gam0``.
         :param setup: the CalibSetup, if its constraint region must be honoured.
+        :param latent: return the latent v instead of theta, for callers that
+            store the latent state (calibClust's empty clusters).
         :return: ``gam0.shape`` when n == 1, else (..., n, p).
         """
         gam0 = np.asarray(gam0, dtype=float)
@@ -353,7 +387,8 @@ class CopulaHyper:
 
         v_flat = g_flat + sd_flat * np.random.normal(size=g_flat.shape)
         if setup is None:
-            return self.to_theta(v_flat).reshape(shape)
+            out = v_flat if latent else self.to_theta(v_flat)
+            return out.reshape(shape)
 
         good = setup.checkConstraints(
             tran_unif(
@@ -379,7 +414,8 @@ class CopulaHyper:
                 )
             )
             j += 1
-        return self.to_theta(v_flat).reshape(shape)
+        out = v_flat if latent else self.to_theta(v_flat)
+        return out.reshape(shape)
 
     def theta_sd_implied(self, gam0, rho, nsim=20000):
         """Theta-scale sd of a new experiment's theta, given the parent.

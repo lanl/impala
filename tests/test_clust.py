@@ -213,10 +213,11 @@ def test_clust():
     setup.theta0_start = np.repeat(best_pool.reshape(1, -1), ntemps, axis=0)
     out = sc.calibClust(setup)
 
-    theta_parent = setup.chol_sample_nper_constraints(
-        out.theta0[:, 0],
-        out.Sigma0[:, 0],
-        n=1,
+    # A brand-new cluster's theta, drawn from the copula hierarchy.  Its
+    # support is the box by construction; a custom constraint_func still
+    # carves a region out of the box, hence setup.
+    theta_parent = out.copula.parent_draw(
+        out.gamma0[:, 0], out.rho[:, 0], setup=setup
     )
     mcmc_use = np.arange(1000, 2000, 2)  # burn and thin index
     mat = theta_parent[mcmc_use, :]
@@ -227,19 +228,33 @@ def test_clust():
 
     pred_sse = np.square(pred - setup.ys[0]).sum(1)
     theta_minsse = mat[np.where(pred_sse == pred_sse.min())[0][0], :]
+    # Baseline regenerated for the copula hierarchy, which replaced the normal
+    # hierarchy truncated to the box, and for the swap-ratio fix (the tempered
+    # hyperprior terms are gone).  Both change the chain entirely.  The best
+    # parent draw scores 1.7e-05 against 1.2e-05 before, still 60x better than
+    # a typical draw (median 1.0e-03).
     theta_minsse_baseline = np.array([
-        0.20526145,
-        0.59566408,
-        0.78755387,
-        0.08794196,
-        0.33280684,
-        0.44106511,
-        0.50686367,
-        0.33024073,
-        0.64569779,
-        0.11573176,
+        0.50114678,
+        0.65764325,
+        0.77933284,
+        0.04147542,
+        0.29667000,
+        0.47956156,
+        0.43639781,
+        0.10914704,
+        0.92424298,
+        0.98993692,
     ])
     assert np.allclose(theta_minsse, theta_minsse_baseline)
+    # Fit quality, which is what the exact values above are a proxy for.
+    assert pred_sse.min() < 1e-4
+    assert pred_sse.min() < 0.05 * np.median(pred_sse)
+
+    # theta0 is the copula image of the latent parent, so it is still a point
+    # in the unit box and still usable wherever the old theta0 was.
+    assert out.theta0.shape == (setup.nmcmc, setup.ntemps, setup.p)
+    assert np.all((out.theta0 > 0.0) & (out.theta0 < 1.0))
+    assert np.all((out.rho > 0.0) & (out.rho < 1.0))
 
     test_dir = pathlib.Path(__file__).parent
     clust_plots = plots.PTW_Plotter(setup, out)

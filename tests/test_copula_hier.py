@@ -13,6 +13,7 @@ from scipy.stats import multivariate_normal as mvn
 from impala import superCal as sc
 from impala.superCal.impala_copula import (
     CopulaHyper,
+    _latent_moments,
     draw_gamma0,
     from_theta,
     hier_logpdf,
@@ -229,3 +230,153 @@ def test_unidentified_parameter_stays_uniform_end_to_end():
     # and the unseen coordinate must pool less than the identified ones
     rho_mean = out.rho[keep, 0].mean(0)
     assert rho_mean[-1] < rho_mean[:-1].mean()
+
+
+def test_masked_draws_honour_per_temperature_occupancy():
+    """calibClust's hierarchy covers only occupied clusters.
+
+    Which clusters are occupied differs by temperature and changes every
+    iteration, so the gamma0 and rho draws take a mask and the cluster count
+    they condition on is per-temperature, not a single number.
+    """
+    ntemps, nclust, p = 3, 6, 2
+    rng = np.random.default_rng(0)
+    v = [rng.standard_normal((ntemps, nclust, p))]
+    mask = [
+        np.array(
+            [
+                [1, 1, 1, 0, 0, 0],
+                [1, 1, 0, 0, 0, 0],
+                [1, 1, 1, 1, 1, 0],
+            ],
+            dtype=bool,
+        )
+    ]
+    gam0 = np.zeros((ntemps, p))
+    rho = np.full((ntemps, p), 0.5)
+    itl = np.array([1.0, 0.7, 0.5])
+
+    n, vsum, _sse = _latent_moments(v, gam0, mask_list=mask)
+    assert np.array_equal(n, np.array([3, 2, 5]))
+    # unoccupied clusters must not contribute
+    assert vsum == pytest.approx((v[0] * mask[0][..., None]).sum(1))
+
+    hy = CopulaHyper(p)
+    assert draw_gamma0(v, rho, itl, mask_list=mask).shape == (ntemps, p)
+    assert hy.draw_rho(v, gam0, itl, mask_list=mask).shape == (ntemps, p)
+
+    # an all-True mask must reproduce the unmasked path exactly
+    full = [np.ones((ntemps, nclust), dtype=bool)]
+    np.random.seed(1)
+    masked = hy.draw_rho(v, gam0, itl, mask_list=full)
+    np.random.seed(1)
+    plain = hy.draw_rho(v, gam0, itl)
+    assert np.array_equal(masked, plain)
+
+    np.random.seed(2)
+    masked_g = draw_gamma0(v, rho, itl, mask_list=full)
+    np.random.seed(2)
+    plain_g = draw_gamma0(v, rho, itl)
+    assert np.array_equal(masked_g, plain_g)
+
+
+def test_parent_draw_latent_round_trips():
+    """parent_draw(latent=True) must return the v behind the theta it would."""
+    p = 3
+    hy = CopulaHyper(p, a=np.full(p, 2.0), b=np.full(p, 5.0))
+    gam0 = np.zeros((4, p))
+    rho = np.full((4, p), 0.5)
+    np.random.seed(7)
+    v = hy.parent_draw(gam0, rho, n=5, latent=True)
+    np.random.seed(7)
+    theta = hy.parent_draw(gam0, rho, n=5)
+    assert v.shape == (4, 5, p)
+    assert hy.to_theta(v) == pytest.approx(theta)
+    assert np.all((theta > 0.0) & (theta < 1.0))
+
+
+def test_clust_unidentified_parameter_stays_uniform():
+    """calibClust must leave an unseen parameter uniform too.
+
+    Same criterion as the hierarchical case, but the cluster hierarchy covers
+    only occupied clusters, so this exercises the masked gamma0/rho draws end
+    to end.  Coordinate 3 has a zero column in the design.
+    """
+    np.random.seed(0)
+    p, nsub, q, sd_obs = 4, 10, 8, 0.02
+    rng = np.random.default_rng(11)
+    design = rng.normal(size=(q, p))
+    design[:, -1] = 0.0
+    # two true groups, so the clustering has something to find
+    truth = np.vstack([
+        np.tile(
+            np.clip(0.3 + 0.02 * rng.standard_normal(p), 0.02, 0.98),
+            (nsub // 2, 1),
+        ),
+        np.tile(
+            np.clip(0.7 + 0.02 * rng.standard_normal(p), 0.02, 0.98),
+            (nsub // 2, 1),
+        ),
+    ])
+    bounds = {f"x{k}": (0.0, 1.0) for k in range(p)}
+
+    def f(theta):  # pool=True hands one theta row at a time
+        return np.tile(np.asarray(theta) @ design.T, nsub)
+
+    model = sc.ModelF(f, list(bounds.keys()))
+    yobs = np.hstack([
+        truth[i] @ design.T + sd_obs * rng.normal(size=q) for i in range(nsub)
+    ])
+    ind = np.repeat(np.arange(nsub), q)
+
+    setup = sc.CalibSetup(bounds, constraint_func="bounds")
+    setup.addVecExperiments(
+        yobs=yobs,
+        model=model,
+        sd_est=np.array([sd_obs] * nsub),
+        s2_df=np.array([50] * nsub),
+        s2_ind=ind,
+        theta_ind=ind,
+    )
+    setup.setTemperatureLadder(1.05 ** np.arange(3), start_temper=300)
+    setup.setMCMC(nmcmc=12000, decor=100)
+    setup.setClusterPriors(nclustmax=8)
+    setup.setHierPriors(
+        theta0_prior_mean=np.full(p, 0.5),
+        theta0_prior_cov=np.eye(p) * 10**2,
+        Sigma0_prior_df=p + 20,
+        Sigma0_prior_scale=np.eye(p) * 0.1**2,
+    )
+    out = sc.calibClust(setup)
+
+    assert np.allclose(out.copula.a, 1.0)
+    assert np.all((out.theta0 > 0.0) & (out.theta0 < 1.0))
+    assert np.all((out.rho > 0.0) & (out.rho < 1.0))
+
+    keep = np.arange(6000, 12000)
+    theta = out.theta_hist[0][keep, 0]
+
+    # the clustering must find the two groups
+    nclust = np.array([
+        (np.bincount(out.delta[0][s, 0], minlength=out.nclustmax) > 0).sum()
+        for s in keep
+    ])
+    assert 1.5 < nclust.mean() < 3.5
+
+    unseen = theta[:, :, -1].ravel()
+    assert unseen.mean() == pytest.approx(0.5, abs=0.07)
+    assert unseen.std() == pytest.approx(0.2887, abs=0.04)
+    assert ((unseen < 0.1) | (unseen > 0.9)).mean() == pytest.approx(
+        0.2, abs=0.07
+    )
+    assert ((unseen > 0.4) & (unseen < 0.6)).mean() == pytest.approx(
+        0.2, abs=0.07
+    )
+
+    mae = np.abs(theta[:, :, :-1].mean(0) - truth[:, :-1]).mean()
+    assert mae < 0.02
+
+    # the unseen coordinate's rho must stay at its prior mean while the
+    # identified ones learn
+    rho_mean = out.rho[keep, 0].mean(0)
+    assert rho_mean[-1] == pytest.approx(0.5, abs=0.07)
