@@ -358,7 +358,10 @@ class CalibSetup:
             the model evaluations at the parameter combinations.  If this is an emulator with
             posterior samples, a step method can also be included
         :param sd_est: a list or numpy array of initial values for observation noise standard deviation, len(sd_est) = number of separately-estimated s2 values
-        :param s2_df: a list or numpy array of initial values for s2 Inverse Gamma prior degrees of freedom (s2_df = 0; Half-Cauchy prior), same structure as sd_est
+        :param s2_df: a list or numpy array of initial values for s2 Inverse Gamma prior degrees of freedom, same structure as sd_est.
+            s2_df = 0 gives an improper prior: p(s2) proportional to 1/s2 when s2 is updated by Gibbs sampling
+            (model s2 = "gibbs" or "gibbs_trunc"), and a half-Cauchy-type kernel 1/(1 + s2) when it is
+            updated by Metropolis-Hastings (model s2 = "MH").
         :param s2_ind: a list or numpy array of indices for s2 value associated with each element of yobs, len(s2_ind) = len(yobs), max(s2_ind)+1 = len(sd_est)
         :param wt: (optional) a list or numpy array of indices for weight value associated with each element of yobs, len(wt) = len(yobs)
         :param sd_lower: (optional) a list or numpy array of indices for measurement error lower bounds, len(sd_est) = number of separately-estimated s2 values
@@ -869,3 +872,20 @@ def ldig_kern(x, a, b):  # ig
 
 def ldhc_kern(x, a, b):  # half cauchy
     return -np.log(x + 1)
+
+
+def s2_swap_kern(setup, i):
+    """
+    Log prior kernel of s2 for experiment ``i`` to use in tempering swap ratios.
+
+    It must be the prior that the within-chain s2 update actually targets.  The
+    conjugate Gibbs updates ("gibbs", "gibbs_trunc") draw from the inverse-gamma
+    full conditional with shape ``ig_a`` and scale ``ig_b`` (both 0 when
+    ``s2_df == 0``, i.e. p(s2) proportional to 1/s2), so the swap must use the
+    inverse-gamma kernel ``ldig_kern`` with the same parameters.  The
+    Metropolis-Hastings update uses ``setup.s2_prior_kern[i]`` directly (the
+    half-Cauchy kernel when any ``s2_df == 0``), so the swap uses that too.
+    """
+    if setup.models[i].s2 in ("gibbs", "gibbs_trunc"):
+        return ldig_kern
+    return setup.s2_prior_kern[i]

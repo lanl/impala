@@ -22,6 +22,7 @@ from .impala_noprobit_emu import (
     chol_sample_1per,
     cov_4d_pcm,
     initfunc_unif,
+    s2_swap_kern,
     tran_unif,
 )
 
@@ -121,13 +122,16 @@ def one_step_in_cluster_covariance_update(Sj, mSj, nSj, n, mus, covs):
     return Sj, mSj, nSj
 
 
-# West 1992, dirichletprocess R package
+# Escobar & West 1995 (JASA 90, 577-588); cf. West 1992, dirichletprocess R package
 def sample_eta(curr_eta, nclust, ndat, prior_shape, prior_rate):
     g = beta(curr_eta + 1, ndat)
     aa = prior_shape + nclust
     bb = prior_rate - np.log(g)
+    # Escobar & West (1995), eq. 13: mixture of Gamma(a + k, b - log g) with
+    # probability eps and Gamma(a + k - 1, b - log g) with probability 1 - eps,
+    # where eps / (1 - eps) = (a + k - 1) / (n (b - log g)).
     eps = (aa - 1) / (ndat * bb + aa - 1)
-    sel = (uniform(size=aa.shape) < eps) * 1
+    sel = (uniform(size=aa.shape) >= eps) * 1  # 0 -> a + k, 1 -> a + k - 1
     aaa = np.vstack((aa, aa - 1)).T[np.arange(aa.shape[0]), sel]
     return gamma(shape=aaa, scale=1 / bb)
 
@@ -903,18 +907,21 @@ def calibClust(setup):
                 log_s2[i][m] = np.log(setup.sd_est[i] ** 2)
 
                 for t in range(setup.ntemps):
-                    s2_stretched = log_s2[i][m][t, setup.theta_ind[i]]
+                    # same indexing as the Gibbs branches: log_s2 has one entry
+                    # per s2 group (s2_ind), the likelihood for theta j uses the
+                    # observations of theta j (theta_which_mat)
+                    s2_stretched = log_s2[i][m][t, setup.s2_ind[i]]
                     for j in range(setup.ntheta[i]):
                         marg_lik_cov_curr[i][t][j] = setup.models[
                             i
                         ].lik_cov_inv(
-                            np.exp(s2_stretched[s2_which_mat[i][j]]),
+                            np.exp(s2_stretched[theta_which_mat[i][j]]),
                             wt_mat[i][theta_which_mat[i][j]],
                             s2_which_mat[i][j],
                         )
                         llik_curr_theta[i][t][j] = setup.models[i].llik(
-                            setup.ys[i][s2_which_mat[i][j]],
-                            pred_curr_theta[i][t][s2_which_mat[i][j]],
+                            setup.ys[i][theta_which_mat[i][j]],
+                            pred_curr_theta[i][t][theta_which_mat[i][j]],
                             marg_lik_cov_curr[i][t][j],
                             wt_mat[i][theta_which_mat[i][j]],
                         )
@@ -1125,26 +1132,24 @@ def calibClust(setup):
                     setup.ntemps, 2 * setup.nswap_per, replace=False
                 ).reshape(-1, 2)
                 sw_alpha[:] = 0.0  # reset swap probability
-                # Only the likelihood and the s2 prior are tempered, so only
-                # they appear here.  The hierarchy and the priors of gamma0,
-                # rho, eta and delta enter every chain at full strength and
-                # cancel.  The previous code added tempered p(theta0),
-                # p(Sigma0) and p(eta) terms and a tempered hierarchy term,
-                # neither of which the Gibbs updates tempered, so the swap
-                # kernel did not preserve the product of the chains' targets.
+                # Only the likelihood (and the s2 prior, which the s2 updates
+                # temper) is tempered.  The clustering prior -- p(gamma0),
+                # p(rho), p(eta), p(delta | eta) and the hierarchy of the
+                # cluster centres -- is the same in every chain, so it cancels
+                # here.
                 for i in range(setup.nexp):
                     sw_alpha[:] = sw_alpha + (
                         setup.itl[sw.T[1]] - setup.itl[sw.T[0]]
                     ) * (
                         # for t_0
-                        +setup.s2_prior_kern[i](
+                        +s2_swap_kern(setup, i)(
                             np.exp(log_s2[i][m][sw.T[0]]),
                             setup.ig_a[i],
                             setup.ig_b[i],
                         ).sum(axis=1)
                         + llik_curr_theta[i][sw.T[0]].sum(axis=1)
                         # for t_1
-                        - setup.s2_prior_kern[i](
+                        - s2_swap_kern(setup, i)(
                             np.exp(log_s2[i][m][sw.T[1]]),
                             setup.ig_a[i],
                             setup.ig_b[i],
@@ -1152,11 +1157,10 @@ def calibClust(setup):
                         - llik_curr_theta[i][sw.T[1]].sum(axis=1)
                     )
 
-                for tt in sw[
-                    np.where(
-                        sw[np.log(uniform(size=setup.nswap_per)) < sw_alpha]
-                    )[0]
-                ]:
+                # select the accepted pairs directly (previously
+                # sw[np.where(sw[accepted])[0]], which indexes sw by row numbers
+                # of the accepted subset and so swapped the wrong pairs)
+                for tt in sw[np.log(uniform(size=setup.nswap_per)) < sw_alpha]:
                     count_temper[tt[0], tt[1]] = count_temper[tt[0], tt[1]] + 1
                     eta[m, tt[0]], eta[m, tt[1]] = (
                         eta[m, tt[1]].copy(),

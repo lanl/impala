@@ -228,20 +228,22 @@ def test_clust():
 
     pred_sse = np.square(pred - setup.ys[0]).sum(1)
     theta_minsse = mat[np.where(pred_sse == pred_sse.min())[0][0], :]
-    # Baseline regenerated for the copula hierarchy, which replaced the normal
-    # hierarchy truncated to the box, and for the switch to likelihood-only
-    # tempering.  Both change the chain entirely.
+    # Baseline regenerated for the copula hierarchy (which replaced the normal
+    # hierarchy truncated to the box), for likelihood-only tempering, and for
+    # the eta-update fix (Escobar & West mixture weights) and s2 swap kernel
+    # that came with the clustered-tempering work.  All of them change the
+    # chain.
     theta_minsse_baseline = np.array([
-        0.08099678,
-        0.79005966,
-        0.70314216,
-        0.39399541,
-        0.36145599,
-        0.34870888,
-        0.64426515,
-        0.32562342,
-        0.60542187,
-        0.38406636,
+        0.37153938,
+        0.10221730,
+        0.73177826,
+        0.10540985,
+        0.29117212,
+        0.63549175,
+        0.37826484,
+        0.46235670,
+        0.89856735,
+        0.71531148,
     ])
     assert np.allclose(theta_minsse, theta_minsse_baseline)
     # Fit quality, which is what the exact values above are a proxy for: the
