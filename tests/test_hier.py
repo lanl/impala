@@ -207,10 +207,8 @@ def test_hier():
     setup.theta0_start = np.repeat(best_pool.reshape(1, -1), ntemps, axis=0)
     out = sc.calibHier(setup)
 
-    theta_parent = setup.chol_sample_nper_constraints(
-        out.theta0[:, 0],
-        out.Sigma0[:, 0],
-        n=1,
+    theta_parent = out.copula.parent_draw(
+        out.gamma0[:, 0], out.rho[:, 0], setup=setup
     )
     mcmc_use = np.arange(2500, 5000, 2)  # burn and thin index
     mat = theta_parent[mcmc_use, :]
@@ -221,21 +219,40 @@ def test_hier():
 
     pred_sse = np.square(pred - setup.ys[0]).sum(1)
     theta_minsse = mat[np.where(pred_sse == pred_sse.min())[0][0], :]
-    # baseline regenerated after the tempering-consistency fix in calibHier
-    # (hyperpriors no longer enter the swap ratio), which changes the chain
+    # Baseline regenerated for the copula hierarchy, which replaced the normal
+    # hierarchy truncated to the box and so changes the chain entirely.  The
+    # best parent draw scores 1.8e-05 here against 5.7e-06 for the pre-copula
+    # baseline, still 50x better than a typical draw (median 8.7e-04).  The
+    # difference is expected rather than a regression: this setup's diffuse
+    # legacy prior maps to uniform margins, so the parent predictive is as wide
+    # as the prior allows instead of being contracted by the truncation, and
+    # the best of 1250 draws from a wider distribution sits further from the
+    # optimum.  What calibration actually delivers -- the per-experiment
+    # theta_i -- is unaffected.
     theta_minsse_baseline = np.array([
-        0.12853127,
-        0.42539201,
-        0.81215234,
-        0.01631357,
-        0.32386442,
-        0.10839125,
-        0.5120487,
-        0.08040948,
-        0.58558863,
-        0.07535544,
+        0.29342559,
+        0.07905567,
+        0.54790997,
+        0.02249746,
+        0.28127869,
+        0.03419814,
+        0.41822620,
+        0.02689255,
+        0.87792551,
+        0.02515761,
     ])
     assert np.allclose(theta_minsse, theta_minsse_baseline)
+    # Fit quality, which is what the exact values above are a proxy for: the
+    # best parent draw must stay far below a typical one.  This catches a real
+    # regression even when the chain legitimately changes.
+    assert pred_sse.min() < 1e-4
+    assert pred_sse.min() < 0.05 * np.median(pred_sse)
+
+    # theta0 is the copula image of the latent parent, so it is still a point
+    # in the unit box and still usable wherever the old theta0 was.
+    assert out.theta0.shape == (setup.nmcmc, setup.ntemps, setup.p)
+    assert np.all((out.theta0 > 0.0) & (out.theta0 < 1.0))
+    assert np.all((out.rho > 0.0) & (out.rho < 1.0))
 
     test_dir = pathlib.Path(__file__).parent
     hier_plots = plots.PTW_Plotter(setup, out)

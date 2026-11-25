@@ -73,6 +73,11 @@ def test_constparams():
     we check that the "best" parameters are within 1 permille of the values
     used to generate the artifical data, as well as that the keys of "params"
     match the keys of the calibrated parameters."""
+    # This test runs an MCMC chain and then builds a KDE plot from it, so it
+    # needs its own seed: without one it inherits whatever global numpy state
+    # the preceding tests happened to leave, and an unlucky state gives a
+    # chain that barely moves and a singular covariance in gaussian_kde.
+    np.random.seed(0)
     test_dir = Path(__file__).parent
     data_dir = test_dir / "data"
 
