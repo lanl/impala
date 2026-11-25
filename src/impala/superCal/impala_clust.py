@@ -405,6 +405,8 @@ def calibClust(setup):
     # The bounds are the copula's support and never need rejection.  A custom
     # constraint_func carves a region out of the box and does.
     cf_setup = None if setup._constraint_func is cf_bounds else setup
+    # the hierarchy is not tempered in calibClust; see the gamma0 update
+    itl_untempered = np.ones(setup.ntemps)
 
     gamma0 = np.empty([setup.nmcmc, setup.ntemps, setup.p])
     rho = np.empty([setup.nmcmc, setup.ntemps, setup.p])
@@ -926,12 +928,21 @@ def calibClust(setup):
         # Only occupied clusters belong to the hierarchy, and which ones are
         # occupied differs by temperature, so the draws are masked by
         # theta_ext.  Must use m-1: theta has not been updated this iteration.
+        #
+        # Only the likelihood is tempered (power posterior): the hierarchy
+        # enters at full strength in every chain, as do the priors of gamma0,
+        # rho, eta and delta.  Tempering the hierarchy here would have no
+        # consistent stationary distribution, because unoccupied clusters are
+        # refreshed from that same density untempered and the delta update
+        # moves centres between occupied and unoccupied without an N^(beta-1)
+        # correction.  calibHier does temper its hierarchy, which is consistent
+        # there because every theta_i is always occupied.
         v_curr = [v[m - 1]]
         mask_curr = [theta_ext]
         gamma0[m][:] = draw_gamma0(
             v_curr,
             rho[m - 1],
-            setup.itl,
+            itl_untempered,
             copula=copula,
             setup=cf_setup,
             mask_list=mask_curr,
@@ -941,7 +952,7 @@ def calibClust(setup):
         ### Gibbs update rho ###
         ########################
         rho[m][:] = copula.draw_rho(
-            v_curr, gamma0[m], setup.itl, mask_list=mask_curr
+            v_curr, gamma0[m], itl_untempered, mask_list=mask_curr
         )
 
         ###################
@@ -1045,13 +1056,9 @@ def calibClust(setup):
 
         alpha[:] = -np.inf
         alpha[good_values] = (
-            itl_mat_theta
-            * (
-                llik_cand_theta_
-                - llik_curr_theta_
-                + hier_logpdf(v_eval, gamma0[m], rho[m]) * theta_ext
-                - hier_logpdf(v[m], gamma0[m], rho[m]) * theta_ext
-            )
+            itl_mat_theta * (llik_cand_theta_ - llik_curr_theta_)
+            + hier_logpdf(v_eval, gamma0[m], rho[m]) * theta_ext
+            - hier_logpdf(v[m], gamma0[m], rho[m]) * theta_ext
         )[good_values]
         accept[:] = np.log(uniform(size=alpha.shape)) < alpha
         v[m, accept] = v_cand[accept]
@@ -1118,14 +1125,13 @@ def calibClust(setup):
                     setup.ntemps, 2 * setup.nswap_per, replace=False
                 ).reshape(-1, 2)
                 sw_alpha[:] = 0.0  # reset swap probability
-                # The hyperpriors p(gamma0) p(rho) p(eta) are not tempered --
-                # the Gibbs updates of gamma0, rho and eta use them at full
-                # strength in every chain -- so they cancel in the swap ratio
-                # and must not appear here.  The previous code added tempered
-                # p(theta0), p(Sigma0) and p(eta) terms, which is correct only
-                # if those hyperpriors were themselves tempered; the swap
-                # kernel therefore did not preserve the product of the chains'
-                # actual targets.  Same fix as calibHier.
+                # Only the likelihood and the s2 prior are tempered, so only
+                # they appear here.  The hierarchy and the priors of gamma0,
+                # rho, eta and delta enter every chain at full strength and
+                # cancel.  The previous code added tempered p(theta0),
+                # p(Sigma0) and p(eta) terms and a tempered hierarchy term,
+                # neither of which the Gibbs updates tempered, so the swap
+                # kernel did not preserve the product of the chains' targets.
                 for i in range(setup.nexp):
                     sw_alpha[:] = sw_alpha + (
                         setup.itl[sw.T[1]] - setup.itl[sw.T[0]]
@@ -1136,28 +1142,12 @@ def calibClust(setup):
                             setup.ig_a[i],
                             setup.ig_b[i],
                         ).sum(axis=1)
-                        + (
-                            hier_logpdf(
-                                v[m, sw.T[0]],
-                                gamma0[m, sw.T[0]],
-                                rho[m, sw.T[0]],
-                            )
-                            * theta_ext[sw.T[0]]
-                        ).sum(axis=1)
                         + llik_curr_theta[i][sw.T[0]].sum(axis=1)
                         # for t_1
                         - setup.s2_prior_kern[i](
                             np.exp(log_s2[i][m][sw.T[1]]),
                             setup.ig_a[i],
                             setup.ig_b[i],
-                        ).sum(axis=1)
-                        - (
-                            hier_logpdf(
-                                v[m, sw.T[1]],
-                                gamma0[m, sw.T[1]],
-                                rho[m, sw.T[1]],
-                            )
-                            * theta_ext[sw.T[1]]
                         ).sum(axis=1)
                         - llik_curr_theta[i][sw.T[1]].sum(axis=1)
                     )
